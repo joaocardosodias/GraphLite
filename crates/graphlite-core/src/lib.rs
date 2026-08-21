@@ -17,6 +17,7 @@ pub use vector::{
     cosine_similarity, dot_product, euclidean_distance, manhattan_distance, norm,
     norm_squared, normalize_in_place, normalized, simd_cosine_similarity,
     simd_dot_product, simd_euclidean_distance, simd_norm_squared, Metric,
+    Quantization, QuantizedVector,
 };
 
 pub const VERSION: &str = env!("CARGO_PKG_VERSION");
