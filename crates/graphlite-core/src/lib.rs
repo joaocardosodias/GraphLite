@@ -3,8 +3,10 @@
 //! An embedded, single-file Graph and Vector database engine written in pure Rust.
 //! Designed for local-first GraphRAG, AI memory, and low-latency knowledge graphs.
 
+pub mod error;
 pub mod id;
 
+pub use error::{GraphLiteError, Result};
 pub use id::{EdgeId, NodeId, StringId};
 
 pub const VERSION: &str = env!("CARGO_PKG_VERSION");
