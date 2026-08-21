@@ -5,10 +5,12 @@
 
 pub mod error;
 pub mod id;
+pub mod interner;
 pub mod record;
 
 pub use error::{GraphLiteError, Result};
 pub use id::{EdgeId, NodeId, StringId};
+pub use interner::StringInterner;
 pub use record::{EdgeRecord, NodeRecord, FLAG_ACTIVE, FLAG_DIRECTED, NO_VECTOR_OFFSET};
 
 pub const VERSION: &str = env!("CARGO_PKG_VERSION");
