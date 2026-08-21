@@ -1,0 +1,14 @@
+[package]
+name = "graphlite-cli"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+repository.workspace = true
+description = "Command-line interface for GraphLite embedded database"
+readme = "../../README.md"
+
+[dependencies]
+graphlite-core = { workspace = true }
+clap = { workspace = true }
+anyhow = { workspace = true }

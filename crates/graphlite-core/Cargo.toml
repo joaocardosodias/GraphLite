@@ -1,0 +1,27 @@
+[package]
+name = "graphlite-core"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+repository.workspace = true
+description = "Core engine for GraphLite: embedded graph and vector storage with token-budgeted retrieval"
+readme = "../../README.md"
+
+[dependencies]
+thiserror.workspace = true
+anyhow.workspace = true
+parking_lot.workspace = true
+rayon.workspace = true
+memmap2.workspace = true
+serde = { workspace = true, optional = true }
+serde_json = { workspace = true, optional = true }
+tiktoken-rs = { workspace = true, optional = true }
+
+[features]
+default = ["serde", "tiktoken"]
+serde = ["dep:serde", "dep:serde_json"]
+tiktoken = ["dep:tiktoken-rs"]
+
+[dev-dependencies]
+tempfile = "3.17"

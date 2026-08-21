@@ -1,0 +1,40 @@
+[workspace]
+members = [
+    "crates/graphlite-core",
+    "crates/graphlite-cli",
+]
+resolver = "2"
+
+[workspace.package]
+version = "0.1.0"
+edition = "2021"
+authors = ["João Cardoso <joaocardosodias>"]
+license = "MIT OR Apache-2.0"
+repository = "https://github.com/joaocardosodias/GraphLite"
+description = "Embedded, single-file Graph + Vector / GraphRAG engine in pure Rust"
+readme = "README.md"
+keywords = ["graphrag", "vector-search", "knowledge-graph", "embedded-database", "llm"]
+categories = ["database-implementations", "data-structures", "algorithms"]
+
+[workspace.dependencies]
+# Error handling
+thiserror = "2.0"
+anyhow = "1.0"
+
+# Serialization & Zero-copy
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+memmap2 = "0.9"
+
+# Concurrency & Performance
+parking_lot = "0.12"
+rayon = "1.10"
+
+# Tokenization
+tiktoken-rs = "0.6"
+
+# CLI
+clap = { version = "4.5", features = ["derive", "cargo"] }
+
+# Internal workspace crates
+graphlite-core = { path = "crates/graphlite-core" }
