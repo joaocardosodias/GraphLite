@@ -12,6 +12,12 @@ pub const FLAG_DIRECTED: u32 = 1 << 1;
 /// Sentinel value indicating no vector embedding is associated with a node.
 pub const NO_VECTOR_OFFSET: u64 = u64::MAX;
 
+/// Binary size of a NodeRecord in bytes.
+pub const NODE_RECORD_SIZE: usize = 32;
+
+/// Binary size of an EdgeRecord in bytes.
+pub const EDGE_RECORD_SIZE: usize = 32;
+
 /// Fixed-size binary representation of a Node in the GraphLite engine.
 ///
 /// Designed with a strict 32-byte memory layout (`#[repr(C)]`) for zero-copy
@@ -79,6 +85,32 @@ impl NodeRecord {
     #[inline]
     pub fn has_vector(&self) -> bool {
         self.vector_offset != NO_VECTOR_OFFSET
+    }
+
+    /// Serializes this `NodeRecord` into a fixed 32-byte array.
+    pub fn to_bytes(&self) -> [u8; NODE_RECORD_SIZE] {
+        let mut buf = [0u8; NODE_RECORD_SIZE];
+        buf[0..4].copy_from_slice(&self.id.as_u32().to_le_bytes());
+        buf[4..8].copy_from_slice(&self.name_id.as_u32().to_le_bytes());
+        buf[8..12].copy_from_slice(&self.type_id.as_u32().to_le_bytes());
+        buf[12..16].copy_from_slice(&self.description_id.as_u32().to_le_bytes());
+        buf[16..24].copy_from_slice(&self.vector_offset.to_le_bytes());
+        buf[24..28].copy_from_slice(&self.flags.to_le_bytes());
+        buf[28..32].copy_from_slice(&self._reserved.to_le_bytes());
+        buf
+    }
+
+    /// Deserializes a `NodeRecord` from a 32-byte array.
+    pub fn from_bytes(buf: [u8; NODE_RECORD_SIZE]) -> Self {
+        Self {
+            id: NodeId::new(u32::from_le_bytes(buf[0..4].try_into().unwrap())),
+            name_id: StringId::new(u32::from_le_bytes(buf[4..8].try_into().unwrap())),
+            type_id: StringId::new(u32::from_le_bytes(buf[8..12].try_into().unwrap())),
+            description_id: StringId::new(u32::from_le_bytes(buf[12..16].try_into().unwrap())),
+            vector_offset: u64::from_le_bytes(buf[16..24].try_into().unwrap()),
+            flags: u32::from_le_bytes(buf[24..28].try_into().unwrap()),
+            _reserved: u32::from_le_bytes(buf[28..32].try_into().unwrap()),
+        }
     }
 }
 
@@ -154,6 +186,32 @@ impl EdgeRecord {
             self.flags |= FLAG_ACTIVE;
         } else {
             self.flags &= !FLAG_ACTIVE;
+        }
+    }
+
+    /// Serializes this `EdgeRecord` into a fixed 32-byte array.
+    pub fn to_bytes(&self) -> [u8; EDGE_RECORD_SIZE] {
+        let mut buf = [0u8; EDGE_RECORD_SIZE];
+        buf[0..4].copy_from_slice(&self.id.as_u32().to_le_bytes());
+        buf[4..8].copy_from_slice(&self.source.as_u32().to_le_bytes());
+        buf[8..12].copy_from_slice(&self.target.as_u32().to_le_bytes());
+        buf[12..16].copy_from_slice(&self.relation_id.as_u32().to_le_bytes());
+        buf[16..20].copy_from_slice(&self.weight.to_le_bytes());
+        buf[20..24].copy_from_slice(&self.flags.to_le_bytes());
+        buf[24..32].copy_from_slice(&self._reserved.to_le_bytes());
+        buf
+    }
+
+    /// Deserializes an `EdgeRecord` from a 32-byte array.
+    pub fn from_bytes(buf: [u8; EDGE_RECORD_SIZE]) -> Self {
+        Self {
+            id: EdgeId::new(u32::from_le_bytes(buf[0..4].try_into().unwrap())),
+            source: NodeId::new(u32::from_le_bytes(buf[4..8].try_into().unwrap())),
+            target: NodeId::new(u32::from_le_bytes(buf[8..12].try_into().unwrap())),
+            relation_id: StringId::new(u32::from_le_bytes(buf[12..16].try_into().unwrap())),
+            weight: f32::from_le_bytes(buf[16..20].try_into().unwrap()),
+            flags: u32::from_le_bytes(buf[20..24].try_into().unwrap()),
+            _reserved: u64::from_le_bytes(buf[24..32].try_into().unwrap()),
         }
     }
 

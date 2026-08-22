@@ -32,8 +32,10 @@ pub use prompt::format_subgraph_json;
 
 pub use record::{EdgeRecord, NodeRecord, FLAG_ACTIVE, FLAG_DIRECTED, NO_VECTOR_OFFSET};
 pub use storage::{
-    compute_file_checksum, crc32, crc32_update, deserialize_string_table,
-    serialize_string_table, verify_file_integrity, GraphHeader, ZeroCopyStringTable,
+    compute_file_checksum, crc32, crc32_update, deserialize_node_block,
+    deserialize_quantized_vector_block, deserialize_string_table, serialize_node_block,
+    serialize_quantized_vector_block, serialize_string_table, verify_file_integrity,
+    GraphHeader, ZeroCopyNodeBlock, ZeroCopyStringTable, ZeroCopyVectorBlock,
     FLAG_COMPRESSED, FLAG_QUANTIZED_SQ8, GRAPH_MAGIC, GRAPH_VERSION, HEADER_SIZE,
 };
 pub use vector::{
