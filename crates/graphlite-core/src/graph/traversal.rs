@@ -22,7 +22,7 @@ pub enum TraversalDirection {
 }
 
 /// Configuration parameters for graph traversal.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 pub struct TraversalConfig {
     /// Maximum search depth in hops from the seed nodes (e.g. 1 or 2).
