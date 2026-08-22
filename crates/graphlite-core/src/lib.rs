@@ -12,8 +12,8 @@ pub mod vector;
 
 pub use error::{GraphLiteError, Result};
 pub use graph::{
-    bfs_adjacency, bfs_csr, AdjacencyGraph, CsrGraph, TraversalConfig, TraversalDirection,
-    TraversedNode,
+    bfs_adjacency, bfs_csr, compute_hybrid_scores, AdjacencyGraph, CsrGraph,
+    HybridScoreConfig, ScoredEntity, TraversalConfig, TraversalDirection, TraversedNode,
 };
 pub use id::{EdgeId, NodeId, StringId};
 pub use interner::StringInterner;
