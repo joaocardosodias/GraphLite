@@ -13,7 +13,7 @@ pub fn execute_init(db_path: &Path, args: &InitArgs) -> Result<()> {
     if db_path.exists() {
         if !args.force {
             bail!(
-                "O arquivo de banco de dados '{:?}' já existe. Use a flag '--force' (-f) se desejar sobrescrever.",
+                "Database file '{:?}' already exists. Use '--force' (-f) to overwrite.",
                 db_path
             );
         } else {
@@ -43,12 +43,12 @@ pub fn execute_init(db_path: &Path, args: &InitArgs) -> Result<()> {
     let engine = GraphLiteEngine::open_or_create(db_path, config)?;
     engine.flush()?;
 
-    println!("✨ Banco de dados GraphLite inicializado com sucesso!");
-    println!("   📁 Arquivo: {:?}", db_path);
-    println!("   📐 Dimensão Vetorial: {} dimensões", args.dim);
-    println!("   📏 Métrica: {:?}", args.metric);
-    println!("   🗜️  Quantização: {:?}", args.quantization);
-    println!("   🪙 Orçamento Padrão de Tokens: {}", args.max_tokens);
+    println!("GraphLite database initialized successfully.");
+    println!("  Database File:        {:?}", db_path);
+    println!("  Vector Dimension:     {} dimensions", args.dim);
+    println!("  Distance Metric:      {:?}", args.metric);
+    println!("  Quantization:         {:?}", args.quantization);
+    println!("  Default Token Budget: {}", args.max_tokens);
 
     Ok(())
 }

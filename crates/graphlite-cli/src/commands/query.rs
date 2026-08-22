@@ -6,16 +6,15 @@ use anyhow::{bail, Context, Result};
 use graphlite_core::engine::config::GraphLiteConfig;
 use graphlite_core::engine::instance::GraphLiteEngine;
 use graphlite_core::engine::query::QueryOptions;
+use graphlite_core::prompt::format_subgraph_triples;
 use graphlite_core::prompt::json::to_json_payload;
 use graphlite_core::prompt::markdown::MarkdownStyle;
-use graphlite_core::prompt::format_subgraph_triples;
 use graphlite_core::storage::mmap_reader::MmapGraphReader;
 use graphlite_core::vector::distance::Metric;
 use graphlite_core::vector::quantization::Quantization;
 
 use crate::args::{CliOutputFormat, QueryArgs};
 
-/// Parses a vector argument from either a comma-separated float string or a JSON file.
 fn parse_vector_arg(raw: Option<&str>) -> Result<Option<Vec<f32>>> {
     let s = match raw {
         Some(v) => v.trim(),
@@ -28,9 +27,9 @@ fn parse_vector_arg(raw: Option<&str>) -> Result<Option<Vec<f32>>> {
 
     if (s.ends_with(".json") || Path::new(s).exists()) && Path::new(s).is_file() {
         let content = fs::read_to_string(s)
-            .with_context(|| format!("Falha ao ler arquivo de vetor: {}", s))?;
+            .with_context(|| format!("Failed to read vector JSON file: {}", s))?;
         let vector: Vec<f32> = serde_json::from_str(&content)
-            .with_context(|| "Formato JSON inválido. Esperava um array de números (ex: [0.1, 0.2, ...])")?;
+            .with_context(|| "Invalid JSON format: expected an array of numbers (e.g. [0.1, 0.2, ...])")?;
         return Ok(Some(vector));
     }
 
@@ -40,7 +39,7 @@ fn parse_vector_arg(raw: Option<&str>) -> Result<Option<Vec<f32>>> {
         let trimmed = part.trim();
         if !trimmed.is_empty() {
             let val = trimmed.parse::<f32>().with_context(|| {
-                format!("Número inválido '{}' no vetor. Esperava floats separados por vírgula.", trimmed)
+                format!("Invalid numeric value '{}' in vector argument. Expected comma-separated floats.", trimmed)
             })?;
             vector.push(val);
         }
@@ -75,7 +74,7 @@ fn load_or_default_config(db_path: &Path) -> GraphLiteConfig {
 
 pub fn execute_query(db_path: &Path, args: &QueryArgs, verbose: bool) -> Result<()> {
     if !db_path.exists() {
-        bail!("O banco de dados '{:?}' não foi encontrado. Use 'graphlite init' para criá-lo.", db_path);
+        bail!("Database file '{:?}' not found. Initialize with 'graphlite init' first.", db_path);
     }
 
     let start_time = Instant::now();
@@ -92,7 +91,7 @@ pub fn execute_query(db_path: &Path, args: &QueryArgs, verbose: bool) -> Result<
     });
 
     if query_vector.is_none() && seed_names.as_ref().map_or(true, |v| v.is_empty()) {
-        bail!("Informe ao menos um vetor de busca (-V / --vector) ou sementes textuais (-s / --seeds).");
+        bail!("Provide at least one query vector (-V / --vector) or textual seed entities (-s / --seeds).");
     }
 
     let options = QueryOptions {
@@ -115,15 +114,11 @@ pub fn execute_query(db_path: &Path, args: &QueryArgs, verbose: bool) -> Result<
 
     let elapsed = start_time.elapsed();
 
-    // Format output
     match args.format {
         CliOutputFormat::Markdown => {
             println!("{}", result.markdown);
         }
         CliOutputFormat::Json => {
-            let state = engine.get_node_by_name("").map(|_| ()); // test state
-            let _ = state;
-            // Build structured JSON payload
             let interner = {
                 if let Ok(reader) = MmapGraphReader::open(db_path) {
                     reader.string_table().map(|st| st.to_interner()).unwrap_or_default()
@@ -148,11 +143,11 @@ pub fn execute_query(db_path: &Path, args: &QueryArgs, verbose: bool) -> Result<
     }
 
     if verbose {
-        eprintln!("\n--- [Estatísticas da Consulta GraphLite] ---");
-        eprintln!("⏱️  Latência Total: {:.2?}", elapsed);
-        eprintln!("🪙 Tokens no Prompt: {}", result.token_count);
-        eprintln!("🌐 Entidades Retidas: {}", result.entities_count);
-        eprintln!("🔗 Arestas Retidas: {}", result.edges_count);
+        eprintln!("\n--- GraphLite Query Metrics ---");
+        eprintln!("Total Latency:     {:.2?}", elapsed);
+        eprintln!("Tokens in Prompt:  {}", result.token_count);
+        eprintln!("Retained Entities: {}", result.entities_count);
+        eprintln!("Retained Edges:    {}", result.edges_count);
     }
 
     Ok(())

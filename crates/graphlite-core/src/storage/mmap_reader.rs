@@ -68,6 +68,12 @@ impl MmapGraphReader {
         self.mmap.len()
     }
 
+    /// Returns the raw memory-mapped byte slice of the entire database file.
+    #[inline]
+    pub fn as_bytes(&self) -> &[u8] {
+        &self.mmap
+    }
+
     /// Returns a zero-copy viewer over the String Table.
     pub fn string_table(&self) -> Result<ZeroCopyStringTable<'_>> {
         let offset = self.header.string_section_offset as usize;

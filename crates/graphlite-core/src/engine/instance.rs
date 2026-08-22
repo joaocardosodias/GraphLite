@@ -8,7 +8,7 @@ use crate::error::Result;
 use crate::graph::adjacency::AdjacencyGraph;
 use crate::id::NodeId;
 use crate::interner::StringInterner;
-use crate::record::NodeRecord;
+use crate::record::{EdgeRecord, NodeRecord};
 use crate::storage::atomic_writer::write_database_atomic;
 use crate::storage::mmap_reader::MmapGraphReader;
 use crate::vector::store::VectorStore;
@@ -216,6 +216,21 @@ impl GraphLiteEngine {
     /// Returns `true` if there are unsaved in-memory mutations.
     pub fn is_dirty(&self) -> bool {
         self.state.read().dirty
+    }
+
+    /// Returns a vector copy of all active `NodeRecord`s in the database.
+    pub fn all_nodes(&self) -> Vec<NodeRecord> {
+        self.state.read().graph.nodes().copied().collect()
+    }
+
+    /// Returns a vector copy of all active `EdgeRecord`s in the database.
+    pub fn all_edges(&self) -> Vec<EdgeRecord> {
+        self.state.read().graph.edges().copied().collect()
+    }
+
+    /// Returns the `NodeRecord` corresponding to `id` if found.
+    pub fn get_node(&self, id: NodeId) -> Option<NodeRecord> {
+        self.state.read().graph.get_node(id).copied()
     }
 }
 

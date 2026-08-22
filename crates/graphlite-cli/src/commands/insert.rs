@@ -11,7 +11,6 @@ use graphlite_core::vector::quantization::Quantization;
 
 use crate::args::{InsertEdgeArgs, InsertNodeArgs};
 
-/// Parses a vector argument from either a comma-separated float string or a JSON file.
 fn parse_vector_arg(raw: Option<&str>) -> Result<Option<Vec<f32>>> {
     let s = match raw {
         Some(v) => v.trim(),
@@ -22,23 +21,21 @@ fn parse_vector_arg(raw: Option<&str>) -> Result<Option<Vec<f32>>> {
         return Ok(None);
     }
 
-    // Check if argument is a JSON file path
     if (s.ends_with(".json") || Path::new(s).exists()) && Path::new(s).is_file() {
         let content = fs::read_to_string(s)
-            .with_context(|| format!("Falha ao ler arquivo de vetor: {}", s))?;
+            .with_context(|| format!("Failed to read vector JSON file: {}", s))?;
         let vector: Vec<f32> = serde_json::from_str(&content)
-            .with_context(|| "Formato JSON inválido. Esperava um array de números (ex: [0.1, 0.2, ...])")?;
+            .with_context(|| "Invalid JSON format: expected an array of numbers (e.g. [0.1, 0.2, ...])")?;
         return Ok(Some(vector));
     }
 
-    // Parse as comma-separated or space-separated floats
     let mut vector = Vec::new();
     let cleaned = s.trim_start_matches('[').trim_end_matches(']');
     for part in cleaned.split([',', ' ']) {
         let trimmed = part.trim();
         if !trimmed.is_empty() {
             let val = trimmed.parse::<f32>().with_context(|| {
-                format!("Número inválido '{}' no vetor. Esperava floats separados por vírgula.", trimmed)
+                format!("Invalid numeric value '{}' in vector argument. Expected comma-separated floats.", trimmed)
             })?;
             vector.push(val);
         }
@@ -47,7 +44,6 @@ fn parse_vector_arg(raw: Option<&str>) -> Result<Option<Vec<f32>>> {
     Ok(Some(vector))
 }
 
-/// Reads the existing database configuration from header if file exists, or returns standard default.
 fn load_or_default_config(db_path: &Path) -> GraphLiteConfig {
     if db_path.exists() {
         if let Ok(reader) = MmapGraphReader::open(db_path) {
@@ -81,7 +77,7 @@ pub fn execute_insert_node(db_path: &Path, args: &InsertNodeArgs) -> Result<()> 
     if let Some(ref v) = parsed_vector {
         if v.len() != engine.config().vector_dim {
             bail!(
-                "Dimensão do vetor incompatível: o banco espera {} dimensões, mas foram fornecidas {}.",
+                "Vector dimension mismatch: database expects {} dimensions, but received {}.",
                 engine.config().vector_dim,
                 v.len()
             );
@@ -120,13 +116,15 @@ pub fn execute_insert_node(db_path: &Path, args: &InsertNodeArgs) -> Result<()> 
         engine.flush()?;
 
         if result.is_merged {
-            println!("🔗 Entidade fundida automaticamente com nó existente (ID: {})!", result.node_id);
-            println!("   🏷️  Nome: '{}' -> Fundido com ID pré-existente", args.name);
+            println!("Entity resolved and merged into existing node.");
+            println!("  Node ID:     {}", result.node_id);
+            println!("  Name:        '{}'", args.name);
+            println!("  Merged With: ID {:?}", result.matched_existing_id);
         } else {
-            println!("✅ Nó cadastrado com sucesso!");
-            println!("   🆔 ID: {}", result.node_id);
-            println!("   🏷️  Nome: '{}'", args.name);
-            println!("   📂 Tipo: '{}'", args.entity_type);
+            println!("Node inserted successfully.");
+            println!("  Node ID:     {}", result.node_id);
+            println!("  Name:        '{}'", args.name);
+            println!("  Type:        '{}'", args.entity_type);
         }
     } else {
         let node_id = engine.upsert_node(
@@ -137,10 +135,10 @@ pub fn execute_insert_node(db_path: &Path, args: &InsertNodeArgs) -> Result<()> 
         )?;
         engine.flush()?;
 
-        println!("✅ Nó cadastrado com sucesso!");
-        println!("   🆔 ID: {}", node_id);
-        println!("   🏷️  Nome: '{}'", args.name);
-        println!("   📂 Tipo: '{}'", args.entity_type);
+        println!("Node inserted successfully.");
+        println!("  Node ID:     {}", node_id);
+        println!("  Name:        '{}'", args.name);
+        println!("  Type:        '{}'", args.entity_type);
     }
 
     Ok(())
@@ -148,7 +146,7 @@ pub fn execute_insert_node(db_path: &Path, args: &InsertNodeArgs) -> Result<()> 
 
 pub fn execute_insert_edge(db_path: &Path, args: &InsertEdgeArgs) -> Result<()> {
     if !db_path.exists() {
-        bail!("O banco de dados '{:?}' não foi encontrado. Inicialize com 'graphlite init' primeiro.", db_path);
+        bail!("Database file '{:?}' not found. Initialize with 'graphlite init' first.", db_path);
     }
 
     let config = load_or_default_config(db_path);
@@ -156,11 +154,11 @@ pub fn execute_insert_edge(db_path: &Path, args: &InsertEdgeArgs) -> Result<()> 
 
     let source_node = engine
         .get_node_by_name(&args.source)
-        .with_context(|| format!("Nó de origem '{}' não foi encontrado no banco de dados.", args.source))?;
+        .with_context(|| format!("Source node '{}' not found in database.", args.source))?;
 
     let target_node = engine
         .get_node_by_name(&args.target)
-        .with_context(|| format!("Nó de destino '{}' não foi encontrado no banco de dados.", args.target))?;
+        .with_context(|| format!("Target node '{}' not found in database.", args.target))?;
 
     let edge_id = engine.add_edge(
         source_node.id,
@@ -172,11 +170,11 @@ pub fn execute_insert_edge(db_path: &Path, args: &InsertEdgeArgs) -> Result<()> 
 
     engine.flush()?;
 
-    println!("✅ Aresta criada com sucesso!");
-    println!("   🆔 ID da Aresta: {}", edge_id);
-    println!("   🔗 Conexão: '{}' ──[{}]──► '{}'", args.source, args.relation, args.target);
-    println!("   ⚖️  Peso: {:.2}", args.weight);
-    println!("   🧭 Direcionada: {}", if args.directed { "Sim" } else { "Não (Bidirecional)" });
+    println!("Edge created successfully.");
+    println!("  Edge ID:     {}", edge_id);
+    println!("  Connection:  '{}' --[{}]--> '{}'", args.source, args.relation, args.target);
+    println!("  Weight:      {:.2}", args.weight);
+    println!("  Directed:    {}", if args.directed { "true" } else { "false (bidirectional)" });
 
     Ok(())
 }
