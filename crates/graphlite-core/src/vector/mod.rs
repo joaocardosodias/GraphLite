@@ -3,6 +3,7 @@
 pub mod distance;
 pub mod quantization;
 pub mod simd;
+pub mod store;
 
 pub use distance::{
     cosine_similarity, dot_product, euclidean_distance, manhattan_distance, norm,
@@ -14,3 +15,5 @@ pub use quantization::{Quantization, QuantizedVector};
 pub use simd::{
     simd_cosine_similarity, simd_dot_product, simd_euclidean_distance, simd_norm_squared,
 };
+
+pub use store::VectorStore;
