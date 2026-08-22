@@ -3,6 +3,7 @@
 pub mod checksum;
 pub mod csr_block;
 pub mod header;
+pub mod mmap_reader;
 pub mod node_block;
 pub mod string_table;
 pub mod vector_block;
@@ -13,6 +14,7 @@ pub use header::{
     GraphHeader, FLAG_COMPRESSED, FLAG_DIRECTED, FLAG_QUANTIZED_SQ8, GRAPH_MAGIC, GRAPH_VERSION,
     HEADER_SIZE,
 };
+pub use mmap_reader::MmapGraphReader;
 pub use node_block::{
     deserialize_node_block, serialize_node_block, ZeroCopyNodeBlock,
 };

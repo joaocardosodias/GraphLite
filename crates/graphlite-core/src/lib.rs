@@ -38,7 +38,7 @@ pub use storage::{
     compute_file_checksum, crc32, crc32_update, deserialize_csr_block, deserialize_node_block,
     deserialize_quantized_vector_block, deserialize_string_table, serialize_csr_block,
     serialize_node_block, serialize_quantized_vector_block, serialize_string_table,
-    verify_file_integrity, GraphHeader, ZeroCopyCsrBlock, ZeroCopyNodeBlock,
+    verify_file_integrity, GraphHeader, MmapGraphReader, ZeroCopyCsrBlock, ZeroCopyNodeBlock,
     ZeroCopyStringTable, ZeroCopyVectorBlock, FLAG_COMPRESSED, FLAG_QUANTIZED_SQ8,
     GRAPH_MAGIC, GRAPH_VERSION, HEADER_SIZE,
 };
