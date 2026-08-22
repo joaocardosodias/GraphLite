@@ -2,6 +2,7 @@
 members = [
     "crates/graphlite-core",
     "crates/graphlite-cli",
+    "crates/graphlite-mcp",
 ]
 resolver = "2"
 

@@ -1,0 +1,11 @@
+{
+  "mcpServers": {
+    "graphlite": {
+      "command": "/home/cardoso/GitHub/GraphLite/target/release/graphlite-mcp",
+      "args": [
+        "--db",
+        "/home/cardoso/GitHub/GraphLite/demo_project/backend.graph"
+      ]
+    }
+  }
+}
