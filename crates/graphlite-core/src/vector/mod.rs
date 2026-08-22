@@ -4,6 +4,7 @@ pub mod distance;
 pub mod quantization;
 pub mod simd;
 pub mod store;
+pub mod topk;
 
 pub use distance::{
     cosine_similarity, dot_product, euclidean_distance, manhattan_distance, norm,
@@ -17,3 +18,4 @@ pub use simd::{
 };
 
 pub use store::VectorStore;
+pub use topk::TopKQueue;
