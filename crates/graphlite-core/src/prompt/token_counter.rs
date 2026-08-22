@@ -29,7 +29,7 @@ impl TokenCounter for HeuristicTokenCounter {
         let words = text.split_whitespace().count();
 
         // Blend character-based and word-based estimates: max(words, ceil(chars / 4.0))
-        let char_based = (chars + 3) / 4;
+        let char_based = chars.div_ceil(4);
         words.max(char_based)
     }
 }
@@ -142,7 +142,7 @@ mod tests {
 
         let long_text = "The quick brown fox jumps over the lazy dog";
         let tokens = counter.count_tokens(long_text);
-        assert!(tokens >= 9 && tokens <= 12);
+        assert!((9..=12).contains(&tokens));
     }
 
     #[test]
