@@ -8,6 +8,23 @@ use crate::vector::quantization::Quantization;
 use serde::{Deserialize, Serialize};
 
 /// Comprehensive configuration and builder for the GraphLite database engine.
+///
+/// # Example
+///
+/// ```rust
+/// use graphlite_core::engine::GraphLiteConfig;
+/// use graphlite_core::vector::Metric;
+/// use graphlite_core::vector::Quantization;
+///
+/// let config = GraphLiteConfig::new()
+///     .with_dim(384)
+///     .with_metric(Metric::Cosine)
+///     .with_quantization(Quantization::ScalarInt8)
+///     .with_max_tokens(1500);
+///
+/// assert_eq!(config.vector_dim, 384);
+/// assert!(config.validate().is_ok());
+/// ```
 #[derive(Debug, Clone, PartialEq)]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 pub struct GraphLiteConfig {
@@ -52,6 +69,13 @@ impl Default for GraphLiteConfig {
 
 impl GraphLiteConfig {
     /// Creates a new `GraphLiteConfig` with standard recommended defaults.
+    ///
+    /// ```rust
+    /// use graphlite_core::engine::GraphLiteConfig;
+    ///
+    /// let config = GraphLiteConfig::new();
+    /// assert_eq!(config.vector_dim, 384);
+    /// ```
     pub fn new() -> Self {
         Self::default()
     }

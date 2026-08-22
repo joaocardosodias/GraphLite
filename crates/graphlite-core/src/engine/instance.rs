@@ -34,6 +34,20 @@ pub struct GraphLiteEngine {
 
 impl GraphLiteEngine {
     /// Opens an existing `.graph` database file from disk, or creates a new one if it does not exist.
+    ///
+    /// # Example
+    ///
+    /// ```rust
+    /// use graphlite_core::engine::{GraphLiteConfig, GraphLiteEngine};
+    /// use tempfile::tempdir;
+    ///
+    /// let dir = tempdir().unwrap();
+    /// let db_path = dir.path().join("demo.graph");
+    /// let config = GraphLiteConfig::new().with_dim(4);
+    ///
+    /// let db = GraphLiteEngine::open_or_create(&db_path, config).unwrap();
+    /// assert_eq!(db.node_count(), 0);
+    /// ```
     pub fn open_or_create<P: AsRef<Path>>(path: P, config: GraphLiteConfig) -> Result<Self> {
         config.validate()?;
         let p = path.as_ref().to_path_buf();
@@ -119,6 +133,18 @@ impl GraphLiteEngine {
     }
 
     /// Creates an ephemeral, in-memory only `GraphLiteEngine` instance without disk persistence.
+    ///
+    /// # Example
+    ///
+    /// ```rust
+    /// use graphlite_core::engine::{GraphLiteConfig, GraphLiteEngine};
+    ///
+    /// let config = GraphLiteConfig::new().with_dim(4);
+    /// let db = GraphLiteEngine::in_memory(config).unwrap();
+    ///
+    /// assert_eq!(db.node_count(), 0);
+    /// assert_eq!(db.edge_count(), 0);
+    /// ```
     pub fn in_memory(config: GraphLiteConfig) -> Result<Self> {
         config.validate()?;
         let vectors = VectorStore::new(config.vector_dim, config.metric, config.quantization);
