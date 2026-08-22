@@ -64,11 +64,13 @@ impl GraphLiteEngine {
 
             // 2. Rebuild in-memory dynamic AdjacencyGraph
             let mut graph = AdjacencyGraph::new();
+            let mut node_ids = Vec::new();
             if let Ok(node_block) = reader.nodes() {
                 for i in 0..node_block.len() {
                     if let Some(node) = node_block.get_by_index(i) {
                         if node.is_active() {
                             graph.add_node(node)?;
+                            node_ids.push(node.id);
                         }
                     }
                 }
@@ -88,9 +90,9 @@ impl GraphLiteEngine {
             let mut vectors = VectorStore::new(config.vector_dim, config.metric, config.quantization);
 
             if let Ok(vec_block) = reader.vectors() {
-                for i in 0..vec_block.len() {
+                for (i, node_id) in node_ids.into_iter().enumerate() {
                     if let Some(qv) = vec_block.get(i) {
-                        vectors.insert_quantized(NodeId::new(i as u32), qv)?;
+                        vectors.insert_quantized(node_id, qv)?;
                     }
                 }
             }
