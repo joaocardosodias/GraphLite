@@ -4,12 +4,14 @@
 //! Designed for local-first GraphRAG, AI memory, and low-latency knowledge graphs.
 
 pub mod error;
+pub mod graph;
 pub mod id;
 pub mod interner;
 pub mod record;
 pub mod vector;
 
 pub use error::{GraphLiteError, Result};
+pub use graph::AdjacencyGraph;
 pub use id::{EdgeId, NodeId, StringId};
 pub use interner::StringInterner;
 pub use record::{EdgeRecord, NodeRecord, FLAG_ACTIVE, FLAG_DIRECTED, NO_VECTOR_OFFSET};
