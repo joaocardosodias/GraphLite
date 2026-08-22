@@ -233,6 +233,8 @@ dependencies = [
  "anyhow",
  "clap",
  "graphlite-core",
+ "serde",
+ "serde_json",
 ]
 
 [[package]]

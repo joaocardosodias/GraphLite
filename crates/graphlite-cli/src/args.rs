@@ -1,0 +1,190 @@
+use std::path::PathBuf;
+use clap::{Args, Parser, Subcommand, ValueEnum};
+
+/// GraphLite: An embedded, single-file Graph + Vector / GraphRAG engine in pure Rust.
+#[derive(Parser, Debug)]
+#[command(
+    name = "graphlite",
+    author,
+    version,
+    about = "Embedded single-file Graph + Vector / GraphRAG engine in pure Rust",
+    long_about = "GraphLite is a lightning-fast, local-first embedded database combining Compressed Sparse Row (CSR) graph traversal with SIMD-accelerated Int8 quantized vector search."
+)]
+pub struct Cli {
+    /// Path to the `.graph` database file.
+    #[arg(
+        short = 'd',
+        long = "db",
+        default_value = "graphlite.graph",
+        global = true,
+        help = "Path to the target .graph database file"
+    )]
+    pub db_path: PathBuf,
+
+    /// Enable verbose diagnostic output.
+    #[arg(short, long, global = true, help = "Enable verbose debug logging")]
+    pub verbose: bool,
+
+    /// Subcommand to execute.
+    #[command(subcommand)]
+    pub command: Commands,
+}
+
+#[derive(Subcommand, Debug)]
+pub enum Commands {
+    /// Initialize a new empty `.graph` database file with the given configuration.
+    Init(InitArgs),
+
+    /// Insert or update an entity node with optional embedding vector.
+    InsertNode(InsertNodeArgs),
+
+    /// Insert a relational edge connecting two entities.
+    InsertEdge(InsertEdgeArgs),
+
+    /// Execute a GraphRAG context retrieval query or vector search.
+    Query(QueryArgs),
+
+    /// Inspect database statistics, binary header, and memory layout.
+    Inspect(InspectArgs),
+
+    /// Export database content and topology as JSON or Markdown triples.
+    Dump(DumpArgs),
+}
+
+#[derive(Args, Debug)]
+pub struct InitArgs {
+    /// Vector embedding dimensionality (e.g. 384, 768, 1536).
+    #[arg(short = 'D', long, default_value_t = 384, help = "Vector embedding dimension")]
+    pub dim: usize,
+
+    /// Vector distance metric.
+    #[arg(short = 'm', long, value_enum, default_value_t = CliMetric::Cosine, help = "Distance metric")]
+    pub metric: CliMetric,
+
+    /// Vector quantization mode.
+    #[arg(short = 'q', long, value_enum, default_value_t = CliQuantization::ScalarInt8, help = "Quantization mode")]
+    pub quantization: CliQuantization,
+
+    /// Default token budget allocated for LLM context retrieval.
+    #[arg(short = 't', long, default_value_t = 2048, help = "Default token budget for prompts")]
+    pub max_tokens: usize,
+}
+
+#[derive(Args, Debug)]
+pub struct InsertNodeArgs {
+    /// Name/label of the entity node.
+    #[arg(short = 'n', long, help = "Entity name / label (e.g. 'Projeto Titan')")]
+    pub name: String,
+
+    /// Category or type of entity.
+    #[arg(short = 't', long, default_value = "", help = "Entity type (e.g. 'Person', 'Project')")]
+    pub entity_type: String,
+
+    /// Text description / summary of the entity.
+    #[arg(short = 'D', long, default_value = "", help = "Textual summary or content")]
+    pub description: String,
+
+    /// Comma-separated float values of the embedding vector, or path to a JSON file.
+    #[arg(short = 'v', long, help = "Comma-separated vector floats (e.g. '0.1,0.2,0.3')")]
+    pub vector: Option<String>,
+
+    /// Automatically merge with an existing node if semantic cosine similarity >= 0.92.
+    #[arg(long, default_value_t = true, help = "Enable real-time entity resolution")]
+    pub resolve: bool,
+}
+
+#[derive(Args, Debug)]
+pub struct InsertEdgeArgs {
+    /// Name of the source entity node.
+    #[arg(short = 's', long, help = "Name of the source node")]
+    pub source: String,
+
+    /// Name of the target entity node.
+    #[arg(short = 't', long, help = "Name of the target node")]
+    pub target: String,
+
+    /// Relationship label (e.g. 'LEADS', 'USES', 'DEPENDS_ON').
+    #[arg(short = 'r', long, help = "Relation type label")]
+    pub relation: String,
+
+    /// Semantic confidence weight of the connection (0.0 to 1.0).
+    #[arg(short = 'w', long, default_value_t = 1.0, help = "Edge weight between 0.0 and 1.0")]
+    pub weight: f32,
+
+    /// Whether the relationship is directed (source -> target).
+    #[arg(long, default_value_t = true, help = "Whether edge is directed")]
+    pub directed: bool,
+}
+
+#[derive(Args, Debug)]
+pub struct QueryArgs {
+    /// Comma-separated query embedding vector floats.
+    #[arg(short = 'v', long, help = "Comma-separated query vector floats")]
+    pub vector: Option<String>,
+
+    /// Comma-separated seed entity names for textual exploration.
+    #[arg(short = 's', long, help = "Comma-separated seed entity names (e.g. 'Titan,Ana')")]
+    pub seeds: Option<String>,
+
+    /// Number of seed entities to retrieve via vector search.
+    #[arg(short = 'k', long, default_value_t = 5, help = "Top-K seed entries")]
+    pub top_k: usize,
+
+    /// Maximum token budget for the returned prompt.
+    #[arg(short = 't', long, help = "Token budget limit (overrides config default)")]
+    pub tokens: Option<usize>,
+
+    /// Maximum BFS graph exploration depth in hops.
+    #[arg(long, help = "Maximum BFS search depth in hops (e.g. 1 or 2)")]
+    pub depth: Option<usize>,
+
+    /// Alpha balancing factor between vector score and graph topology ($0.0 \le \alpha \le 1.0$).
+    #[arg(long, help = "Hybrid score alpha (1.0 = pure vector, 0.0 = pure graph)")]
+    pub alpha: Option<f32>,
+
+    /// Output formatting mode.
+    #[arg(short = 'f', long, value_enum, default_value_t = CliOutputFormat::Markdown, help = "Output format")]
+    pub format: CliOutputFormat,
+}
+
+#[derive(Args, Debug)]
+pub struct InspectArgs {
+    /// Display full JSON dump of header metadata.
+    #[arg(long, help = "Output inspection data as JSON")]
+    pub json: bool,
+}
+
+#[derive(Args, Debug)]
+pub struct DumpArgs {
+    /// Format of the exported graph.
+    #[arg(short = 'f', long, value_enum, default_value_t = CliDumpFormat::Json, help = "Export format")]
+    pub format: CliDumpFormat,
+}
+
+#[derive(ValueEnum, Clone, Copy, Debug, PartialEq, Eq)]
+pub enum CliMetric {
+    Cosine,
+    DotProduct,
+    Euclidean,
+    Manhattan,
+}
+
+#[derive(ValueEnum, Clone, Copy, Debug, PartialEq, Eq)]
+pub enum CliQuantization {
+    None,
+    ScalarInt8,
+}
+
+#[derive(ValueEnum, Clone, Copy, Debug, PartialEq, Eq)]
+pub enum CliOutputFormat {
+    Markdown,
+    Json,
+    Triples,
+}
+
+#[derive(ValueEnum, Clone, Copy, Debug, PartialEq, Eq)]
+pub enum CliDumpFormat {
+    Json,
+    Triples,
+    Markdown,
+}
