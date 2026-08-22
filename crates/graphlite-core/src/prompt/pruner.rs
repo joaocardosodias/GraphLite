@@ -2,7 +2,7 @@ use std::collections::HashSet;
 
 use crate::graph::hybrid_score::ScoredEntity;
 use crate::graph::subgraph::ConnectedSubgraph;
-use crate::id::NodeId;
+use crate::id::{EdgeId, NodeId, StringId};
 use crate::interner::StringInterner;
 use crate::prompt::token_counter::TokenCounter;
 use crate::record::EdgeRecord;
@@ -79,22 +79,24 @@ pub fn prune_subgraph_by_budget(
     let mut selected_entities: Vec<ScoredEntity> = Vec::new();
     let mut selected_node_ids: HashSet<NodeId> = HashSet::new();
     let mut selected_edges: Vec<EdgeRecord> = Vec::new();
+    let mut included_edge_ids: HashSet<EdgeId> = HashSet::new();
 
-    // Map entity node IDs to their outgoing edges in this subgraph
-    let mut outgoing_edge_map: std::collections::HashMap<NodeId, Vec<EdgeRecord>> =
+    // Index all edges in this subgraph by both endpoints
+    let mut incident_edges: std::collections::HashMap<NodeId, Vec<EdgeRecord>> =
         std::collections::HashMap::new();
     for edge in &subgraph.edges {
-        outgoing_edge_map.entry(edge.source).or_default().push(*edge);
+        incident_edges.entry(edge.source).or_default().push(*edge);
+        incident_edges.entry(edge.target).or_default().push(*edge);
     }
 
     for entity in &subgraph.entities {
         let node_id = entity.node_id;
         let node_name = interner
-            .resolve(crate::id::StringId::new(node_id.as_u32()))
+            .resolve(StringId::new(node_id.as_u32()))
             .unwrap_or("Entidade");
 
-        // Format candidate entity string to measure token cost
-        let entity_line = format!("- [{}] (Score: {:.2})\n", node_name, entity.final_score);
+        // Format candidate entity string to measure exact token cost
+        let entity_line = format!("- [{}] (Relevância: {:.2})\n", node_name, entity.final_score);
         let entity_tokens = counter.count_tokens(&entity_line);
 
         if current_tokens + entity_tokens > max_tokens {
@@ -106,22 +108,28 @@ pub fn prune_subgraph_by_budget(
         selected_entities.push(entity.clone());
         selected_node_ids.insert(node_id);
 
-        // Try to include connecting edges originating from or pointing to this node
-        if let Some(out_edges) = outgoing_edge_map.get(&node_id) {
-            for edge in out_edges {
-                // Only include edge if both source and target are selected
-                if selected_node_ids.contains(&edge.target) {
+        // Try to include connecting edges between this new node and already selected nodes
+        if let Some(edges) = incident_edges.get(&node_id) {
+            for edge in edges {
+                if !included_edge_ids.contains(&edge.id)
+                    && selected_node_ids.contains(&edge.source)
+                    && selected_node_ids.contains(&edge.target)
+                {
                     let rel_name = interner.resolve(edge.relation_id).unwrap_or("RELACAO");
                     let target_name = interner
-                        .resolve(crate::id::StringId::new(edge.target.as_u32()))
+                        .resolve(StringId::new(edge.target.as_u32()))
                         .unwrap_or("Alvo");
 
-                    let edge_line = format!("  - {} -> [{}]\n", rel_name, target_name);
+                    let edge_line = format!(
+                        "  - {} -> [{}] (Confiança: {:.2})\n",
+                        rel_name, target_name, edge.weight
+                    );
                     let edge_tokens = counter.count_tokens(&edge_line);
 
                     if current_tokens + edge_tokens <= max_tokens {
                         current_tokens += edge_tokens;
                         selected_edges.push(*edge);
+                        included_edge_ids.insert(edge.id);
                     }
                 }
             }
@@ -139,7 +147,6 @@ pub fn prune_subgraph_by_budget(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::id::EdgeId;
     use crate::prompt::token_counter::HeuristicTokenCounter;
 
     #[test]
@@ -176,8 +183,8 @@ mod tests {
             path_edge: None,
         };
 
-        let edge0 = EdgeRecord::new(EdgeId::new(1), e0.node_id, e1.node_id, rel_lidera);
-        let edge1 = EdgeRecord::new(EdgeId::new(2), e0.node_id, e2.node_id, rel_escrito);
+        let edge0 = EdgeRecord::new(EdgeId::new(1), e0.node_id, e1.node_id, rel_lidera).with_weight(0.95);
+        let edge1 = EdgeRecord::new(EdgeId::new(2), e0.node_id, e2.node_id, rel_escrito).with_weight(0.90);
 
         let subgraph = ConnectedSubgraph {
             entities: vec![e0, e1, e2],
@@ -193,9 +200,9 @@ mod tests {
         assert!(pruned_full.total_tokens <= 500);
 
         // Extremely tight budget: fits only header + top 1 entity
-        let pruned_tight = prune_subgraph_by_budget(&subgraph, &interner, 18, &counter);
+        let pruned_tight = prune_subgraph_by_budget(&subgraph, &interner, 20, &counter);
         assert_eq!(pruned_tight.entity_count(), 1);
         assert_eq!(pruned_tight.entities[0].node_id, NodeId::new(s0.as_u32()));
-        assert!(pruned_tight.total_tokens <= 18);
+        assert!(pruned_tight.total_tokens <= 20);
     }
 }
