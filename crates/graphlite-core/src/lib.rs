@@ -32,7 +32,8 @@ pub use prompt::format_subgraph_json;
 
 pub use record::{EdgeRecord, NodeRecord, FLAG_ACTIVE, FLAG_DIRECTED, NO_VECTOR_OFFSET};
 pub use storage::{
-    GraphHeader, FLAG_COMPRESSED, FLAG_QUANTIZED_SQ8, GRAPH_MAGIC, GRAPH_VERSION, HEADER_SIZE,
+    compute_file_checksum, crc32, crc32_update, verify_file_integrity, GraphHeader,
+    FLAG_COMPRESSED, FLAG_QUANTIZED_SQ8, GRAPH_MAGIC, GRAPH_VERSION, HEADER_SIZE,
 };
 pub use vector::{
     cosine_similarity, dot_product, euclidean_distance, manhattan_distance, norm,
