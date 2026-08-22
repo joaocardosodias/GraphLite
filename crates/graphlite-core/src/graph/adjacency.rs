@@ -1,6 +1,7 @@
 use std::collections::HashMap;
 
 use crate::error::{GraphLiteError, Result};
+use crate::graph::csr::CsrGraph;
 use crate::id::{EdgeId, NodeId};
 use crate::record::{EdgeRecord, NodeRecord};
 
@@ -219,6 +220,41 @@ impl AdjacencyGraph {
         Some(edge)
     }
 
+    /// Compiles this dynamic `AdjacencyGraph` into an immutable, contiguous `CsrGraph`.
+    ///
+    /// The resulting `CsrGraph` can be serialized to disk zero-copy or traversed with zero pointer chasing.
+    pub fn to_csr(&self) -> CsrGraph {
+        if self.nodes.is_empty() {
+            return CsrGraph::new(vec![0], Vec::new(), 0);
+        }
+
+        let max_id = self.nodes.keys().map(|n| n.as_usize()).max().unwrap_or(0);
+        let node_count = max_id + 1;
+
+        let mut offsets = Vec::with_capacity(node_count + 1);
+        let mut contiguous_edges = Vec::with_capacity(self.edges.len());
+
+        let mut current_offset: u64 = 0;
+        offsets.push(current_offset);
+
+        for idx in 0..node_count {
+            let node_id = NodeId::new(idx as u32);
+            if let Some(edge_ids) = self.out_edges.get(&node_id) {
+                for &edge_id in edge_ids {
+                    if let Some(edge) = self.edges.get(&edge_id) {
+                        if edge.is_active() {
+                            contiguous_edges.push(*edge);
+                            current_offset += 1;
+                        }
+                    }
+                }
+            }
+            offsets.push(current_offset);
+        }
+
+        CsrGraph::new(offsets, contiguous_edges, node_count)
+    }
+
     /// Returns the total number of nodes in the graph.
     #[inline]
     pub fn node_count(&self) -> usize {
@@ -253,6 +289,12 @@ impl AdjacencyGraph {
         self.edges.clear();
         self.out_edges.clear();
         self.in_edges.clear();
+    }
+}
+
+impl From<&AdjacencyGraph> for CsrGraph {
+    fn from(graph: &AdjacencyGraph) -> Self {
+        graph.to_csr()
     }
 }
 
@@ -323,7 +365,7 @@ mod tests {
         let edge = EdgeRecord::new(
             EdgeId::new(50),
             NodeId::new(1),
-            NodeId::new(999), // Node 999 does not exist
+            NodeId::new(999),
             StringId::new(5),
         );
 
@@ -360,5 +402,43 @@ mod tests {
 
         assert_eq!(graph.out_neighbors(NodeId::new(1)), vec![]);
         assert_eq!(graph.in_neighbors(NodeId::new(3)), vec![]);
+    }
+
+    #[test]
+    fn test_adjacency_to_csr_compilation() {
+        let mut graph = AdjacencyGraph::new();
+
+        let n0 = NodeRecord::new(NodeId::new(0), StringId::new(1), StringId::new(2), StringId::INVALID, 0);
+        let n1 = NodeRecord::new(NodeId::new(1), StringId::new(3), StringId::new(4), StringId::INVALID, 0);
+        let n2 = NodeRecord::new(NodeId::new(2), StringId::new(5), StringId::new(6), StringId::INVALID, 0);
+
+        graph.add_node(n0).unwrap();
+        graph.add_node(n1).unwrap();
+        graph.add_node(n2).unwrap();
+
+        // Node 0 -> Node 1 (weight 0.9)
+        // Node 0 -> Node 2 (weight 0.8)
+        // Node 1 -> Node 2 (weight 0.7)
+        let e1 = EdgeRecord::new(EdgeId::new(1), NodeId::new(0), NodeId::new(1), StringId::new(10)).with_weight(0.9);
+        let e2 = EdgeRecord::new(EdgeId::new(2), NodeId::new(0), NodeId::new(2), StringId::new(11)).with_weight(0.8);
+        let e3 = EdgeRecord::new(EdgeId::new(3), NodeId::new(1), NodeId::new(2), StringId::new(12)).with_weight(0.7);
+
+        graph.add_edge(e1).unwrap();
+        graph.add_edge(e2).unwrap();
+        graph.add_edge(e3).unwrap();
+
+        // Compile to CSR
+        let csr: CsrGraph = (&graph).into();
+
+        assert_eq!(csr.node_count(), 3);
+        assert_eq!(csr.edge_count(), 3);
+
+        // Check CSR topology parity
+        assert_eq!(csr.out_degree(NodeId::new(0)), 2);
+        assert_eq!(csr.out_edges(NodeId::new(0)), &[e1, e2]);
+        assert_eq!(csr.out_degree(NodeId::new(1)), 1);
+        assert_eq!(csr.out_edges(NodeId::new(1)), &[e3]);
+        assert_eq!(csr.out_degree(NodeId::new(2)), 0);
+        assert_eq!(csr.out_edges(NodeId::new(2)), &[]);
     }
 }
