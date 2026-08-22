@@ -23,6 +23,15 @@ pub struct MmapGraphReader {
     header: GraphHeader,
 }
 
+impl std::fmt::Debug for MmapGraphReader {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("MmapGraphReader")
+            .field("header", &self.header)
+            .field("file_size", &self.mmap.len())
+            .finish()
+    }
+}
+
 impl MmapGraphReader {
     /// Opens a `.graph` database file from disk with zero-copy memory mapping.
     pub fn open<P: AsRef<Path>>(path: P) -> Result<Self> {
