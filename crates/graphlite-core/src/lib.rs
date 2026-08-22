@@ -30,13 +30,17 @@ pub use prompt::{
 #[cfg(feature = "serde")]
 pub use prompt::format_subgraph_json;
 
-pub use record::{EdgeRecord, NodeRecord, FLAG_ACTIVE, FLAG_DIRECTED, NO_VECTOR_OFFSET};
+pub use record::{
+    EdgeRecord, NodeRecord, EDGE_RECORD_SIZE, FLAG_ACTIVE, FLAG_DIRECTED, NODE_RECORD_SIZE,
+    NO_VECTOR_OFFSET,
+};
 pub use storage::{
-    compute_file_checksum, crc32, crc32_update, deserialize_node_block,
-    deserialize_quantized_vector_block, deserialize_string_table, serialize_node_block,
-    serialize_quantized_vector_block, serialize_string_table, verify_file_integrity,
-    GraphHeader, ZeroCopyNodeBlock, ZeroCopyStringTable, ZeroCopyVectorBlock,
-    FLAG_COMPRESSED, FLAG_QUANTIZED_SQ8, GRAPH_MAGIC, GRAPH_VERSION, HEADER_SIZE,
+    compute_file_checksum, crc32, crc32_update, deserialize_csr_block, deserialize_node_block,
+    deserialize_quantized_vector_block, deserialize_string_table, serialize_csr_block,
+    serialize_node_block, serialize_quantized_vector_block, serialize_string_table,
+    verify_file_integrity, GraphHeader, ZeroCopyCsrBlock, ZeroCopyNodeBlock,
+    ZeroCopyStringTable, ZeroCopyVectorBlock, FLAG_COMPRESSED, FLAG_QUANTIZED_SQ8,
+    GRAPH_MAGIC, GRAPH_VERSION, HEADER_SIZE,
 };
 pub use vector::{
     cosine_similarity, dot_product, euclidean_distance, manhattan_distance, norm,
