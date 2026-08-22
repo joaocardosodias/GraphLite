@@ -61,7 +61,7 @@ impl GraphLiteEngine {
                     if vector.is_some() {
                         record.vector_offset = (id.as_u32() as u64) * (8 + self.config().vector_dim as u64);
                     }
-                    state.graph.add_node(record)?;
+                    state.graph.upsert_node(record);
                     id
                 }
                 None => {
