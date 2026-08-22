@@ -64,11 +64,7 @@ impl CsrGraph {
         let start = self.offsets[idx] as usize;
         let end = self.offsets[idx + 1] as usize;
 
-        if end >= start {
-            end - start
-        } else {
-            0
-        }
+        end.saturating_sub(start)
     }
 
     /// Returns a list of active target `NodeId`s reachable in 1 hop from `node_id`.

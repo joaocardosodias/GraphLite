@@ -11,7 +11,10 @@ pub mod record;
 pub mod vector;
 
 pub use error::{GraphLiteError, Result};
-pub use graph::{AdjacencyGraph, CsrGraph};
+pub use graph::{
+    bfs_adjacency, bfs_csr, AdjacencyGraph, CsrGraph, TraversalConfig, TraversalDirection,
+    TraversedNode,
+};
 pub use id::{EdgeId, NodeId, StringId};
 pub use interner::StringInterner;
 pub use record::{EdgeRecord, NodeRecord, FLAG_ACTIVE, FLAG_DIRECTED, NO_VECTOR_OFFSET};
