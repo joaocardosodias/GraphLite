@@ -33,6 +33,9 @@ rayon = "1.10"
 # Tokenization
 tiktoken-rs = "0.6"
 
+# Benchmarking
+criterion = { version = "0.5", default-features = false }
+
 # CLI
 clap = { version = "4.5", features = ["derive", "cargo"] }
 

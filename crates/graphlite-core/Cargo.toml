@@ -25,3 +25,8 @@ tiktoken = ["dep:tiktoken-rs"]
 
 [dev-dependencies]
 tempfile = "3.17"
+criterion = { workspace = true }
+
+[[bench]]
+name = "engine_benchmarks"
+harness = false
