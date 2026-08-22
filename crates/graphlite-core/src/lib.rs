@@ -9,6 +9,7 @@ pub mod id;
 pub mod interner;
 pub mod prompt;
 pub mod record;
+pub mod storage;
 pub mod vector;
 
 pub use error::{GraphLiteError, Result};
@@ -30,6 +31,9 @@ pub use prompt::{
 pub use prompt::format_subgraph_json;
 
 pub use record::{EdgeRecord, NodeRecord, FLAG_ACTIVE, FLAG_DIRECTED, NO_VECTOR_OFFSET};
+pub use storage::{
+    GraphHeader, FLAG_COMPRESSED, FLAG_QUANTIZED_SQ8, GRAPH_MAGIC, GRAPH_VERSION, HEADER_SIZE,
+};
 pub use vector::{
     cosine_similarity, dot_product, euclidean_distance, manhattan_distance, norm,
     norm_squared, normalize_in_place, normalized, simd_cosine_similarity,
