@@ -59,6 +59,12 @@ impl StringInterner {
         self.strings.get(id.as_usize()).map(|s| s.as_str())
     }
 
+    /// Looks up a string's existing `StringId` without interning or mutating.
+    #[inline]
+    pub fn get_id(&self, s: &str) -> Option<StringId> {
+        self.map.get(s).copied()
+    }
+
     /// Returns the total number of unique strings interned.
     #[inline]
     pub fn len(&self) -> usize {

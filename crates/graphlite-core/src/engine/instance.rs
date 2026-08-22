@@ -27,9 +27,9 @@ pub(crate) struct EngineState {
 /// managed by `parking_lot::RwLock` for high-throughput reads and writes.
 #[derive(Clone)]
 pub struct GraphLiteEngine {
-    path: Option<PathBuf>,
-    config: GraphLiteConfig,
-    state: Arc<RwLock<EngineState>>,
+    pub(crate) path: Option<PathBuf>,
+    pub(crate) config: GraphLiteConfig,
+    pub(crate) state: Arc<RwLock<EngineState>>,
 }
 
 impl GraphLiteEngine {
