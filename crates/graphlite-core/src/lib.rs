@@ -21,9 +21,14 @@ pub use id::{EdgeId, NodeId, StringId};
 pub use interner::StringInterner;
 pub use prompt::{
     count_tokens, format_connected_subgraph_markdown, format_pruned_subgraph_markdown,
-    prune_subgraph_by_budget, HeuristicTokenCounter, MarkdownFormatConfig, MarkdownStyle,
+    format_subgraph_triples, prune_subgraph_by_budget, to_json_payload, HeuristicTokenCounter,
+    JsonEntity, JsonRelation, JsonSubgraphPayload, MarkdownFormatConfig, MarkdownStyle,
     PrunedSubgraph, TiktokenCounter, TokenCounter, TokenizerEncoding,
 };
+
+#[cfg(feature = "serde")]
+pub use prompt::format_subgraph_json;
+
 pub use record::{EdgeRecord, NodeRecord, FLAG_ACTIVE, FLAG_DIRECTED, NO_VECTOR_OFFSET};
 pub use vector::{
     cosine_similarity, dot_product, euclidean_distance, manhattan_distance, norm,
