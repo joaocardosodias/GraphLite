@@ -7,6 +7,7 @@ pub mod error;
 pub mod graph;
 pub mod id;
 pub mod interner;
+pub mod prompt;
 pub mod record;
 pub mod vector;
 
@@ -18,6 +19,9 @@ pub use graph::{
 };
 pub use id::{EdgeId, NodeId, StringId};
 pub use interner::StringInterner;
+pub use prompt::{
+    count_tokens, HeuristicTokenCounter, TiktokenCounter, TokenCounter, TokenizerEncoding,
+};
 pub use record::{EdgeRecord, NodeRecord, FLAG_ACTIVE, FLAG_DIRECTED, NO_VECTOR_OFFSET};
 pub use vector::{
     cosine_similarity, dot_product, euclidean_distance, manhattan_distance, norm,
