@@ -3,6 +3,8 @@
 pub mod config;
 pub mod instance;
 pub mod mutation;
+pub mod query;
 
 pub use config::GraphLiteConfig;
 pub use instance::GraphLiteEngine;
+pub use query::{QueryOptions, QueryResult};

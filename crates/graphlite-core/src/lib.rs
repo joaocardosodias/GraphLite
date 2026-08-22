@@ -13,7 +13,7 @@ pub mod record;
 pub mod storage;
 pub mod vector;
 
-pub use engine::{GraphLiteConfig, GraphLiteEngine};
+pub use engine::{GraphLiteConfig, GraphLiteEngine, QueryOptions, QueryResult};
 pub use error::{GraphLiteError, Result};
 pub use graph::{
     bfs_adjacency, bfs_csr, compute_hybrid_scores, extract_subgraph_adjacency,
