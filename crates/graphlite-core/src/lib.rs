@@ -20,8 +20,9 @@ pub use graph::{
 pub use id::{EdgeId, NodeId, StringId};
 pub use interner::StringInterner;
 pub use prompt::{
-    count_tokens, prune_subgraph_by_budget, HeuristicTokenCounter, PrunedSubgraph,
-    TiktokenCounter, TokenCounter, TokenizerEncoding,
+    count_tokens, format_connected_subgraph_markdown, format_pruned_subgraph_markdown,
+    prune_subgraph_by_budget, HeuristicTokenCounter, MarkdownFormatConfig, MarkdownStyle,
+    PrunedSubgraph, TiktokenCounter, TokenCounter, TokenizerEncoding,
 };
 pub use record::{EdgeRecord, NodeRecord, FLAG_ACTIVE, FLAG_DIRECTED, NO_VECTOR_OFFSET};
 pub use vector::{
