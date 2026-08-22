@@ -138,6 +138,17 @@ impl<'a> ZeroCopyStringTable<'a> {
         let raw_bytes = &self.data_slice[start..end];
         str::from_utf8(raw_bytes).ok()
     }
+
+    /// Converts this zero-copy string table into an owned in-memory `StringInterner`.
+    pub fn to_interner(&self) -> StringInterner {
+        let mut interner = StringInterner::with_capacity(self.count);
+        for i in 0..self.count {
+            if let Some(s) = self.get(StringId::new(i as u32)) {
+                interner.intern(s);
+            }
+        }
+        interner
+    }
 }
 
 /// Deserializes a binary string table slice into a new in-memory `StringInterner`.

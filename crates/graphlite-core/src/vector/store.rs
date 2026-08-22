@@ -110,6 +110,47 @@ impl VectorStore {
         Ok(())
     }
 
+    /// Inserts or updates a pre-quantized vector for a given `NodeId`.
+    pub fn insert_quantized(&mut self, node_id: NodeId, qv: QuantizedVector) -> Result<()> {
+        if qv.data.len() != self.dim {
+            return Err(GraphLiteError::VectorDimensionMismatch {
+                expected: self.dim,
+                found: qv.data.len(),
+            });
+        }
+
+        if let Some(&idx) = self.node_to_idx.get(&node_id) {
+            match self.quantization {
+                Quantization::ScalarInt8 => {
+                    self.quantized[idx] = qv;
+                }
+                Quantization::None => {
+                    let deq = qv.dequantize();
+                    let start = idx * self.dim;
+                    let end = start + self.dim;
+                    self.flat_f32[start..end].copy_from_slice(&deq);
+                }
+            }
+            return Ok(());
+        }
+
+        let idx = self.node_ids.len();
+        self.node_ids.push(node_id);
+        self.node_to_idx.insert(node_id, idx);
+
+        match self.quantization {
+            Quantization::ScalarInt8 => {
+                self.quantized.push(qv);
+            }
+            Quantization::None => {
+                let deq = qv.dequantize();
+                self.flat_f32.extend_from_slice(&deq);
+            }
+        }
+
+        Ok(())
+    }
+
     /// Retrieves the float embedding vector for a given `NodeId`.
     pub fn get(&self, node_id: NodeId) -> Option<Vec<f32>> {
         let &idx = self.node_to_idx.get(&node_id)?;
@@ -120,6 +161,19 @@ impl VectorStore {
                 Some(self.flat_f32[start..end].to_vec())
             }
             Quantization::ScalarInt8 => Some(self.quantized[idx].dequantize()),
+        }
+    }
+
+    /// Retrieves the quantized embedding vector for a given `NodeId`.
+    pub fn get_quantized(&self, node_id: NodeId) -> Option<QuantizedVector> {
+        let &idx = self.node_to_idx.get(&node_id)?;
+        match self.quantization {
+            Quantization::ScalarInt8 => Some(self.quantized[idx].clone()),
+            Quantization::None => {
+                let start = idx * self.dim;
+                let end = start + self.dim;
+                Some(QuantizedVector::quantize(&self.flat_f32[start..end]))
+            }
         }
     }
 
