@@ -68,6 +68,10 @@ pub struct InitArgs {
     /// Default token budget allocated for LLM context retrieval.
     #[arg(short = 't', long, default_value_t = 2048, help = "Default token budget for prompts")]
     pub max_tokens: usize,
+
+    /// Overwrite existing database file if it already exists.
+    #[arg(short = 'f', long, help = "Overwrite existing database file")]
+    pub force: bool,
 }
 
 #[derive(Args, Debug)]

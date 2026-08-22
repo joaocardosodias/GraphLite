@@ -1,16 +1,18 @@
 mod args;
+mod commands;
 
 use anyhow::Result;
 use clap::Parser;
 
 use args::{Cli, Commands};
+use commands::init::execute_init;
 
 fn main() -> Result<()> {
     let cli = Cli::parse();
 
-    match cli.command {
+    match &cli.command {
         Commands::Init(args) => {
-            println!("Inicializando banco: {:?} com dim={}", cli.db_path, args.dim);
+            execute_init(&cli.db_path, args)?;
         }
         Commands::InsertNode(args) => {
             println!("Inserindo nó: '{}'", args.name);
