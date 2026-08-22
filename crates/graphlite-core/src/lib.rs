@@ -11,7 +11,7 @@ pub mod record;
 pub mod vector;
 
 pub use error::{GraphLiteError, Result};
-pub use graph::AdjacencyGraph;
+pub use graph::{AdjacencyGraph, CsrGraph};
 pub use id::{EdgeId, NodeId, StringId};
 pub use interner::StringInterner;
 pub use record::{EdgeRecord, NodeRecord, FLAG_ACTIVE, FLAG_DIRECTED, NO_VECTOR_OFFSET};
