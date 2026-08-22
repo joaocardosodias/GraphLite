@@ -89,7 +89,7 @@ pub struct InsertNodeArgs {
     pub description: String,
 
     /// Comma-separated float values of the embedding vector, or path to a JSON file.
-    #[arg(short = 'v', long, help = "Comma-separated vector floats (e.g. '0.1,0.2,0.3')")]
+    #[arg(short = 'V', long, help = "Comma-separated vector floats (e.g. '0.1,0.2,0.3')")]
     pub vector: Option<String>,
 
     /// Automatically merge with an existing node if semantic cosine similarity >= 0.92.
@@ -123,7 +123,7 @@ pub struct InsertEdgeArgs {
 #[derive(Args, Debug)]
 pub struct QueryArgs {
     /// Comma-separated query embedding vector floats.
-    #[arg(short = 'v', long, help = "Comma-separated query vector floats")]
+    #[arg(short = 'V', long, help = "Comma-separated query vector floats")]
     pub vector: Option<String>,
 
     /// Comma-separated seed entity names for textual exploration.

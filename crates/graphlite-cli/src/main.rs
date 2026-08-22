@@ -6,6 +6,7 @@ use clap::Parser;
 
 use args::{Cli, Commands};
 use commands::init::execute_init;
+use commands::insert::{execute_insert_edge, execute_insert_node};
 
 fn main() -> Result<()> {
     let cli = Cli::parse();
@@ -15,10 +16,10 @@ fn main() -> Result<()> {
             execute_init(&cli.db_path, args)?;
         }
         Commands::InsertNode(args) => {
-            println!("Inserindo nó: '{}'", args.name);
+            execute_insert_node(&cli.db_path, args)?;
         }
         Commands::InsertEdge(args) => {
-            println!("Inserindo aresta: '{}' -> '{}' ({})", args.source, args.target, args.relation);
+            execute_insert_edge(&cli.db_path, args)?;
         }
         Commands::Query(_args) => {
             println!("Executando query no banco: {:?}", cli.db_path);

@@ -78,6 +78,12 @@ impl GraphHeader {
         }
     }
 
+    /// Returns `true` if this database stores 8-bit Scalarly Quantized vectors (SQ8).
+    #[inline]
+    pub fn is_quantized(&self) -> bool {
+        self.quant_type == 1 || (self.flags & FLAG_QUANTIZED_SQ8) != 0
+    }
+
     /// Serializes this header into a fixed 64-byte array in little-endian order.
     pub fn to_bytes(&self) -> [u8; HEADER_SIZE] {
         let mut buf = [0u8; HEADER_SIZE];
