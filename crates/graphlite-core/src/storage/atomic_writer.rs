@@ -43,11 +43,8 @@ pub fn serialize_database(
     header.vector_section_offset = vector_offset;
     header.string_section_offset = string_offset;
 
-    let total_size = HEADER_SIZE
-        + node_bytes.len()
-        + edge_bytes.len()
-        + vector_bytes.len()
-        + string_bytes.len();
+    let total_size =
+        HEADER_SIZE + node_bytes.len() + edge_bytes.len() + vector_bytes.len() + string_bytes.len();
 
     let mut full_file = Vec::with_capacity(total_size);
     full_file.extend_from_slice(&header.to_bytes());
@@ -148,7 +145,8 @@ mod tests {
             384,
         );
 
-        let edge0 = EdgeRecord::new(EdgeId::new(1), node0.id, node1.id, rel_enables).with_weight(0.99);
+        let edge0 =
+            EdgeRecord::new(EdgeId::new(1), node0.id, node1.id, rel_enables).with_weight(0.99);
         let csr = CsrGraph::new(vec![0, 1, 1], vec![edge0], 2);
 
         let v0 = QuantizedVector {

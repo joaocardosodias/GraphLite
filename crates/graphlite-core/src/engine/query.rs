@@ -3,7 +3,9 @@ use crate::error::{GraphLiteError, Result};
 use crate::graph::hybrid_score::ScoredEntity;
 use crate::graph::subgraph::extract_subgraph_adjacency;
 use crate::id::NodeId;
-use crate::prompt::markdown::{format_pruned_subgraph_markdown, MarkdownFormatConfig, MarkdownStyle};
+use crate::prompt::markdown::{
+    format_pruned_subgraph_markdown, MarkdownFormatConfig, MarkdownStyle,
+};
 use crate::prompt::pruner::{prune_subgraph_by_budget, PrunedSubgraph};
 use crate::prompt::token_counter::TiktokenCounter;
 
@@ -165,7 +167,8 @@ impl GraphLiteEngine {
             include_edge_weights: true,
             style: opts.markdown_style,
         };
-        let markdown = format_pruned_subgraph_markdown(&pruned_subgraph, &state.interner, &format_config);
+        let markdown =
+            format_pruned_subgraph_markdown(&pruned_subgraph, &state.interner, &format_config);
 
         let entities_count = pruned_subgraph.entities.len();
         let edges_count = pruned_subgraph.edges.len();
@@ -241,12 +244,8 @@ impl GraphLiteEngine {
 
         // Budget Pruning
         let token_counter = TiktokenCounter::cl100k();
-        let pruned_subgraph = prune_subgraph_by_budget(
-            &connected_subgraph,
-            &state.interner,
-            budget,
-            &token_counter,
-        );
+        let pruned_subgraph =
+            prune_subgraph_by_budget(&connected_subgraph, &state.interner, budget, &token_counter);
 
         // Markdown Formatting
         let format_config = MarkdownFormatConfig {
@@ -255,7 +254,8 @@ impl GraphLiteEngine {
             include_edge_weights: true,
             style: opts.markdown_style,
         };
-        let markdown = format_pruned_subgraph_markdown(&pruned_subgraph, &state.interner, &format_config);
+        let markdown =
+            format_pruned_subgraph_markdown(&pruned_subgraph, &state.interner, &format_config);
 
         let entities_count = pruned_subgraph.entities.len();
         let edges_count = pruned_subgraph.edges.len();
@@ -297,10 +297,18 @@ mod tests {
             .upsert_node("Carlos Dev", "Pessoa", "Rust Engineer", Some(&v_carlos))
             .unwrap();
 
-        engine.add_edge(id_titan, id_ana, "TEM_LIDER", 0.95, true).unwrap();
-        engine.add_edge(id_titan, id_carlos, "TEM_ENGENHEIRO", 0.85, true).unwrap();
-        engine.add_edge(id_ana, id_titan, "LIDERA", 0.95, true).unwrap();
-        engine.add_edge(id_carlos, id_titan, "DESENVOLVE", 0.85, true).unwrap();
+        engine
+            .add_edge(id_titan, id_ana, "TEM_LIDER", 0.95, true)
+            .unwrap();
+        engine
+            .add_edge(id_titan, id_carlos, "TEM_ENGENHEIRO", 0.85, true)
+            .unwrap();
+        engine
+            .add_edge(id_ana, id_titan, "LIDERA", 0.95, true)
+            .unwrap();
+        engine
+            .add_edge(id_carlos, id_titan, "DESENVOLVE", 0.85, true)
+            .unwrap();
 
         // Query with vector matching "Projeto Titan"
         let query_vector = [0.98, 0.02, 0.0, 0.0];

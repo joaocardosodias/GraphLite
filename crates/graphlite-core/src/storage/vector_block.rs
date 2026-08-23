@@ -22,11 +22,10 @@ pub fn serialize_quantized_vector_block(vectors: &[QuantizedVector], dim: usize)
     for v in vectors {
         buffer.extend_from_slice(&v.scale.to_le_bytes());
         buffer.extend_from_slice(&v.norm.to_le_bytes()); // módulo do vetor
-        
+
         // Cast &[i8] to &[u8] for serialization
-        let data_u8: &[u8] = unsafe {
-            std::slice::from_raw_parts(v.data.as_ptr() as *const u8, v.data.len())
-        };
+        let data_u8: &[u8] =
+            unsafe { std::slice::from_raw_parts(v.data.as_ptr() as *const u8, v.data.len()) };
         buffer.extend_from_slice(data_u8);
     }
 
@@ -118,11 +117,7 @@ impl<'a> ZeroCopyVectorBlock<'a> {
             data.push(b as i8);
         }
 
-        Some(QuantizedVector {
-            data,
-            scale,
-            norm,
-        })
+        Some(QuantizedVector { data, scale, norm })
     }
 }
 

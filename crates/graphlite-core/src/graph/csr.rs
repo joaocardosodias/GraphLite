@@ -125,9 +125,24 @@ mod tests {
         // Node 0 has edges to 1 and 2
         // Node 1 has edge to 2
         // Node 2 has 0 edges
-        let e0 = EdgeRecord::new(EdgeId::new(1), NodeId::new(0), NodeId::new(1), StringId::new(10));
-        let e1 = EdgeRecord::new(EdgeId::new(2), NodeId::new(0), NodeId::new(2), StringId::new(11));
-        let e2 = EdgeRecord::new(EdgeId::new(3), NodeId::new(1), NodeId::new(2), StringId::new(12));
+        let e0 = EdgeRecord::new(
+            EdgeId::new(1),
+            NodeId::new(0),
+            NodeId::new(1),
+            StringId::new(10),
+        );
+        let e1 = EdgeRecord::new(
+            EdgeId::new(2),
+            NodeId::new(0),
+            NodeId::new(2),
+            StringId::new(11),
+        );
+        let e2 = EdgeRecord::new(
+            EdgeId::new(3),
+            NodeId::new(1),
+            NodeId::new(2),
+            StringId::new(12),
+        );
 
         let offsets = vec![0, 2, 3, 3]; // Node 0: [0..2], Node 1: [2..3], Node 2: [3..3]
         let edges = vec![e0, e1, e2];
@@ -139,7 +154,10 @@ mod tests {
         // Node 0 out-edges
         assert_eq!(csr.out_degree(NodeId::new(0)), 2);
         assert_eq!(csr.out_edges(NodeId::new(0)), &[e0, e1]);
-        assert_eq!(csr.out_neighbors(NodeId::new(0)), vec![NodeId::new(1), NodeId::new(2)]);
+        assert_eq!(
+            csr.out_neighbors(NodeId::new(0)),
+            vec![NodeId::new(1), NodeId::new(2)]
+        );
 
         // Node 1 out-edges
         assert_eq!(csr.out_degree(NodeId::new(1)), 1);

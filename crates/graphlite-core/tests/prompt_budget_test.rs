@@ -4,8 +4,7 @@ use graphlite_core::id::{EdgeId, NodeId};
 use graphlite_core::interner::StringInterner;
 use graphlite_core::prompt::{
     format_pruned_subgraph_markdown, format_subgraph_json, format_subgraph_triples,
-    prune_subgraph_by_budget, MarkdownFormatConfig, MarkdownStyle, TiktokenCounter,
-    TokenCounter,
+    prune_subgraph_by_budget, MarkdownFormatConfig, MarkdownStyle, TiktokenCounter, TokenCounter,
 };
 use graphlite_core::record::EdgeRecord;
 

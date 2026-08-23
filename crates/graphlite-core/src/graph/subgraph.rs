@@ -96,8 +96,7 @@ pub fn extract_subgraph_csr(
         };
     }
 
-    let selected_node_set: HashSet<NodeId> =
-        scored_entities.iter().map(|e| e.node_id).collect();
+    let selected_node_set: HashSet<NodeId> = scored_entities.iter().map(|e| e.node_id).collect();
 
     // 3. Extract all interconnecting edges between the selected entities
     let mut interconnecting_edges: Vec<EdgeRecord> = Vec::new();
@@ -149,8 +148,7 @@ pub fn extract_subgraph_adjacency(
         };
     }
 
-    let selected_node_set: HashSet<NodeId> =
-        scored_entities.iter().map(|e| e.node_id).collect();
+    let selected_node_set: HashSet<NodeId> = scored_entities.iter().map(|e| e.node_id).collect();
 
     // 3. Extract all interconnecting edges between the selected entities
     let mut interconnecting_edges: Vec<EdgeRecord> = Vec::new();
@@ -198,9 +196,36 @@ mod tests {
         }
 
         // 0 -> 1 (0.95), 1 -> 2 (0.90), 0 -> 2 (cross-edge: 0.85), 3 (isolated node)
-        g.add_edge(EdgeRecord::new(EdgeId::new(10), NodeId::new(0), NodeId::new(1), StringId::new(1)).with_weight(0.95)).unwrap();
-        g.add_edge(EdgeRecord::new(EdgeId::new(20), NodeId::new(1), NodeId::new(2), StringId::new(2)).with_weight(0.90)).unwrap();
-        g.add_edge(EdgeRecord::new(EdgeId::new(30), NodeId::new(0), NodeId::new(2), StringId::new(3)).with_weight(0.85)).unwrap();
+        g.add_edge(
+            EdgeRecord::new(
+                EdgeId::new(10),
+                NodeId::new(0),
+                NodeId::new(1),
+                StringId::new(1),
+            )
+            .with_weight(0.95),
+        )
+        .unwrap();
+        g.add_edge(
+            EdgeRecord::new(
+                EdgeId::new(20),
+                NodeId::new(1),
+                NodeId::new(2),
+                StringId::new(2),
+            )
+            .with_weight(0.90),
+        )
+        .unwrap();
+        g.add_edge(
+            EdgeRecord::new(
+                EdgeId::new(30),
+                NodeId::new(0),
+                NodeId::new(2),
+                StringId::new(3),
+            )
+            .with_weight(0.85),
+        )
+        .unwrap();
 
         g
     }
@@ -221,7 +246,7 @@ mod tests {
         let subgraph = extract_subgraph_csr(&csr, &seeds, &t_config, &h_config);
 
         assert_eq!(subgraph.entity_count(), 3); // Nodes 0, 1, 2
-        assert_eq!(subgraph.edge_count(), 3);   // Edges 10, 20, 30
+        assert_eq!(subgraph.edge_count(), 3); // Edges 10, 20, 30
 
         assert!(subgraph.contains_node(NodeId::new(0)));
         assert!(subgraph.contains_node(NodeId::new(1)));

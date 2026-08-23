@@ -122,9 +122,7 @@ pub fn format_subgraph_triples(
         let source_name = interner
             .resolve(StringId::new(edge.source.as_u32()))
             .unwrap_or("Origem");
-        let rel_name = interner
-            .resolve(edge.relation_id)
-            .unwrap_or("RELACAO");
+        let rel_name = interner.resolve(edge.relation_id).unwrap_or("RELACAO");
         let target_name = interner
             .resolve(StringId::new(edge.target.as_u32()))
             .unwrap_or("Destino");
@@ -166,13 +164,8 @@ mod tests {
             path_edge: None,
         };
 
-        let edge = EdgeRecord::new(
-            EdgeId::new(1),
-            e_titan.node_id,
-            e_ana.node_id,
-            rel_lidera,
-        )
-        .with_weight(0.98);
+        let edge = EdgeRecord::new(EdgeId::new(1), e_titan.node_id, e_ana.node_id, rel_lidera)
+            .with_weight(0.98);
 
         let pruned = PrunedSubgraph {
             entities: vec![e_titan, e_ana],

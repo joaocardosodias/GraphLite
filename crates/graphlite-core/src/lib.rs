@@ -57,8 +57,7 @@ pub mod storage;
 pub mod vector;
 
 pub use engine::{
-    GraphLiteConfig, GraphLiteEngine, QueryOptions, QueryResult, ResolutionConfig,
-    ResolutionResult,
+    GraphLiteConfig, GraphLiteEngine, QueryOptions, QueryResult, ResolutionConfig, ResolutionResult,
 };
 pub use error::{GraphLiteError, Result};
 pub use graph::{
@@ -88,15 +87,14 @@ pub use storage::{
     deserialize_quantized_vector_block, deserialize_string_table, serialize_csr_block,
     serialize_database, serialize_node_block, serialize_quantized_vector_block,
     serialize_string_table, verify_file_integrity, write_database_atomic, GraphHeader,
-    MmapGraphReader, ZeroCopyCsrBlock, ZeroCopyNodeBlock, ZeroCopyStringTable,
-    ZeroCopyVectorBlock, FLAG_COMPRESSED, FLAG_QUANTIZED_SQ8, GRAPH_MAGIC, GRAPH_VERSION,
-    HEADER_SIZE,
+    MmapGraphReader, ZeroCopyCsrBlock, ZeroCopyNodeBlock, ZeroCopyStringTable, ZeroCopyVectorBlock,
+    FLAG_COMPRESSED, FLAG_QUANTIZED_SQ8, GRAPH_MAGIC, GRAPH_VERSION, HEADER_SIZE,
 };
 pub use vector::{
-    cosine_similarity, dot_product, euclidean_distance, manhattan_distance, norm,
-    norm_squared, normalize_in_place, normalized, simd_cosine_similarity,
-    simd_dot_product, simd_euclidean_distance, simd_norm_squared, LocalEmbedder, Metric,
-    Quantization, QuantizedVector, TopKQueue, VectorStore,
+    cosine_similarity, dot_product, euclidean_distance, manhattan_distance, norm, norm_squared,
+    normalize_in_place, normalized, simd_cosine_similarity, simd_dot_product,
+    simd_euclidean_distance, simd_norm_squared, LocalEmbedder, Metric, Quantization,
+    QuantizedVector, TopKQueue, VectorStore,
 };
 
 pub const VERSION: &str = env!("CARGO_PKG_VERSION");

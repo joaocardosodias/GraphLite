@@ -1,6 +1,6 @@
-use std::path::Path;
 use anyhow::{bail, Result};
 use serde::Serialize;
+use std::path::Path;
 
 use graphlite_core::engine::config::GraphLiteConfig;
 use graphlite_core::engine::instance::GraphLiteEngine;
@@ -151,7 +151,10 @@ pub fn execute_dump(db_path: &Path, args: &DumpArgs) -> Result<()> {
                     .unwrap_or_default();
 
                 let relation = engine.resolve_string(e.relation_id).unwrap_or_default();
-                println!("- **{}** --[{}]--> **{}** (weight: {:.2})", source_name, relation, target_name, e.weight);
+                println!(
+                    "- **{}** --[{}]--> **{}** (weight: {:.2})",
+                    source_name, relation, target_name, e.weight
+                );
             }
         }
         CliDumpFormat::Triples => {
@@ -167,7 +170,10 @@ pub fn execute_dump(db_path: &Path, args: &DumpArgs) -> Result<()> {
                     .unwrap_or_default();
 
                 let relation = engine.resolve_string(e.relation_id).unwrap_or_default();
-                println!("(\"{}\") -[:{}]-> (\"{})\";", source_name, relation, target_name);
+                println!(
+                    "(\"{}\") -[:{}]-> (\"{})\";",
+                    source_name, relation, target_name
+                );
             }
         }
     }

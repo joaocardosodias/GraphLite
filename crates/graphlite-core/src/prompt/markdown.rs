@@ -57,20 +57,10 @@ pub fn format_pruned_subgraph_markdown(
 
     match config.style {
         MarkdownStyle::Hierarchical => {
-            format_hierarchical(
-                &subgraph.entities,
-                &subgraph.edges,
-                interner,
-                config,
-            )
+            format_hierarchical(&subgraph.entities, &subgraph.edges, interner, config)
         }
         MarkdownStyle::SeparatedSections => {
-            format_separated(
-                &subgraph.entities,
-                &subgraph.edges,
-                interner,
-                config,
-            )
+            format_separated(&subgraph.entities, &subgraph.edges, interner, config)
         }
     }
 }
@@ -87,20 +77,10 @@ pub fn format_connected_subgraph_markdown(
 
     match config.style {
         MarkdownStyle::Hierarchical => {
-            format_hierarchical(
-                &subgraph.entities,
-                &subgraph.edges,
-                interner,
-                config,
-            )
+            format_hierarchical(&subgraph.entities, &subgraph.edges, interner, config)
         }
         MarkdownStyle::SeparatedSections => {
-            format_separated(
-                &subgraph.entities,
-                &subgraph.edges,
-                interner,
-                config,
-            )
+            format_separated(&subgraph.entities, &subgraph.edges, interner, config)
         }
     }
 }
@@ -128,7 +108,10 @@ fn format_hierarchical(
             .unwrap_or("Entidade");
 
         if config.include_scores {
-            output.push_str(&format!("- [{}] (Relevância: {:.2})\n", node_name, entity.final_score));
+            output.push_str(&format!(
+                "- [{}] (Relevância: {:.2})\n",
+                node_name, entity.final_score
+            ));
         } else {
             output.push_str(&format!("- [{}]\n", node_name));
         }
@@ -172,7 +155,10 @@ fn format_separated(
             .unwrap_or("Entidade");
 
         if config.include_scores {
-            output.push_str(&format!("- [{}] (Score: {:.2})\n", node_name, entity.final_score));
+            output.push_str(&format!(
+                "- [{}] (Score: {:.2})\n",
+                node_name, entity.final_score
+            ));
         } else {
             output.push_str(&format!("- [{}]\n", node_name));
         }
@@ -236,13 +222,8 @@ mod tests {
             path_edge: None,
         };
 
-        let edge = EdgeRecord::new(
-            EdgeId::new(1),
-            e_titan.node_id,
-            e_ana.node_id,
-            rel_lidera,
-        )
-        .with_weight(0.98);
+        let edge = EdgeRecord::new(EdgeId::new(1), e_titan.node_id, e_ana.node_id, rel_lidera)
+            .with_weight(0.98);
 
         let pruned = PrunedSubgraph {
             entities: vec![e_titan, e_ana],

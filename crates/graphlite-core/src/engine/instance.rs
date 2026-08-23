@@ -97,7 +97,8 @@ impl GraphLiteEngine {
             }
 
             // 3. Rebuild in-memory VectorStore
-            let mut vectors = VectorStore::new(config.vector_dim, config.metric, config.quantization);
+            let mut vectors =
+                VectorStore::new(config.vector_dim, config.metric, config.quantization);
 
             if let Ok(vec_block) = reader.vectors() {
                 for (i, node_id) in node_ids.into_iter().enumerate() {

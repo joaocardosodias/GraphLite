@@ -1,5 +1,5 @@
-use std::hint::black_box;
 use criterion::{criterion_group, criterion_main, BenchmarkId, Criterion};
+use std::hint::black_box;
 use tempfile::tempdir;
 
 use graphlite_core::engine::config::GraphLiteConfig;
@@ -58,7 +58,14 @@ fn bench_csr_graph_bfs_traversal(c: &mut Criterion) {
 
     for i in 0..num_nodes {
         let nid = NodeId::new(i);
-        adj.add_node(NodeRecord::new(nid, StringId::new(i + 1), StringId::INVALID, StringId::INVALID, 0)).unwrap();
+        adj.add_node(NodeRecord::new(
+            nid,
+            StringId::new(i + 1),
+            StringId::INVALID,
+            StringId::INVALID,
+            0,
+        ))
+        .unwrap();
     }
 
     let mut edge_counter = 1;
@@ -68,11 +75,29 @@ fn bench_csr_graph_bfs_traversal(c: &mut Criterion) {
         let tgt2 = NodeId::new((i + 7) % num_nodes);
         let tgt3 = NodeId::new((i + 31) % num_nodes);
 
-        adj.add_edge(EdgeRecord::new(EdgeId::new(edge_counter), src, tgt1, StringId::new(1))).unwrap();
+        adj.add_edge(EdgeRecord::new(
+            EdgeId::new(edge_counter),
+            src,
+            tgt1,
+            StringId::new(1),
+        ))
+        .unwrap();
         edge_counter += 1;
-        adj.add_edge(EdgeRecord::new(EdgeId::new(edge_counter), src, tgt2, StringId::new(1))).unwrap();
+        adj.add_edge(EdgeRecord::new(
+            EdgeId::new(edge_counter),
+            src,
+            tgt2,
+            StringId::new(1),
+        ))
+        .unwrap();
         edge_counter += 1;
-        adj.add_edge(EdgeRecord::new(EdgeId::new(edge_counter), src, tgt3, StringId::new(1))).unwrap();
+        adj.add_edge(EdgeRecord::new(
+            EdgeId::new(edge_counter),
+            src,
+            tgt3,
+            StringId::new(1),
+        ))
+        .unwrap();
         edge_counter += 1;
     }
 
@@ -111,8 +136,12 @@ fn bench_end_to_end_retrieve_context(c: &mut Criterion) {
     // Populate 200 nodes with edges
     for i in 0..200 {
         let name = format!("Entity_{}", i);
-        let v: Vec<f32> = (0..384).map(|d| ((i * 384 + d) as f32 * 0.001).sin()).collect();
-        let nid = engine.upsert_node(&name, "Concept", "Benchmark Entity Description", Some(&v)).unwrap();
+        let v: Vec<f32> = (0..384)
+            .map(|d| ((i * 384 + d) as f32 * 0.001).sin())
+            .collect();
+        let nid = engine
+            .upsert_node(&name, "Concept", "Benchmark Entity Description", Some(&v))
+            .unwrap();
 
         if i > 0 {
             let prev = NodeId::new((i - 1) as u32);
@@ -125,7 +154,9 @@ fn bench_end_to_end_retrieve_context(c: &mut Criterion) {
 
     group.bench_function("retrieve_context_200_nodes_384d", |b| {
         b.iter(|| {
-            engine.retrieve_context(black_box(&query_vector), None).unwrap()
+            engine
+                .retrieve_context(black_box(&query_vector), None)
+                .unwrap()
         });
     });
 

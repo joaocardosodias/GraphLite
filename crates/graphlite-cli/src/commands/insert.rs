@@ -1,6 +1,6 @@
+use anyhow::{bail, Context, Result};
 use std::fs;
 use std::path::Path;
-use anyhow::{bail, Context, Result};
 
 use graphlite_core::engine::config::GraphLiteConfig;
 use graphlite_core::engine::entity_resolution::ResolutionConfig;
@@ -24,8 +24,9 @@ fn parse_vector_arg(raw: Option<&str>) -> Result<Option<Vec<f32>>> {
     if (s.ends_with(".json") || Path::new(s).exists()) && Path::new(s).is_file() {
         let content = fs::read_to_string(s)
             .with_context(|| format!("Failed to read vector JSON file: {}", s))?;
-        let vector: Vec<f32> = serde_json::from_str(&content)
-            .with_context(|| "Invalid JSON format: expected an array of numbers (e.g. [0.1, 0.2, ...])")?;
+        let vector: Vec<f32> = serde_json::from_str(&content).with_context(|| {
+            "Invalid JSON format: expected an array of numbers (e.g. [0.1, 0.2, ...])"
+        })?;
         return Ok(Some(vector));
     }
 
@@ -109,12 +110,7 @@ pub fn execute_insert_node(db_path: &Path, args: &InsertNodeArgs) -> Result<()> 
                 Some(res_config),
             )?
         } else {
-            let id = engine.upsert_node(
-                &args.name,
-                &args.entity_type,
-                &args.description,
-                None,
-            )?;
+            let id = engine.upsert_node(&args.name, &args.entity_type, &args.description, None)?;
             graphlite_core::engine::ResolutionResult {
                 node_id: id,
                 is_merged: false,
@@ -155,7 +151,10 @@ pub fn execute_insert_node(db_path: &Path, args: &InsertNodeArgs) -> Result<()> 
 
 pub fn execute_insert_edge(db_path: &Path, args: &InsertEdgeArgs) -> Result<()> {
     if !db_path.exists() {
-        bail!("Database file '{:?}' not found. Initialize with 'graphlite init' first.", db_path);
+        bail!(
+            "Database file '{:?}' not found. Initialize with 'graphlite init' first.",
+            db_path
+        );
     }
 
     let config = load_or_default_config(db_path);
@@ -181,9 +180,19 @@ pub fn execute_insert_edge(db_path: &Path, args: &InsertEdgeArgs) -> Result<()> 
 
     println!("Edge created successfully.");
     println!("  Edge ID:     {}", edge_id);
-    println!("  Connection:  '{}' --[{}]--> '{}'", args.source, args.relation, args.target);
+    println!(
+        "  Connection:  '{}' --[{}]--> '{}'",
+        args.source, args.relation, args.target
+    );
     println!("  Weight:      {:.2}", args.weight);
-    println!("  Directed:    {}", if args.directed { "true" } else { "false (bidirectional)" });
+    println!(
+        "  Directed:    {}",
+        if args.directed {
+            "true"
+        } else {
+            "false (bidirectional)"
+        }
+    );
 
     Ok(())
 }

@@ -1,5 +1,5 @@
-use std::path::PathBuf;
 use clap::{Args, Parser, Subcommand, ValueEnum};
+use std::path::PathBuf;
 
 /// GraphLite: An embedded, single-file Graph + Vector / GraphRAG engine in pure Rust.
 #[derive(Parser, Debug)]
@@ -54,7 +54,12 @@ pub enum Commands {
 #[derive(Args, Debug)]
 pub struct InitArgs {
     /// Vector embedding dimensionality (e.g. 384, 768, 1536).
-    #[arg(short = 'D', long, default_value_t = 384, help = "Vector embedding dimension")]
+    #[arg(
+        short = 'D',
+        long,
+        default_value_t = 384,
+        help = "Vector embedding dimension"
+    )]
     pub dim: usize,
 
     /// Vector distance metric.
@@ -66,7 +71,12 @@ pub struct InitArgs {
     pub quantization: CliQuantization,
 
     /// Default token budget allocated for LLM context retrieval.
-    #[arg(short = 't', long, default_value_t = 2048, help = "Default token budget for prompts")]
+    #[arg(
+        short = 't',
+        long,
+        default_value_t = 2048,
+        help = "Default token budget for prompts"
+    )]
     pub max_tokens: usize,
 
     /// Overwrite existing database file if it already exists.
@@ -81,15 +91,29 @@ pub struct InsertNodeArgs {
     pub name: String,
 
     /// Category or type of entity.
-    #[arg(short = 't', long, default_value = "", help = "Entity type (e.g. 'Person', 'Project')")]
+    #[arg(
+        short = 't',
+        long,
+        default_value = "",
+        help = "Entity type (e.g. 'Person', 'Project')"
+    )]
     pub entity_type: String,
 
     /// Text description / summary of the entity.
-    #[arg(short = 'D', long, default_value = "", help = "Textual summary or content")]
+    #[arg(
+        short = 'D',
+        long,
+        default_value = "",
+        help = "Textual summary or content"
+    )]
     pub description: String,
 
     /// Comma-separated float values of the embedding vector, or path to a JSON file.
-    #[arg(short = 'V', long, help = "Comma-separated vector floats (e.g. '0.1,0.2,0.3')")]
+    #[arg(
+        short = 'V',
+        long,
+        help = "Comma-separated vector floats (e.g. '0.1,0.2,0.3')"
+    )]
     pub vector: Option<String>,
 
     /// Automatically compute vector embedding in pure Rust from name and description.
@@ -97,7 +121,11 @@ pub struct InsertNodeArgs {
     pub auto_embed: bool,
 
     /// Automatically merge with an existing node if semantic cosine similarity >= 0.92.
-    #[arg(long, default_value_t = true, help = "Enable real-time entity resolution")]
+    #[arg(
+        long,
+        default_value_t = true,
+        help = "Enable real-time entity resolution"
+    )]
     pub resolve: bool,
 }
 
@@ -116,7 +144,12 @@ pub struct InsertEdgeArgs {
     pub relation: String,
 
     /// Semantic confidence weight of the connection (0.0 to 1.0).
-    #[arg(short = 'w', long, default_value_t = 1.0, help = "Edge weight between 0.0 and 1.0")]
+    #[arg(
+        short = 'w',
+        long,
+        default_value_t = 1.0,
+        help = "Edge weight between 0.0 and 1.0"
+    )]
     pub weight: f32,
 
     /// Whether the relationship is directed (source -> target).
@@ -131,11 +164,19 @@ pub struct QueryArgs {
     pub vector: Option<String>,
 
     /// Plain text search query (computes vector embedding automatically in pure Rust).
-    #[arg(short = 'T', long = "text", help = "Plain text search query (auto-embedded)")]
+    #[arg(
+        short = 'T',
+        long = "text",
+        help = "Plain text search query (auto-embedded)"
+    )]
     pub query_text: Option<String>,
 
     /// Comma-separated seed entity names for textual exploration.
-    #[arg(short = 's', long, help = "Comma-separated seed entity names (e.g. 'Titan,Ana')")]
+    #[arg(
+        short = 's',
+        long,
+        help = "Comma-separated seed entity names (e.g. 'Titan,Ana')"
+    )]
     pub seeds: Option<String>,
 
     /// Number of seed entities to retrieve via vector search.
@@ -143,7 +184,11 @@ pub struct QueryArgs {
     pub top_k: usize,
 
     /// Maximum token budget for the returned prompt.
-    #[arg(short = 't', long, help = "Token budget limit (overrides config default)")]
+    #[arg(
+        short = 't',
+        long,
+        help = "Token budget limit (overrides config default)"
+    )]
     pub tokens: Option<usize>,
 
     /// Maximum BFS graph exploration depth in hops.
@@ -151,7 +196,10 @@ pub struct QueryArgs {
     pub depth: Option<usize>,
 
     /// Alpha balancing factor between vector score and graph topology ($0.0 \le \alpha \le 1.0$).
-    #[arg(long, help = "Hybrid score alpha (1.0 = pure vector, 0.0 = pure graph)")]
+    #[arg(
+        long,
+        help = "Hybrid score alpha (1.0 = pure vector, 0.0 = pure graph)"
+    )]
     pub alpha: Option<f32>,
 
     /// Output formatting mode.

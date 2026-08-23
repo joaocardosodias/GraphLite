@@ -1,7 +1,7 @@
-use std::fs;
-use std::path::Path;
 use anyhow::{bail, Result};
 use serde::Serialize;
+use std::fs;
+use std::path::Path;
 
 use graphlite_core::storage::checksum::verify_file_integrity;
 use graphlite_core::storage::mmap_reader::MmapGraphReader;
@@ -89,13 +89,21 @@ pub fn execute_inspect(db_path: &Path, args: &InspectArgs) -> Result<()> {
         println!("                GRAPHLITE DATABASE DIAGNOSTICS              ");
         println!("============================================================");
         println!("Database File:         {:?}", db_path);
-        println!("Disk File Size:        {} bytes ({:.2} KB)", file_size, file_size as f64 / 1024.0);
-        println!("CRC32 Integrity:       {} (Checksum: 0x{:08X})", 
-            if is_valid { "VALID" } else { "CORRUPTED" }, 
+        println!(
+            "Disk File Size:        {} bytes ({:.2} KB)",
+            file_size,
+            file_size as f64 / 1024.0
+        );
+        println!(
+            "CRC32 Integrity:       {} (Checksum: 0x{:08X})",
+            if is_valid { "VALID" } else { "CORRUPTED" },
             header.checksum
         );
         println!("------------------------------------------------------------");
-        println!("Binary Format:         {} (Version: {})", magic_str, header.version);
+        println!(
+            "Binary Format:         {} (Version: {})",
+            magic_str, header.version
+        );
         println!("Vector Dimension:      {} dimensions", header.vector_dim);
         println!("Distance Metric:       {}", metric_str);
         println!("Quantization Mode:     {}", quant_str);
@@ -105,10 +113,23 @@ pub fn execute_inspect(db_path: &Path, args: &InspectArgs) -> Result<()> {
         println!("String Pool Size:      {} bytes", header.string_bytes_len);
         println!("------------------------------------------------------------");
         println!("Section Offsets (Zero-Copy Mmap):");
-        println!("  NodeBlock:           offset 0x{:08X} ({} bytes)", header.node_section_offset, header.node_count as u64 * 32);
-        println!("  Edge/CSR Block:      offset 0x{:08X}", header.edge_section_offset);
-        println!("  VectorBlock:         offset 0x{:08X}", header.vector_section_offset);
-        println!("  StringTable:         offset 0x{:08X} ({} bytes)", header.string_section_offset, header.string_bytes_len);
+        println!(
+            "  NodeBlock:           offset 0x{:08X} ({} bytes)",
+            header.node_section_offset,
+            header.node_count as u64 * 32
+        );
+        println!(
+            "  Edge/CSR Block:      offset 0x{:08X}",
+            header.edge_section_offset
+        );
+        println!(
+            "  VectorBlock:         offset 0x{:08X}",
+            header.vector_section_offset
+        );
+        println!(
+            "  StringTable:         offset 0x{:08X} ({} bytes)",
+            header.string_section_offset, header.string_bytes_len
+        );
         println!("============================================================");
     }
 

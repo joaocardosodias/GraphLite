@@ -15,10 +15,7 @@ pub struct Bm25Params {
 
 impl Default for Bm25Params {
     fn default() -> Self {
-        Self {
-            k1: 1.2,
-            b: 0.75,
-        }
+        Self { k1: 1.2, b: 0.75 }
     }
 }
 
@@ -97,7 +94,8 @@ impl Bm25Index {
             for postings in self.inverted_index.values_mut() {
                 postings.retain(|(nid, _)| *nid != node_id);
             }
-            self.inverted_index.retain(|_, postings| !postings.is_empty());
+            self.inverted_index
+                .retain(|_, postings| !postings.is_empty());
         }
     }
 
@@ -203,7 +201,10 @@ mod tests {
         let n2 = NodeId::new(2);
         let n3 = NodeId::new(3);
 
-        index.index_node(n1, "AuthService JWT token validation and session management");
+        index.index_node(
+            n1,
+            "AuthService JWT token validation and session management",
+        );
         index.index_node(n2, "PaymentGateway Stripe and Pix transaction processing");
         index.index_node(n3, "InventoryManager real-time stock and warehouse catalog");
 

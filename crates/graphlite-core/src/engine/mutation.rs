@@ -59,7 +59,8 @@ impl GraphLiteEngine {
                     record.type_id = type_id;
                     record.description_id = description_id;
                     if vector.is_some() {
-                        record.vector_offset = (id.as_u32() as u64) * (8 + self.config().vector_dim as u64);
+                        record.vector_offset =
+                            (id.as_u32() as u64) * (8 + self.config().vector_dim as u64);
                     }
                     state.graph.upsert_node(record);
                     id
@@ -73,13 +74,8 @@ impl GraphLiteEngine {
                         NO_VECTOR_OFFSET
                     };
 
-                    let record = NodeRecord::new(
-                        new_id,
-                        name_id,
-                        type_id,
-                        description_id,
-                        vector_offset,
-                    );
+                    let record =
+                        NodeRecord::new(new_id, name_id, type_id, description_id, vector_offset);
                     state.graph.add_node(record)?;
                     new_id
                 }
@@ -91,7 +87,12 @@ impl GraphLiteEngine {
             }
 
             // Update BM25 lexical index
-            let text_to_index = format!("{} {} {}", trimmed_name, entity_type.trim(), description.trim());
+            let text_to_index = format!(
+                "{} {} {}",
+                trimmed_name,
+                entity_type.trim(),
+                description.trim()
+            );
             state.bm25.index_node(target_node_id, &text_to_index);
 
             state.dirty = true;

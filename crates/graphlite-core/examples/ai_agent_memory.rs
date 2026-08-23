@@ -79,7 +79,11 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         db.add_edge(id_apollo, id_axum, "BUILT_WITH", 0.90, true)?;
         db.add_edge(id_apollo, id_rule, "MUST_COMPLY_WITH", 0.99, true)?;
 
-        println!("  - Ingested {} nodes and {} edges to disk.\n", db.node_count(), db.edge_count());
+        println!(
+            "  - Ingested {} nodes and {} edges to disk.\n",
+            db.node_count(),
+            db.edge_count()
+        );
     }
 
     // =========================================================================
@@ -104,8 +108,14 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             }),
         )?;
 
-        println!("  - Entity Resolution Triggered: is_merged = {}", res.is_merged);
-        println!("  - Node Count remained at {} (No duplicate nodes created!)\n", db.node_count());
+        println!(
+            "  - Entity Resolution Triggered: is_merged = {}",
+            res.is_merged
+        );
+        println!(
+            "  - Node Count remained at {} (No duplicate nodes created!)\n",
+            db.node_count()
+        );
     }
 
     // =========================================================================
@@ -132,11 +142,16 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             }),
         )?;
 
-        println!("=== Context Retrieved by GraphLite ({} tokens) ===", result.token_count);
+        println!(
+            "=== Context Retrieved by GraphLite ({} tokens) ===",
+            result.token_count
+        );
         println!("{}\n", result.markdown);
 
         println!("=== Formatted LLM Prompt ===");
-        println!("System: You are an autonomous coding assistant. Use the verified knowledge below:");
+        println!(
+            "System: You are an autonomous coding assistant. Use the verified knowledge below:"
+        );
         println!("```markdown\n{}\n```", result.markdown.trim());
         println!("User: How should I implement the new endpoint for Alice's service?\n");
     }

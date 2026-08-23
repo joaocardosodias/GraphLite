@@ -27,18 +27,23 @@ fn test_full_ai_assistant_knowledge_graph_workflow() {
         let db = GraphLiteEngine::open_or_create(&db_path, config.clone()).unwrap();
 
         // Vectors representing semantic clusters
-        let v_ai_titan = [1.0, 0.0, 0.0, 0.0];      // AI Cluster
-        let v_ana = [0.95, 0.05, 0.0, 0.0];         // AI Cluster
-        let v_carlos = [0.9, 0.1, 0.0, 0.0];        // AI Cluster
-        let v_graphlite = [0.85, 0.15, 0.0, 0.0];   // AI Cluster
+        let v_ai_titan = [1.0, 0.0, 0.0, 0.0]; // AI Cluster
+        let v_ana = [0.95, 0.05, 0.0, 0.0]; // AI Cluster
+        let v_carlos = [0.9, 0.1, 0.0, 0.0]; // AI Cluster
+        let v_graphlite = [0.85, 0.15, 0.0, 0.0]; // AI Cluster
 
-        let v_ecommerce = [0.0, 0.0, 1.0, 0.0];     // E-Commerce Cluster (Unrelated)
-        let v_mariana = [0.0, 0.0, 0.95, 0.05];     // E-Commerce Cluster
-        let v_postgres = [0.0, 0.0, 0.9, 0.1];      // E-Commerce Cluster
+        let v_ecommerce = [0.0, 0.0, 1.0, 0.0]; // E-Commerce Cluster (Unrelated)
+        let v_mariana = [0.0, 0.0, 0.95, 0.05]; // E-Commerce Cluster
+        let v_postgres = [0.0, 0.0, 0.9, 0.1]; // E-Commerce Cluster
 
         // Insert AI project cluster
         let id_titan = db
-            .upsert_node("Projeto Titan", "Projeto", "IA Generativa e RAG", Some(&v_ai_titan))
+            .upsert_node(
+                "Projeto Titan",
+                "Projeto",
+                "IA Generativa e RAG",
+                Some(&v_ai_titan),
+            )
             .unwrap();
         let id_ana = db
             .upsert_node("Ana Silva", "Pessoa", "Tech Lead de IA", Some(&v_ana))
@@ -47,28 +52,54 @@ fn test_full_ai_assistant_knowledge_graph_workflow() {
             .upsert_node("Carlos Dev", "Pessoa", "Engenheiro Rust", Some(&v_carlos))
             .unwrap();
         let id_graphlite = db
-            .upsert_node("GraphLite Engine", "Tecnologia", "Banco de Grafos Embutido", Some(&v_graphlite))
+            .upsert_node(
+                "GraphLite Engine",
+                "Tecnologia",
+                "Banco de Grafos Embutido",
+                Some(&v_graphlite),
+            )
             .unwrap();
 
         // Insert E-Commerce project cluster
         let id_ecom = db
-            .upsert_node("Loja Online", "Projeto", "Plataforma E-Commerce", Some(&v_ecommerce))
+            .upsert_node(
+                "Loja Online",
+                "Projeto",
+                "Plataforma E-Commerce",
+                Some(&v_ecommerce),
+            )
             .unwrap();
         let id_mariana = db
-            .upsert_node("Mariana PM", "Pessoa", "Gerente de Produto", Some(&v_mariana))
+            .upsert_node(
+                "Mariana PM",
+                "Pessoa",
+                "Gerente de Produto",
+                Some(&v_mariana),
+            )
             .unwrap();
         let id_postgres = db
-            .upsert_node("PostgreSQL", "Tecnologia", "Banco Relacional", Some(&v_postgres))
+            .upsert_node(
+                "PostgreSQL",
+                "Tecnologia",
+                "Banco Relacional",
+                Some(&v_postgres),
+            )
             .unwrap();
 
         // Connect relationships
-        db.add_edge(id_titan, id_ana, "LIDERADO_POR", 0.95, true).unwrap();
-        db.add_edge(id_titan, id_carlos, "DESENVOLVIDO_POR", 0.90, true).unwrap();
-        db.add_edge(id_titan, id_graphlite, "UTILIZA", 0.99, true).unwrap();
-        db.add_edge(id_ana, id_carlos, "COORDENA", 0.85, false).unwrap();
+        db.add_edge(id_titan, id_ana, "LIDERADO_POR", 0.95, true)
+            .unwrap();
+        db.add_edge(id_titan, id_carlos, "DESENVOLVIDO_POR", 0.90, true)
+            .unwrap();
+        db.add_edge(id_titan, id_graphlite, "UTILIZA", 0.99, true)
+            .unwrap();
+        db.add_edge(id_ana, id_carlos, "COORDENA", 0.85, false)
+            .unwrap();
 
-        db.add_edge(id_ecom, id_mariana, "GERENCIADO_POR", 0.90, true).unwrap();
-        db.add_edge(id_ecom, id_postgres, "UTILIZA", 0.95, true).unwrap();
+        db.add_edge(id_ecom, id_mariana, "GERENCIADO_POR", 0.90, true)
+            .unwrap();
+        db.add_edge(id_ecom, id_postgres, "UTILIZA", 0.95, true)
+            .unwrap();
 
         assert_eq!(db.node_count(), 7);
         assert_eq!(db.edge_count(), 6);
@@ -123,7 +154,9 @@ fn test_multithreaded_concurrent_reads_and_writes() {
     for i in 0..10 {
         let name = format!("Entidade_Base_{}", i);
         let v = [(i as f32) * 0.1, 0.2, 0.3, 0.4];
-        engine.upsert_node(&name, "Base", "Descricao", Some(&v)).unwrap();
+        engine
+            .upsert_node(&name, "Base", "Descricao", Some(&v))
+            .unwrap();
     }
 
     let mut handles = Vec::new();
@@ -206,7 +239,9 @@ fn test_entity_resolution_with_synonyms_and_merging() {
     assert_eq!(db.node_count(), 1);
 
     // Verify merged description contains both inputs
-    let node = db.get_node_by_name("Inteligência Artificial Generativa").unwrap();
+    let node = db
+        .get_node_by_name("Inteligência Artificial Generativa")
+        .unwrap();
     let desc = db.resolve_string(node.description_id).unwrap();
     assert!(desc.contains("gerar conteúdo"));
     assert!(desc.contains("LLMs e difusão"));

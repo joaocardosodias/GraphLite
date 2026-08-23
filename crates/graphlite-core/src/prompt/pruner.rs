@@ -96,7 +96,10 @@ pub fn prune_subgraph_by_budget(
             .unwrap_or("Entidade");
 
         // Format candidate entity string to measure exact token cost
-        let entity_line = format!("- [{}] (Relevância: {:.2})\n", node_name, entity.final_score);
+        let entity_line = format!(
+            "- [{}] (Relevância: {:.2})\n",
+            node_name, entity.final_score
+        );
         let entity_tokens = counter.count_tokens(&entity_line);
 
         if current_tokens + entity_tokens > max_tokens {
@@ -183,8 +186,10 @@ mod tests {
             path_edge: None,
         };
 
-        let edge0 = EdgeRecord::new(EdgeId::new(1), e0.node_id, e1.node_id, rel_lidera).with_weight(0.95);
-        let edge1 = EdgeRecord::new(EdgeId::new(2), e0.node_id, e2.node_id, rel_escrito).with_weight(0.90);
+        let edge0 =
+            EdgeRecord::new(EdgeId::new(1), e0.node_id, e1.node_id, rel_lidera).with_weight(0.95);
+        let edge1 =
+            EdgeRecord::new(EdgeId::new(2), e0.node_id, e2.node_id, rel_escrito).with_weight(0.90);
 
         let subgraph = ConnectedSubgraph {
             entities: vec![e0, e1, e2],

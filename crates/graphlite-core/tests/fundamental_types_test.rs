@@ -52,8 +52,8 @@ fn test_string_interner_unicode_and_portuguese() {
     );
 
     // Total byte count must match actual UTF-8 byte lengths
-    let expected_bytes = "São Paulo - Engenharia de Software".len()
-        + "Configuração de Grafos & IA 🚀".len();
+    let expected_bytes =
+        "São Paulo - Engenharia de Software".len() + "Configuração de Grafos & IA 🚀".len();
     assert_eq!(interner.total_bytes(), expected_bytes);
     assert_eq!(interner.len(), 2);
 }
@@ -79,10 +79,7 @@ fn test_records_binary_packing_and_alignment() {
         })
         .collect();
 
-    assert_eq!(
-        nodes.len() * NodeRecord::BINARY_SIZE,
-        320
-    );
+    assert_eq!(nodes.len() * NodeRecord::BINARY_SIZE, 320);
 }
 
 #[test]
@@ -125,13 +122,7 @@ fn test_simulated_mini_graph_construction() {
     let str_leads = interner.intern("LEADS");
 
     // 2. Build nodes
-    let node_ana = NodeRecord::new(
-        NodeId::new(1),
-        str_ana,
-        str_person,
-        StringId::INVALID,
-        0,
-    );
+    let node_ana = NodeRecord::new(NodeId::new(1), str_ana, str_person, StringId::INVALID, 0);
 
     let node_titan = NodeRecord::new(
         NodeId::new(2),
@@ -142,13 +133,8 @@ fn test_simulated_mini_graph_construction() {
     );
 
     // 3. Build edge
-    let edge_lead = EdgeRecord::new(
-        EdgeId::new(1),
-        node_ana.id,
-        node_titan.id,
-        str_leads,
-    )
-    .with_weight(0.98);
+    let edge_lead =
+        EdgeRecord::new(EdgeId::new(1), node_ana.id, node_titan.id, str_leads).with_weight(0.98);
 
     // 4. Verify graph connections and string resolutions
     assert_eq!(interner.resolve(node_ana.name_id), Some("Ana Silva"));

@@ -1,5 +1,5 @@
-use std::collections::HashMap;
 use rayon::prelude::*;
+use std::collections::HashMap;
 
 use crate::error::{GraphLiteError, Result};
 use crate::id::NodeId;
@@ -239,12 +239,10 @@ impl VectorStore {
                         let node_id = self.node_ids[idx];
 
                         let score = match self.metric {
-                            Metric::Cosine => {
-                                q.cosine_similarity_asymmetric(query, query_norm).unwrap_or(0.0)
-                            }
-                            Metric::DotProduct => {
-                                q.dot_product_asymmetric(query).unwrap_or(0.0)
-                            }
+                            Metric::Cosine => q
+                                .cosine_similarity_asymmetric(query, query_norm)
+                                .unwrap_or(0.0),
+                            Metric::DotProduct => q.dot_product_asymmetric(query).unwrap_or(0.0),
                             Metric::Euclidean | Metric::Manhattan => {
                                 // Dequantize for distance fallback
                                 let deq = q.dequantize();
@@ -265,9 +263,7 @@ impl VectorStore {
         });
 
         scores.truncate(k);
-        scores.sort_by(|a, b| {
-            b.1.partial_cmp(&a.1).unwrap_or(std::cmp::Ordering::Equal)
-        });
+        scores.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap_or(std::cmp::Ordering::Equal));
 
         // If metric is Euclidean or Manhattan, restore positive distance values
         if self.metric == Metric::Euclidean || self.metric == Metric::Manhattan {
@@ -312,7 +308,8 @@ impl VectorStore {
     /// Calculates the approximate memory usage in bytes.
     pub fn memory_usage(&self) -> usize {
         let ids_mem = self.node_ids.len() * std::mem::size_of::<NodeId>();
-        let map_mem = self.node_to_idx.len() * (std::mem::size_of::<NodeId>() + std::mem::size_of::<usize>());
+        let map_mem =
+            self.node_to_idx.len() * (std::mem::size_of::<NodeId>() + std::mem::size_of::<usize>());
         let payload_mem = match self.quantization {
             Quantization::None => self.flat_f32.len() * std::mem::size_of::<f32>(),
             Quantization::ScalarInt8 => self.quantized.iter().map(|q| q.byte_size()).sum(),

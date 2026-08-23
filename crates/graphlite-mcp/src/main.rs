@@ -102,7 +102,11 @@ fn compute_auto_embedding(
                 if let Some(arr) = res.get("embedding").and_then(|v| v.as_array()) {
                     let vec: Result<Vec<f32>, _> = arr
                         .iter()
-                        .map(|x| x.as_f64().map(|f| f as f32).ok_or_else(|| anyhow::anyhow!("Invalid float in embedding array")))
+                        .map(|x| {
+                            x.as_f64()
+                                .map(|f| f as f32)
+                                .ok_or_else(|| anyhow::anyhow!("Invalid float in embedding array"))
+                        })
                         .collect();
                     if let Ok(v) = vec {
                         return Ok(v);
@@ -226,7 +230,12 @@ fn handle_tool_call(
             }
 
             // High-priority automatic in-memory embedding
-            let query_vec = compute_auto_embedding(local_embedder, &args.ollama_url, &args.embedding_model, query)?;
+            let query_vec = compute_auto_embedding(
+                local_embedder,
+                &args.ollama_url,
+                &args.embedding_model,
+                query,
+            )?;
 
             let options = QueryOptions {
                 top_k_seeds: top_k,
@@ -266,12 +275,19 @@ fn handle_tool_call(
                 .unwrap_or("");
 
             if name.trim().is_empty() || description.trim().is_empty() {
-                anyhow::bail!("'name' and 'description' are required parameters for graphlite_remember");
+                anyhow::bail!(
+                    "'name' and 'description' are required parameters for graphlite_remember"
+                );
             }
 
             let text_to_embed = format!("{} {}: {}", name, entity_type, description);
             // High-priority automatic in-memory embedding
-            let vec = compute_auto_embedding(local_embedder, &args.ollama_url, &args.embedding_model, &text_to_embed)?;
+            let vec = compute_auto_embedding(
+                local_embedder,
+                &args.ollama_url,
+                &args.embedding_model,
+                &text_to_embed,
+            )?;
 
             let res_config = ResolutionConfig {
                 similarity_threshold: 0.92,
@@ -279,7 +295,13 @@ fn handle_tool_call(
                 merge_descriptions: true,
             };
 
-            let res = engine.upsert_node_resolved(name, entity_type, description, &vec, Some(res_config))?;
+            let res = engine.upsert_node_resolved(
+                name,
+                entity_type,
+                description,
+                &vec,
+                Some(res_config),
+            )?;
             engine.flush()?;
 
             if res.is_merged {
@@ -419,7 +441,13 @@ fn main() -> anyhow::Result<()> {
                 let tool_name = params.get("name").and_then(|v| v.as_str()).unwrap_or("");
                 let arguments = params.get("arguments").unwrap_or(&Value::Null);
 
-                match handle_tool_call(&engine, local_embedder.as_ref(), &args, tool_name, arguments) {
+                match handle_tool_call(
+                    &engine,
+                    local_embedder.as_ref(),
+                    &args,
+                    tool_name,
+                    arguments,
+                ) {
                     Ok(text) => JsonRpcResponse {
                         jsonrpc: "2.0",
                         id: req.id,

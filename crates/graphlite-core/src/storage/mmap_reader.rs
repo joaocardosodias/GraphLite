@@ -154,7 +154,7 @@ mod tests {
     use crate::graph::csr::CsrGraph;
     use crate::id::{EdgeId, StringId};
     use crate::interner::StringInterner;
-    use crate::record::{NO_VECTOR_OFFSET};
+    use crate::record::NO_VECTOR_OFFSET;
     use crate::storage::checksum::compute_file_checksum;
     use crate::storage::csr_block::serialize_csr_block;
     use crate::storage::header::FLAG_QUANTIZED_SQ8;
@@ -189,7 +189,8 @@ mod tests {
         );
         let node_bytes = serialize_node_block(&[node0, node1]);
 
-        let edge0 = EdgeRecord::new(EdgeId::new(1), node0.id, node1.id, rel_lidera).with_weight(0.95);
+        let edge0 =
+            EdgeRecord::new(EdgeId::new(1), node0.id, node1.id, rel_lidera).with_weight(0.95);
         let csr = CsrGraph::new(vec![0, 1, 1], vec![edge0], 2);
         let edge_bytes = serialize_csr_block(&csr);
 

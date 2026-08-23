@@ -130,7 +130,13 @@ mod tests {
             (NodeId::new(2), 0.80),
         ];
 
-        let e1 = EdgeRecord::new(EdgeId::new(10), NodeId::new(1), NodeId::new(3), StringId::new(1)).with_weight(0.95);
+        let e1 = EdgeRecord::new(
+            EdgeId::new(10),
+            NodeId::new(1),
+            NodeId::new(3),
+            StringId::new(1),
+        )
+        .with_weight(0.95);
 
         let traversed = vec![
             TraversedNode {

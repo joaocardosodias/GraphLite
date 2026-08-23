@@ -57,7 +57,9 @@ impl LocalEmbedder {
             .map_err(|e| GraphLiteError::Io(std::io::Error::other(e.to_string())))?;
 
         embeddings.into_iter().next().ok_or_else(|| {
-            GraphLiteError::Io(std::io::Error::other("Empty embedding output from ONNX runtime"))
+            GraphLiteError::Io(std::io::Error::other(
+                "Empty embedding output from ONNX runtime",
+            ))
         })
     }
 

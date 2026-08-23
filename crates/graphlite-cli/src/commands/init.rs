@@ -1,6 +1,6 @@
+use anyhow::{bail, Result};
 use std::fs;
 use std::path::Path;
-use anyhow::{bail, Result};
 
 use graphlite_core::engine::config::GraphLiteConfig;
 use graphlite_core::engine::instance::GraphLiteEngine;

@@ -380,17 +380,49 @@ mod tests {
     fn test_remove_node_cascades_edges() {
         let mut graph = AdjacencyGraph::new();
 
-        let n1 = NodeRecord::new(NodeId::new(1), StringId::new(1), StringId::new(2), StringId::INVALID, 0);
-        let n2 = NodeRecord::new(NodeId::new(2), StringId::new(3), StringId::new(4), StringId::INVALID, 0);
-        let n3 = NodeRecord::new(NodeId::new(3), StringId::new(5), StringId::new(6), StringId::INVALID, 0);
+        let n1 = NodeRecord::new(
+            NodeId::new(1),
+            StringId::new(1),
+            StringId::new(2),
+            StringId::INVALID,
+            0,
+        );
+        let n2 = NodeRecord::new(
+            NodeId::new(2),
+            StringId::new(3),
+            StringId::new(4),
+            StringId::INVALID,
+            0,
+        );
+        let n3 = NodeRecord::new(
+            NodeId::new(3),
+            StringId::new(5),
+            StringId::new(6),
+            StringId::INVALID,
+            0,
+        );
 
         graph.add_node(n1).unwrap();
         graph.add_node(n2).unwrap();
         graph.add_node(n3).unwrap();
 
         // 1 -> 2 and 2 -> 3
-        graph.add_edge(EdgeRecord::new(EdgeId::new(1), NodeId::new(1), NodeId::new(2), StringId::new(10))).unwrap();
-        graph.add_edge(EdgeRecord::new(EdgeId::new(2), NodeId::new(2), NodeId::new(3), StringId::new(11))).unwrap();
+        graph
+            .add_edge(EdgeRecord::new(
+                EdgeId::new(1),
+                NodeId::new(1),
+                NodeId::new(2),
+                StringId::new(10),
+            ))
+            .unwrap();
+        graph
+            .add_edge(EdgeRecord::new(
+                EdgeId::new(2),
+                NodeId::new(2),
+                NodeId::new(3),
+                StringId::new(11),
+            ))
+            .unwrap();
 
         assert_eq!(graph.edge_count(), 2);
 
@@ -408,9 +440,27 @@ mod tests {
     fn test_adjacency_to_csr_compilation() {
         let mut graph = AdjacencyGraph::new();
 
-        let n0 = NodeRecord::new(NodeId::new(0), StringId::new(1), StringId::new(2), StringId::INVALID, 0);
-        let n1 = NodeRecord::new(NodeId::new(1), StringId::new(3), StringId::new(4), StringId::INVALID, 0);
-        let n2 = NodeRecord::new(NodeId::new(2), StringId::new(5), StringId::new(6), StringId::INVALID, 0);
+        let n0 = NodeRecord::new(
+            NodeId::new(0),
+            StringId::new(1),
+            StringId::new(2),
+            StringId::INVALID,
+            0,
+        );
+        let n1 = NodeRecord::new(
+            NodeId::new(1),
+            StringId::new(3),
+            StringId::new(4),
+            StringId::INVALID,
+            0,
+        );
+        let n2 = NodeRecord::new(
+            NodeId::new(2),
+            StringId::new(5),
+            StringId::new(6),
+            StringId::INVALID,
+            0,
+        );
 
         graph.add_node(n0).unwrap();
         graph.add_node(n1).unwrap();
@@ -419,9 +469,27 @@ mod tests {
         // Node 0 -> Node 1 (weight 0.9)
         // Node 0 -> Node 2 (weight 0.8)
         // Node 1 -> Node 2 (weight 0.7)
-        let e1 = EdgeRecord::new(EdgeId::new(1), NodeId::new(0), NodeId::new(1), StringId::new(10)).with_weight(0.9);
-        let e2 = EdgeRecord::new(EdgeId::new(2), NodeId::new(0), NodeId::new(2), StringId::new(11)).with_weight(0.8);
-        let e3 = EdgeRecord::new(EdgeId::new(3), NodeId::new(1), NodeId::new(2), StringId::new(12)).with_weight(0.7);
+        let e1 = EdgeRecord::new(
+            EdgeId::new(1),
+            NodeId::new(0),
+            NodeId::new(1),
+            StringId::new(10),
+        )
+        .with_weight(0.9);
+        let e2 = EdgeRecord::new(
+            EdgeId::new(2),
+            NodeId::new(0),
+            NodeId::new(2),
+            StringId::new(11),
+        )
+        .with_weight(0.8);
+        let e3 = EdgeRecord::new(
+            EdgeId::new(3),
+            NodeId::new(1),
+            NodeId::new(2),
+            StringId::new(12),
+        )
+        .with_weight(0.7);
 
         graph.add_edge(e1).unwrap();
         graph.add_edge(e2).unwrap();

@@ -128,7 +128,10 @@ mod tests {
         // Verification with wrong checksum returns ChecksumMismatch
         let err = verify_file_integrity(&mock_file, 0x12345678).unwrap_err();
         match err {
-            GraphLiteError::ChecksumMismatch { expected, calculated } => {
+            GraphLiteError::ChecksumMismatch {
+                expected,
+                calculated,
+            } => {
                 assert_eq!(expected, 0x12345678);
                 assert_eq!(calculated, real_checksum);
             }

@@ -92,10 +92,14 @@ pub fn cosine_similarity(a: &[f32], b: &[f32]) -> Result<f32> {
 pub fn euclidean_distance(a: &[f32], b: &[f32]) -> Result<f32> {
     validate_dimensions(a, b)?;
 
-    let sum_sq: f32 = a.iter().zip(b.iter()).map(|(x, y)| {
-        let diff = x - y;
-        diff * diff
-    }).sum();
+    let sum_sq: f32 = a
+        .iter()
+        .zip(b.iter())
+        .map(|(x, y)| {
+            let diff = x - y;
+            diff * diff
+        })
+        .sum();
 
     Ok(sum_sq.sqrt())
 }

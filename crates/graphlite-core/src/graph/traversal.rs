@@ -61,11 +61,7 @@ pub struct TraversedNode {
 }
 
 /// Executes a multi-hop Breadth-First Search (BFS) on an immutable `CsrGraph`.
-pub fn bfs_csr(
-    csr: &CsrGraph,
-    seeds: &[NodeId],
-    config: &TraversalConfig,
-) -> Vec<TraversedNode> {
+pub fn bfs_csr(csr: &CsrGraph, seeds: &[NodeId], config: &TraversalConfig) -> Vec<TraversedNode> {
     if seeds.is_empty() || config.max_nodes == 0 {
         return Vec::new();
     }
@@ -173,7 +169,10 @@ pub fn bfs_adjacency(
         };
 
         // Helper to process an edge ID
-        let mut process_edge = |edge_id: &crate::id::EdgeId, results: &mut Vec<TraversedNode>, queue: &mut VecDeque<(NodeId, usize, Option<EdgeRecord>, f32)>| -> bool {
+        let mut process_edge = |edge_id: &crate::id::EdgeId,
+                                results: &mut Vec<TraversedNode>,
+                                queue: &mut VecDeque<(NodeId, usize, Option<EdgeRecord>, f32)>|
+         -> bool {
             if let Some(edge) = adj.get_edge(*edge_id) {
                 if !edge.is_active() || edge.weight < config.min_edge_weight {
                     return true; // continue
@@ -249,16 +248,48 @@ mod tests {
 
         // 0 -> 1 (0.9), 1 -> 2 (0.8), 2 -> 3 (0.3 - weak), 0 -> 4 (0.95)
         graph
-            .add_edge(EdgeRecord::new(EdgeId::new(1), NodeId::new(0), NodeId::new(1), StringId::new(100)).with_weight(0.9))
+            .add_edge(
+                EdgeRecord::new(
+                    EdgeId::new(1),
+                    NodeId::new(0),
+                    NodeId::new(1),
+                    StringId::new(100),
+                )
+                .with_weight(0.9),
+            )
             .unwrap();
         graph
-            .add_edge(EdgeRecord::new(EdgeId::new(2), NodeId::new(1), NodeId::new(2), StringId::new(101)).with_weight(0.8))
+            .add_edge(
+                EdgeRecord::new(
+                    EdgeId::new(2),
+                    NodeId::new(1),
+                    NodeId::new(2),
+                    StringId::new(101),
+                )
+                .with_weight(0.8),
+            )
             .unwrap();
         graph
-            .add_edge(EdgeRecord::new(EdgeId::new(3), NodeId::new(2), NodeId::new(3), StringId::new(102)).with_weight(0.3))
+            .add_edge(
+                EdgeRecord::new(
+                    EdgeId::new(3),
+                    NodeId::new(2),
+                    NodeId::new(3),
+                    StringId::new(102),
+                )
+                .with_weight(0.3),
+            )
             .unwrap();
         graph
-            .add_edge(EdgeRecord::new(EdgeId::new(4), NodeId::new(0), NodeId::new(4), StringId::new(103)).with_weight(0.95))
+            .add_edge(
+                EdgeRecord::new(
+                    EdgeId::new(4),
+                    NodeId::new(0),
+                    NodeId::new(4),
+                    StringId::new(103),
+                )
+                .with_weight(0.95),
+            )
             .unwrap();
 
         graph
@@ -301,12 +332,39 @@ mod tests {
         // Triangle cycle: 0 -> 1 -> 2 -> 0
         for i in 0..3 {
             graph
-                .add_node(NodeRecord::new(NodeId::new(i), StringId::new(i), StringId::new(1), StringId::INVALID, 0))
+                .add_node(NodeRecord::new(
+                    NodeId::new(i),
+                    StringId::new(i),
+                    StringId::new(1),
+                    StringId::INVALID,
+                    0,
+                ))
                 .unwrap();
         }
-        graph.add_edge(EdgeRecord::new(EdgeId::new(1), NodeId::new(0), NodeId::new(1), StringId::new(10))).unwrap();
-        graph.add_edge(EdgeRecord::new(EdgeId::new(2), NodeId::new(1), NodeId::new(2), StringId::new(11))).unwrap();
-        graph.add_edge(EdgeRecord::new(EdgeId::new(3), NodeId::new(2), NodeId::new(0), StringId::new(12))).unwrap();
+        graph
+            .add_edge(EdgeRecord::new(
+                EdgeId::new(1),
+                NodeId::new(0),
+                NodeId::new(1),
+                StringId::new(10),
+            ))
+            .unwrap();
+        graph
+            .add_edge(EdgeRecord::new(
+                EdgeId::new(2),
+                NodeId::new(1),
+                NodeId::new(2),
+                StringId::new(11),
+            ))
+            .unwrap();
+        graph
+            .add_edge(EdgeRecord::new(
+                EdgeId::new(3),
+                NodeId::new(2),
+                NodeId::new(0),
+                StringId::new(12),
+            ))
+            .unwrap();
 
         let csr: CsrGraph = (&graph).into();
         let config = TraversalConfig {

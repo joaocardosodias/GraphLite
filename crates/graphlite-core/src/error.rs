@@ -12,31 +12,21 @@ pub enum GraphLiteError {
 
     /// File header magic bytes do not match expected signature.
     #[error("Invalid magic bytes: expected {expected:?}, found {found:?}")]
-    InvalidMagicBytes {
-        expected: [u8; 4],
-        found: [u8; 4],
-    },
+    InvalidMagicBytes { expected: [u8; 4], found: [u8; 4] },
 
     /// Unsupported or incompatible binary file format version.
     #[error("Unsupported file version: expected {expected}, found {found}")]
-    UnsupportedVersion {
-        expected: u16,
-        found: u16,
-    },
+    UnsupportedVersion { expected: u16, found: u16 },
 
     /// Data integrity check failed (CRC32 mismatch).
-    #[error("Integrity check failed: expected checksum {expected:#010x}, calculated {calculated:#010x}")]
-    ChecksumMismatch {
-        expected: u32,
-        calculated: u32,
-    },
+    #[error(
+        "Integrity check failed: expected checksum {expected:#010x}, calculated {calculated:#010x}"
+    )]
+    ChecksumMismatch { expected: u32, calculated: u32 },
 
     /// Embedding vector dimension mismatch.
     #[error("Vector dimension mismatch: expected {expected} dimensions, found {found}")]
-    VectorDimensionMismatch {
-        expected: usize,
-        found: usize,
-    },
+    VectorDimensionMismatch { expected: usize, found: usize },
 
     /// Node with the specified ID was not found in the database.
     #[error("Node not found: {0}")]
@@ -60,10 +50,7 @@ pub enum GraphLiteError {
 
     /// Token budget constraint violation.
     #[error("Invalid token budget: requested {requested}, maximum allowable {limit}")]
-    InvalidTokenBudget {
-        requested: usize,
-        limit: usize,
-    },
+    InvalidTokenBudget { requested: usize, limit: usize },
 
     /// Concurrency lock was poisoned.
     #[error("Lock poisoned: another thread panicked while holding the resource")]

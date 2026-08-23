@@ -1,7 +1,7 @@
+use anyhow::{bail, Context, Result};
 use std::fs;
 use std::path::Path;
 use std::time::Instant;
-use anyhow::{bail, Context, Result};
 
 use graphlite_core::engine::config::GraphLiteConfig;
 use graphlite_core::engine::instance::GraphLiteEngine;
@@ -28,8 +28,9 @@ fn parse_vector_arg(raw: Option<&str>) -> Result<Option<Vec<f32>>> {
     if (s.ends_with(".json") || Path::new(s).exists()) && Path::new(s).is_file() {
         let content = fs::read_to_string(s)
             .with_context(|| format!("Failed to read vector JSON file: {}", s))?;
-        let vector: Vec<f32> = serde_json::from_str(&content)
-            .with_context(|| "Invalid JSON format: expected an array of numbers (e.g. [0.1, 0.2, ...])")?;
+        let vector: Vec<f32> = serde_json::from_str(&content).with_context(|| {
+            "Invalid JSON format: expected an array of numbers (e.g. [0.1, 0.2, ...])"
+        })?;
         return Ok(Some(vector));
     }
 
@@ -74,7 +75,10 @@ fn load_or_default_config(db_path: &Path) -> GraphLiteConfig {
 
 pub fn execute_query(db_path: &Path, args: &QueryArgs, verbose: bool) -> Result<()> {
     if !db_path.exists() {
-        bail!("Database file '{:?}' not found. Initialize with 'graphlite init' first.", db_path);
+        bail!(
+            "Database file '{:?}' not found. Initialize with 'graphlite init' first.",
+            db_path
+        );
     }
 
     let start_time = Instant::now();
@@ -135,7 +139,10 @@ pub fn execute_query(db_path: &Path, args: &QueryArgs, verbose: bool) -> Result<
         CliOutputFormat::Json => {
             let interner = {
                 if let Ok(reader) = MmapGraphReader::open(db_path) {
-                    reader.string_table().map(|st| st.to_interner()).unwrap_or_default()
+                    reader
+                        .string_table()
+                        .map(|st| st.to_interner())
+                        .unwrap_or_default()
                 } else {
                     graphlite_core::interner::StringInterner::new()
                 }
@@ -146,7 +153,10 @@ pub fn execute_query(db_path: &Path, args: &QueryArgs, verbose: bool) -> Result<
         CliOutputFormat::Triples => {
             let interner = {
                 if let Ok(reader) = MmapGraphReader::open(db_path) {
-                    reader.string_table().map(|st| st.to_interner()).unwrap_or_default()
+                    reader
+                        .string_table()
+                        .map(|st| st.to_interner())
+                        .unwrap_or_default()
                 } else {
                     graphlite_core::interner::StringInterner::new()
                 }

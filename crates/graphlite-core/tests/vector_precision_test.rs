@@ -1,8 +1,7 @@
 use graphlite_core::id::NodeId;
 use graphlite_core::vector::{
     cosine_similarity, dot_product, euclidean_distance, norm, normalized, simd_cosine_similarity,
-    simd_dot_product, simd_euclidean_distance, Metric, Quantization, QuantizedVector,
-    VectorStore,
+    simd_dot_product, simd_euclidean_distance, Metric, Quantization, QuantizedVector, VectorStore,
 };
 
 /// Helper: Deterministic pseudo-random number generator for reproducible vector testing (Xorshift32).

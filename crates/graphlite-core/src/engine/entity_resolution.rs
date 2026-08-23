@@ -158,7 +158,8 @@ impl GraphLiteEngine {
                         state.interner.intern(description.trim())
                     };
 
-                    let vector_offset = (new_id.as_u32() as u64) * (8 + self.config().vector_dim as u64);
+                    let vector_offset =
+                        (new_id.as_u32() as u64) * (8 + self.config().vector_dim as u64);
                     let record = NodeRecord::new(new_id, name_id, type_id, desc_id, vector_offset);
 
                     state.graph.add_node(record)?;

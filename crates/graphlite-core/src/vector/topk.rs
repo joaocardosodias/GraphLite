@@ -92,9 +92,7 @@ impl<T> TopKQueue<T> {
             .collect();
 
         // Sort descending by score
-        vec.sort_by(|a, b| {
-            b.1.partial_cmp(&a.1).unwrap_or(Ordering::Equal)
-        });
+        vec.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap_or(Ordering::Equal));
 
         vec
     }

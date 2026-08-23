@@ -17,12 +17,8 @@ pub use header::{
     HEADER_SIZE,
 };
 pub use mmap_reader::MmapGraphReader;
-pub use node_block::{
-    deserialize_node_block, serialize_node_block, ZeroCopyNodeBlock,
-};
-pub use string_table::{
-    deserialize_string_table, serialize_string_table, ZeroCopyStringTable,
-};
+pub use node_block::{deserialize_node_block, serialize_node_block, ZeroCopyNodeBlock};
+pub use string_table::{deserialize_string_table, serialize_string_table, ZeroCopyStringTable};
 pub use vector_block::{
     deserialize_quantized_vector_block, serialize_quantized_vector_block, ZeroCopyVectorBlock,
 };
