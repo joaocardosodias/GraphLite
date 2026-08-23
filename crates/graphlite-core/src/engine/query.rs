@@ -30,6 +30,8 @@ pub struct QueryOptions {
     pub relative_drop_off: Option<f32>,
     /// Optional semantic redundancy suppression threshold (e.g. `Some(0.85)`).
     pub redundancy_threshold: Option<f32>,
+    /// Optional entity type filter (e.g. `Some(vec!["Function", "Struct"])`).
+    pub type_filter: Option<Vec<String>>,
 }
 
 impl Default for QueryOptions {
@@ -44,6 +46,7 @@ impl Default for QueryOptions {
             alpha: None,
             relative_drop_off: None,
             redundancy_threshold: None,
+            type_filter: None,
         }
     }
 }
@@ -94,10 +97,38 @@ impl GraphLiteEngine {
             });
         }
 
+        let candidate_pool_size = if opts.type_filter.is_some() {
+            state.graph.node_count().min(500).max(opts.top_k_seeds * 20)
+        } else {
+            (opts.top_k_seeds * 4).max(20)
+        };
+
+        let matches_type_filter = |node_id: NodeId| -> bool {
+            if let Some(ref filters) = opts.type_filter {
+                if let Some(record) = state.graph.get_node(node_id) {
+                    if let Some(type_str) = state.interner.resolve(record.type_id) {
+                        let lower = type_str.to_lowercase();
+                        return filters.iter().any(|f| lower.contains(&f.to_lowercase()));
+                    }
+                }
+                return false;
+            }
+            true
+        };
+
         // 1. Vector Search + BM25 Lexical Hybrid Search via RRF Fusion
         let seed_matches = if let Some(ref text) = opts.query_text {
-            let bm25_matches = state.bm25.search(text, opts.top_k_seeds * 2);
-            let vector_matches = state.vectors.search(query_vector, opts.top_k_seeds * 2)?;
+            let bm25_raw = state.bm25.search(text, candidate_pool_size);
+            let vector_raw = state.vectors.search(query_vector, candidate_pool_size)?;
+
+            let bm25_matches: Vec<(NodeId, f32)> = bm25_raw
+                .into_iter()
+                .filter(|(id, _)| matches_type_filter(*id))
+                .collect();
+            let vector_matches: Vec<(NodeId, f32)> = vector_raw
+                .into_iter()
+                .filter(|(id, _)| matches_type_filter(*id))
+                .collect();
 
             let vec_ids: Vec<NodeId> = vector_matches.iter().map(|(id, _)| *id).collect();
             let bm25_ids: Vec<NodeId> = bm25_matches.iter().map(|(id, _)| *id).collect();
@@ -114,7 +145,12 @@ impl GraphLiteEngine {
             }
             top_fused
         } else {
-            state.vectors.search(query_vector, opts.top_k_seeds)?
+            let vector_raw = state.vectors.search(query_vector, candidate_pool_size)?;
+            vector_raw
+                .into_iter()
+                .filter(|(id, _)| matches_type_filter(*id))
+                .take(opts.top_k_seeds)
+                .collect()
         };
 
         if seed_matches.is_empty() {
@@ -223,6 +259,50 @@ impl GraphLiteEngine {
                 entities: deduped_entities,
                 edges: deduped_edges,
                 seed_ids: connected_subgraph.seed_ids,
+            }
+        } else {
+            connected_subgraph
+        };
+
+        // 3.6. Filter by Entity Type if specified (e.g. Function, Struct, DatabaseTable)
+        let connected_subgraph = if let Some(ref type_filters) = opts.type_filter {
+            let normalized_filters: Vec<String> = type_filters
+                .iter()
+                .map(|t| t.trim().to_lowercase())
+                .filter(|t| !t.is_empty())
+                .collect();
+
+            if !normalized_filters.is_empty() {
+                let filtered_entities: Vec<ScoredEntity> = connected_subgraph
+                    .entities
+                    .into_iter()
+                    .filter(|entity| {
+                        if let Some(rec) = entity.node_record {
+                            if let Some(t_str) = state.interner.resolve(rec.type_id) {
+                                let lower_type = t_str.to_lowercase();
+                                return normalized_filters.iter().any(|f| lower_type.contains(f));
+                            }
+                        }
+                        false
+                    })
+                    .collect();
+
+                let valid_ids: std::collections::HashSet<NodeId> =
+                    filtered_entities.iter().map(|e| e.node_id).collect();
+
+                let filtered_edges: Vec<crate::record::EdgeRecord> = connected_subgraph
+                    .edges
+                    .into_iter()
+                    .filter(|e| valid_ids.contains(&e.source) && valid_ids.contains(&e.target))
+                    .collect();
+
+                crate::graph::subgraph::ConnectedSubgraph {
+                    entities: filtered_entities,
+                    edges: filtered_edges,
+                    seed_ids: connected_subgraph.seed_ids,
+                }
+            } else {
+                connected_subgraph
             }
         } else {
             connected_subgraph

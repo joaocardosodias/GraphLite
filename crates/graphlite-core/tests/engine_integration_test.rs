@@ -127,6 +127,7 @@ fn test_full_ai_assistant_knowledge_graph_workflow() {
                     alpha: Some(0.6),
                     relative_drop_off: None,
                     redundancy_threshold: None,
+                    type_filter: None,
                 }),
             )
             .unwrap();

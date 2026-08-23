@@ -7,8 +7,7 @@ use graphlite_core::engine::instance::GraphLiteEngine;
 use graphlite_core::vector::distance::Metric;
 use graphlite_core::vector::quantization::Quantization;
 
-use crate::args::{CliMetric, CliQuantization, IndexCodeArgs, InitArgs};
-use crate::commands::index_code::execute_index_code;
+use crate::args::{CliMetric, CliQuantization, InitArgs};
 
 pub fn execute_init(db_path: &Path, args: &InitArgs) -> Result<()> {
     if db_path.exists() {
@@ -70,20 +69,10 @@ pub fn execute_init(db_path: &Path, args: &InitArgs) -> Result<()> {
         setup_agent_rules(project_dir, db_filename)?;
     }
 
-    if args.index {
-        println!(
-            "\nAuto-indexing codebase symbols into '{}'...",
-            db_path.display()
-        );
-        let index_args = IndexCodeArgs {
-            path: project_dir.to_path_buf(),
-            extensions: None,
-            max_files: 2000,
-        };
-        execute_index_code(db_path, &index_args)?;
-    } else {
-        println!("\n💡 Tip: Run 'graphlite -d {} index-code .' to automatically index structs, functions and routes!", db_path.display());
-    }
+    println!(
+        "\n💡 Dica: Execute 'graphlite -d {} ingest ./documentos' para ingerir arquivos e construir o grafo de conhecimento!",
+        db_path.display()
+    );
 
     Ok(())
 }

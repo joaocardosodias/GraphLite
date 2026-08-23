@@ -1,17 +1,18 @@
 mod args;
 mod commands;
-mod indexer;
+pub mod ingestion;
 
 use anyhow::Result;
 use clap::Parser;
 
 use args::{Cli, Commands};
 use commands::dump::execute_dump;
-use commands::index_code::execute_index_code;
 use commands::init::execute_init;
 use commands::insert::{execute_insert_edge, execute_insert_node};
 use commands::inspect::execute_inspect;
 use commands::query::execute_query;
+use commands::remember::execute_remember;
+use ingestion::execute_ingest;
 
 fn main() -> Result<()> {
     let cli = Cli::parse();
@@ -35,8 +36,11 @@ fn main() -> Result<()> {
         Commands::Dump(args) => {
             execute_dump(&cli.db_path, args)?;
         }
-        Commands::IndexCode(args) => {
-            execute_index_code(&cli.db_path, args)?;
+        Commands::Ingest(args) => {
+            execute_ingest(&cli.db_path, args)?;
+        }
+        Commands::Remember(args) => {
+            execute_remember(&cli.db_path, args)?;
         }
     }
 

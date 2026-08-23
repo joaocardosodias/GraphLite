@@ -111,6 +111,13 @@ pub fn execute_query(db_path: &Path, args: &QueryArgs, verbose: bool) -> Result<
         bail!("Provide at least one query vector (-V / --vector), plain text query (-T / --text), or textual seed entities (-s / --seeds).");
     }
 
+    let type_filter = args.entity_type.as_ref().map(|s| {
+        s.split(',')
+            .map(|t| t.trim().to_string())
+            .filter(|t| !t.is_empty())
+            .collect()
+    });
+
     let options = QueryOptions {
         top_k_seeds: args.top_k,
         query_text: args.query_text.clone(),
@@ -121,6 +128,7 @@ pub fn execute_query(db_path: &Path, args: &QueryArgs, verbose: bool) -> Result<
         alpha: args.alpha,
         relative_drop_off: Some(0.60),
         redundancy_threshold: Some(0.82),
+        type_filter,
     };
 
     let result = if let Some(ref v) = query_vector {

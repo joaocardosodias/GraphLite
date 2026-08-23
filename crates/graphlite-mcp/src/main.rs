@@ -237,6 +237,17 @@ fn handle_tool_call(
                 query,
             )?;
 
+            let type_filter: Option<Vec<String>> = params
+                .get("entity_type")
+                .or_else(|| params.get("type"))
+                .and_then(|v| v.as_str())
+                .map(|s| {
+                    s.split(',')
+                        .map(|t| t.trim().to_string())
+                        .filter(|t| !t.is_empty())
+                        .collect()
+                });
+
             let options = QueryOptions {
                 top_k_seeds: top_k,
                 query_text: Some(query.to_string()),
@@ -247,6 +258,7 @@ fn handle_tool_call(
                 alpha: Some(0.6),
                 relative_drop_off: Some(0.60),
                 redundancy_threshold: Some(0.82),
+                type_filter,
             };
 
             let res = engine.retrieve_context(&query_vec, Some(options))?;

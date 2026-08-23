@@ -50,8 +50,11 @@ pub enum Commands {
     /// Export database content and topology as JSON or Markdown triples.
     Dump(DumpArgs),
 
-    /// Scan and parse a codebase into the knowledge graph with automatic AST symbol extraction.
-    IndexCode(IndexCodeArgs),
+    /// Ingest documents (Markdown, PDF, Text, JSON, CSV) with hierarchical semantic chunking into the knowledge graph.
+    Ingest(IngestArgs),
+
+    /// Record an agent memory, fact, rule, or preference with automatic embedding and relational linking.
+    Remember(RememberArgs),
 }
 
 #[derive(Args, Debug)]
@@ -89,10 +92,6 @@ pub struct InitArgs {
     /// Skip creating or updating AI agent rules files (AGENTS.md, CLAUDE.md, GEMINI.md).
     #[arg(long, help = "Skip generating AI assistant rules files")]
     pub no_rules: bool,
-
-    /// Automatically index codebase AST symbols immediately after initialization.
-    #[arg(short = 'i', long, help = "Auto-index codebase symbols after init")]
-    pub index: bool,
 }
 
 #[derive(Args, Debug)]
@@ -213,6 +212,14 @@ pub struct QueryArgs {
     )]
     pub alpha: Option<f32>,
 
+    /// Filter retrieved entities by comma-separated entity types (e.g. 'Function,Struct,Class,DatabaseTable').
+    #[arg(
+        short = 'y',
+        long = "type",
+        help = "Filter by entity type (e.g. 'Function,Struct')"
+    )]
+    pub entity_type: Option<String>,
+
     /// Output formatting mode.
     #[arg(short = 'f', long, value_enum, default_value_t = CliOutputFormat::Markdown, help = "Output format")]
     pub format: CliOutputFormat,
@@ -233,18 +240,64 @@ pub struct DumpArgs {
 }
 
 #[derive(Args, Debug)]
-pub struct IndexCodeArgs {
-    /// Directory path of the codebase to analyze and index.
-    #[arg(default_value = ".", help = "Target codebase directory")]
+pub struct IngestArgs {
+    /// Path to the file or directory containing documents to ingest.
+    #[arg(default_value = ".", help = "Path to file or directory to ingest")]
     pub path: std::path::PathBuf,
 
-    /// Comma-separated list of file extensions to scan (e.g. 'rs,py,ts,go').
-    #[arg(short = 'e', long, help = "File extensions to scan (comma-separated)")]
+    /// Target token size per semantic text chunk (approx 4 chars per token).
+    #[arg(
+        short = 's',
+        long,
+        default_value_t = 350,
+        help = "Target token size per chunk"
+    )]
+    pub chunk_size: usize,
+
+    /// Overlap tokens between adjacent sliding window chunks.
+    #[arg(
+        short = 'o',
+        long,
+        default_value_t = 40,
+        help = "Overlap tokens between chunks"
+    )]
+    pub chunk_overlap: usize,
+
+    /// Comma-separated list of file extensions to ingest (e.g. 'md,txt,json,csv,pdf').
+    #[arg(short = 'e', long, help = "File extensions to include")]
     pub extensions: Option<String>,
 
-    /// Maximum number of source files to scan.
-    #[arg(long, default_value_t = 2000, help = "Max files limit")]
+    /// Maximum number of files to ingest.
+    #[arg(
+        long,
+        default_value_t = 1000,
+        help = "Maximum number of files to ingest"
+    )]
     pub max_files: usize,
+}
+
+#[derive(Args, Debug)]
+pub struct RememberArgs {
+    /// The fact, preference, rule, or memory text to record.
+    #[arg(help = "Memory text content to record")]
+    pub text: String,
+
+    /// Optional semantic category or type for the memory (e.g. 'preference', 'fact', 'task', 'rule').
+    #[arg(
+        short = 'c',
+        long,
+        default_value = "AgentMemory",
+        help = "Category/type label for the memory"
+    )]
+    pub category: String,
+
+    /// Optional related entity name to establish an immediate connection with.
+    #[arg(
+        short = 'r',
+        long,
+        help = "Name of an existing related entity to connect to"
+    )]
+    pub relate_to: Option<String>,
 }
 
 #[derive(ValueEnum, Clone, Copy, Debug, PartialEq, Eq)]

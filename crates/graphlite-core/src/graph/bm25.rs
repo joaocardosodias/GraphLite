@@ -46,18 +46,96 @@ impl Bm25Index {
         }
     }
 
-    /// Tokenizes input text into normalized lowercase alphanumeric terms.
+    /// Tokenizes input text into normalized lowercase alphanumeric terms,
+    /// with intelligent CamelCase splitting, snake_case splitting, and bilingual code synonym expansion.
     pub fn tokenize(text: &str) -> Vec<String> {
-        text.split(|c: char| !c.is_alphanumeric() && c != '_')
-            .filter_map(|s| {
-                let lower = s.trim().to_lowercase();
-                if lower.is_empty() || lower.len() < 2 {
-                    None
-                } else {
-                    Some(lower)
+        let mut tokens = Vec::new();
+
+        // 1. Initial split on whitespace and punctuation (preserving underscore for compound identifiers)
+        let raw_parts = text.split(|c: char| !c.is_alphanumeric() && c != '_');
+
+        for part in raw_parts {
+            let trimmed = part.trim();
+            if trimmed.len() < 2 {
+                continue;
+            }
+
+            let lower = trimmed.to_lowercase();
+            if !tokens.contains(&lower) {
+                tokens.push(lower.clone());
+            }
+
+            // 1b. If it contains `_`, also extract sub-words
+            if trimmed.contains('_') {
+                for sub in trimmed.split('_') {
+                    let sub_lower = sub.trim().to_lowercase();
+                    if sub_lower.len() >= 2 && !tokens.contains(&sub_lower) {
+                        tokens.push(sub_lower);
+                    }
                 }
-            })
-            .collect()
+            }
+
+            // 2. CamelCase / PascalCase splitting (e.g. `connectWiFi` -> `connect`, `wifi`)
+            let mut sub_token = String::new();
+            let mut chars = trimmed.chars().peekable();
+            let mut sub_tokens = Vec::new();
+
+            while let Some(c) = chars.next() {
+                if c == '_' {
+                    if !sub_token.is_empty() {
+                        sub_tokens.push(sub_token.to_lowercase());
+                        sub_token = String::new();
+                    }
+                    continue;
+                }
+                sub_token.push(c);
+                if let Some(&next) = chars.peek() {
+                    if c.is_lowercase() && next.is_uppercase() {
+                        sub_tokens.push(sub_token.to_lowercase());
+                        sub_token = String::new();
+                    }
+                }
+            }
+            if !sub_token.is_empty() {
+                sub_tokens.push(sub_token.to_lowercase());
+            }
+
+            if sub_tokens.len() > 1 {
+                for st in sub_tokens {
+                    if st.len() >= 2 && !tokens.contains(&st) {
+                        tokens.push(st);
+                    }
+                }
+            }
+
+            // 3. Synonym expansion for code & cross-lingual queries (PT <-> EN)
+            let synonyms: &[&str] = match lower.as_str() {
+                "conectar" | "conexao" | "conexão" | "conectando" => &["connect", "connection"],
+                "connect" | "connection" => &["conectar", "conexao", "conexão"],
+                "banco" | "db" | "database" => &["banco", "db", "database", "dados"],
+                "dados" | "data" => &["dados", "data"],
+                "funcao" | "função" => &["function", "fn", "func", "method"],
+                "function" | "func" | "fn" => &["funcao", "função"],
+                "modelo" | "modelos" => &["model", "struct", "schema"],
+                "model" | "models" => &["modelo", "modelos", "struct"],
+                "struct" | "structs" => &["struct", "structs", "modelo", "modelos", "estrutura"],
+                "classe" | "classes" => &["class", "classes"],
+                "class" => &["classe", "classes"],
+                "tabela" | "tabelas" => &["table", "tables"],
+                "table" | "tables" => &["tabela", "tabelas"],
+                "rota" | "rotas" | "endpoint" | "endpoints" => &["route", "endpoint", "api"],
+                _ => &[],
+            };
+
+            for &syn in synonyms {
+                let syn_str = syn.to_string();
+                if !tokens.contains(&syn_str) {
+                    tokens.push(syn_str);
+                }
+            }
+        }
+
+        tokens
     }
 
     /// Indexes a node with its associated text (name, type, description).
