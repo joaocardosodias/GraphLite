@@ -174,6 +174,18 @@ impl QuantizedVector {
         }
     }
 
+    /// Symmetric Cosine Similarity: computes cosine similarity between two quantized vectors.
+    pub fn cosine_similarity_symmetric(&self, other: &Self) -> Result<f32> {
+        let dot = self.dot_product_symmetric(other)?;
+        let denominator = self.norm * other.norm;
+
+        if denominator < 1e-12 {
+            Ok(0.0)
+        } else {
+            Ok((dot / denominator).clamp(-1.0, 1.0))
+        }
+    }
+
     /// Returns the vector dimensionality.
     #[inline]
     pub fn dim(&self) -> usize {

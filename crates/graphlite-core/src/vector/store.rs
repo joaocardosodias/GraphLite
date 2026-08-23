@@ -275,6 +275,27 @@ impl VectorStore {
         Ok(scores)
     }
 
+    /// Computes the cosine similarity between two stored nodes.
+    pub fn similarity_between(&self, a: NodeId, b: NodeId) -> Option<f32> {
+        let idx_a = *self.node_to_idx.get(&a)?;
+        let idx_b = *self.node_to_idx.get(&b)?;
+
+        match self.quantization {
+            Quantization::None => {
+                let start_a = idx_a * self.dim;
+                let vec_a = &self.flat_f32[start_a..start_a + self.dim];
+                let start_b = idx_b * self.dim;
+                let vec_b = &self.flat_f32[start_b..start_b + self.dim];
+                simd_cosine_similarity(vec_a, vec_b).ok()
+            }
+            Quantization::ScalarInt8 => {
+                let qa = &self.quantized.get(idx_a)?;
+                let qb = &self.quantized.get(idx_b)?;
+                qa.cosine_similarity_symmetric(qb).ok()
+            }
+        }
+    }
+
     /// Returns the number of vectors stored.
     #[inline]
     pub fn len(&self) -> usize {

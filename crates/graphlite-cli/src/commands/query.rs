@@ -120,6 +120,7 @@ pub fn execute_query(db_path: &Path, args: &QueryArgs, verbose: bool) -> Result<
         min_score_threshold: None,
         alpha: args.alpha,
         relative_drop_off: Some(0.60),
+        redundancy_threshold: Some(0.82),
     };
 
     let result = if let Some(ref v) = query_vector {

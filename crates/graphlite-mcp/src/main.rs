@@ -246,6 +246,7 @@ fn handle_tool_call(
                 min_score_threshold: Some(0.0),
                 alpha: Some(0.6),
                 relative_drop_off: Some(0.60),
+                redundancy_threshold: Some(0.82),
             };
 
             let res = engine.retrieve_context(&query_vec, Some(options))?;

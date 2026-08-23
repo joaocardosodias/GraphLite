@@ -74,6 +74,9 @@ pub fn parse_file(path: &Path) -> anyhow::Result<Vec<ExtractedSymbol>> {
         "rs" => parse_rust_file(&content, &relative_path),
         "py" => parse_python_file(&content, &relative_path),
         "ts" | "tsx" | "js" | "jsx" => parse_typescript_file(&content, &relative_path),
+        "c" | "cpp" | "cc" | "cxx" | "h" | "hpp" | "ino" => {
+            parse_cpp_c_arduino_file(&content, &relative_path)
+        }
         "go" => parse_go_file(&content, &relative_path),
         "md" | "markdown" => parse_markdown_file(&content, &relative_path),
         "sql" => parse_sql_file(&content, &relative_path),
@@ -510,32 +513,59 @@ fn parse_typescript_file(content: &str, file_path: &str) -> Vec<ExtractedSymbol>
             }
         }
 
-        if (trimmed.starts_with("function ")
+        // JavaScript / TypeScript Functions and Arrow functions
+        let is_func_decl = trimmed.starts_with("function ")
             || trimmed.starts_with("export function ")
-            || trimmed.starts_with("export const "))
-            && trimmed.contains('(')
+            || trimmed.starts_with("async function ")
+            || trimmed.starts_with("export async function ")
+            || trimmed.starts_with("export default function ")
+            || trimmed.starts_with("export default async function ");
+
+        let is_arrow_or_func_expr = (trimmed.starts_with("const ")
+            || trimmed.starts_with("export const ")
+            || trimmed.starts_with("let ")
+            || trimmed.starts_with("export let ")
+            || trimmed.starts_with("var "))
+            && (trimmed.contains("=>")
+                || trimmed.contains("function(")
+                || trimmed.contains("function (")
+                || trimmed.contains("createClient")
+                || trimmed.contains("model("));
+
+        if (is_func_decl || is_arrow_or_func_expr)
+            && (trimmed.contains('(') || trimmed.contains('='))
         {
             let name = trimmed
                 .replace("export ", "")
+                .replace("default ", "")
                 .replace("async ", "")
                 .replace("function ", "")
                 .replace("const ", "")
-                .split(['(', ':', '=', '<'])
+                .replace("let ", "")
+                .replace("var ", "")
+                .split(['(', ':', '=', '<', ' '])
                 .next()
                 .unwrap_or("")
                 .trim()
                 .to_string();
 
-            if !name.is_empty() && name != "default" {
+            if !name.is_empty() && name != "default" && name != "if" && name != "switch" {
                 let body = extract_block_body(&lines, idx);
+                let is_model = trimmed.contains("model(") || name.ends_with("Model");
                 symbols.push(ExtractedSymbol {
                     name: name.clone(),
-                    symbol_type: "Function".to_string(),
+                    symbol_type: if is_model {
+                        "Model".to_string()
+                    } else {
+                        "Function".to_string()
+                    },
                     description: format!(
-                        "TypeScript Function '{}' in {}:{}",
+                        "JavaScript/TypeScript {} '{}' in {}:{}. Signature: {}",
+                        if is_model { "Model" } else { "Function" },
                         name,
                         file_path,
-                        idx + 1
+                        idx + 1,
+                        trimmed
                     ),
                     file_path: file_path.to_string(),
                     line_number: idx + 1,
@@ -545,6 +575,151 @@ fn parse_typescript_file(content: &str, file_path: &str) -> Vec<ExtractedSymbol>
                 });
             }
         }
+    }
+
+    symbols
+}
+
+/// Extracts classes, structs, enums, functions, and methods from C/C++/Arduino source files.
+fn parse_cpp_c_arduino_file(content: &str, file_path: &str) -> Vec<ExtractedSymbol> {
+    let mut symbols = Vec::new();
+    let lines: Vec<&str> = content.lines().collect();
+    let mut current_docs: Vec<String> = Vec::new();
+
+    for (idx, line) in lines.iter().enumerate() {
+        let trimmed = line.trim();
+
+        if trimmed.starts_with("//") {
+            current_docs.push(trimmed.trim_start_matches('/').trim().to_string());
+            continue;
+        }
+
+        // Struct / Class
+        if (trimmed.starts_with("struct ")
+            || trimmed.starts_with("class ")
+            || trimmed.starts_with("typedef struct "))
+            && trimmed.contains('{')
+        {
+            let is_class = trimmed.starts_with("class ");
+            let name = trimmed
+                .replace("typedef struct ", "")
+                .replace("struct ", "")
+                .replace("class ", "")
+                .split([':', '{', ' ', ';'])
+                .next()
+                .unwrap_or("")
+                .trim()
+                .to_string();
+
+            if !name.is_empty() {
+                let doc_summary = if !current_docs.is_empty() {
+                    format!(" // {}", current_docs.join(" "))
+                } else {
+                    String::new()
+                };
+                let body = extract_block_body(&lines, idx);
+                symbols.push(ExtractedSymbol {
+                    name: name.clone(),
+                    symbol_type: if is_class {
+                        "Class".to_string()
+                    } else {
+                        "Struct".to_string()
+                    },
+                    description: format!(
+                        "C/C++/Arduino {} '{}' in {}:{}{}",
+                        if is_class { "Class" } else { "Struct" },
+                        name,
+                        file_path,
+                        idx + 1,
+                        doc_summary
+                    ),
+                    file_path: file_path.to_string(),
+                    line_number: idx + 1,
+                    parent_symbol: None,
+                    body: Some(body),
+                    relations: Vec::new(),
+                });
+            }
+            current_docs.clear();
+            continue;
+        }
+
+        // Function / Method: e.g. `void setup()`, `void loop()`, `bool connectWiFi()`, `void connectDB()`, `void WiFiClass::begin()`
+        if !trimmed.starts_with('#')
+            && !trimmed.starts_with("//")
+            && !trimmed.starts_with("if ")
+            && !trimmed.starts_with("for ")
+            && !trimmed.starts_with("while ")
+            && !trimmed.starts_with("switch ")
+            && !trimmed.starts_with("return ")
+            && trimmed.contains('(')
+            && (trimmed.contains('{')
+                || (lines
+                    .get(idx + 1)
+                    .map(|l| l.trim().starts_with('{'))
+                    .unwrap_or(false)))
+        {
+            let sig_part = trimmed.split('(').next().unwrap_or("").trim();
+            let parts: Vec<&str> = sig_part.split_whitespace().collect();
+            if let Some(raw_name) = parts.last() {
+                let name = raw_name.trim_start_matches('*').trim();
+                if !name.is_empty()
+                    && name != "if"
+                    && name != "for"
+                    && name != "while"
+                    && name != "switch"
+                {
+                    let (parent, func_name, is_method) = if name.contains("::") {
+                        let splits: Vec<&str> = name.split("::").collect();
+                        (Some(splits[0].to_string()), splits[1], true)
+                    } else {
+                        (None, name, false)
+                    };
+
+                    let doc_summary = if !current_docs.is_empty() {
+                        format!(" // {}", current_docs.join(" "))
+                    } else {
+                        String::new()
+                    };
+
+                    let body = extract_block_body(&lines, idx);
+                    let mut relations = Vec::new();
+                    if let Some(ref p) = parent {
+                        relations.push((p.clone(), "METHOD_OF".to_string(), 0.95));
+                    }
+
+                    symbols.push(ExtractedSymbol {
+                        name: if let Some(ref p) = parent {
+                            format!("{}.{}", p, func_name)
+                        } else {
+                            func_name.to_string()
+                        },
+                        symbol_type: if is_method {
+                            "Method".to_string()
+                        } else {
+                            "Function".to_string()
+                        },
+                        description: format!(
+                            "C/C++/Arduino Function '{}' in {}:{}. Signature: {}{}",
+                            func_name,
+                            file_path,
+                            idx + 1,
+                            trimmed,
+                            doc_summary
+                        ),
+                        file_path: file_path.to_string(),
+                        line_number: idx + 1,
+                        parent_symbol: parent,
+                        body: Some(body),
+                        relations,
+                    });
+                }
+            }
+            current_docs.clear();
+            continue;
+        }
+
+        current_docs.clear();
     }
 
     symbols
@@ -1443,5 +1618,32 @@ mod tests {
             maps_to_table,
             "TaskModel struct should have MAPS_TO_TABLE relation to Table: tasks"
         );
+    }
+
+    #[test]
+    fn test_parse_cpp_arduino_code() {
+        let cpp_code = r#"
+        struct SensorReading {
+            float temperature;
+            float flow_rate;
+        };
+
+        void connectWiFi() {
+            WiFi.begin(SSID, PASS);
+        }
+
+        void connectDatabase() {
+            supabase.connect();
+        }
+        "#;
+
+        let symbols = parse_cpp_c_arduino_file(cpp_code, "src/firmware.ino");
+        assert_eq!(symbols.len(), 3);
+        assert_eq!(symbols[0].name, "SensorReading");
+        assert_eq!(symbols[0].symbol_type, "Struct");
+        assert_eq!(symbols[1].name, "connectWiFi");
+        assert_eq!(symbols[1].symbol_type, "Function");
+        assert_eq!(symbols[2].name, "connectDatabase");
+        assert_eq!(symbols[2].symbol_type, "Function");
     }
 }

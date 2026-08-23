@@ -28,6 +28,8 @@ pub struct QueryOptions {
     pub alpha: Option<f32>,
     /// Optional relative score drop-off threshold (e.g. `Some(0.60)`).
     pub relative_drop_off: Option<f32>,
+    /// Optional semantic redundancy suppression threshold (e.g. `Some(0.85)`).
+    pub redundancy_threshold: Option<f32>,
 }
 
 impl Default for QueryOptions {
@@ -41,6 +43,7 @@ impl Default for QueryOptions {
             min_score_threshold: None,
             alpha: None,
             relative_drop_off: None,
+            redundancy_threshold: None,
         }
     }
 }
@@ -155,6 +158,75 @@ impl GraphLiteEngine {
             &traversal_config,
             &hybrid_config,
         );
+
+        // 3.5. Apply Semantic Redundancy Deduplication (MMR / Diversity Filter)
+        let connected_subgraph = if let Some(redundancy_thresh) = opts.redundancy_threshold {
+            let mut deduped_entities: Vec<ScoredEntity> = Vec::new();
+            let mut deduped_node_ids = std::collections::HashSet::new();
+
+            for entity in connected_subgraph.entities {
+                let is_redundant = deduped_entities.iter().any(|selected| {
+                    // Check 1: Vector Cosine Similarity
+                    if let Some(sim) = state
+                        .vectors
+                        .similarity_between(entity.node_id, selected.node_id)
+                    {
+                        if sim >= redundancy_thresh {
+                            return true;
+                        }
+                    }
+
+                    // Check 2: Content Token Jaccard Overlap
+                    if let (Some(rec_a), Some(rec_b)) = (entity.node_record, selected.node_record) {
+                        let desc_a = state.interner.resolve(rec_a.description_id).unwrap_or("");
+                        let desc_b = state.interner.resolve(rec_b.description_id).unwrap_or("");
+                        if !desc_a.is_empty() && !desc_b.is_empty() {
+                            let tokens_a: std::collections::HashSet<String> =
+                                crate::graph::bm25::Bm25Index::tokenize(desc_a)
+                                    .into_iter()
+                                    .collect();
+                            let tokens_b: std::collections::HashSet<String> =
+                                crate::graph::bm25::Bm25Index::tokenize(desc_b)
+                                    .into_iter()
+                                    .collect();
+                            if !tokens_a.is_empty() && !tokens_b.is_empty() {
+                                let intersection = tokens_a.intersection(&tokens_b).count();
+                                let union = tokens_a.union(&tokens_b).count();
+                                if union > 0 {
+                                    let jaccard = (intersection as f32) / (union as f32);
+                                    if jaccard >= 0.50 {
+                                        return true;
+                                    }
+                                }
+                            }
+                        }
+                    }
+
+                    false
+                });
+
+                if !is_redundant {
+                    deduped_node_ids.insert(entity.node_id);
+                    deduped_entities.push(entity);
+                }
+            }
+
+            let deduped_edges: Vec<crate::record::EdgeRecord> = connected_subgraph
+                .edges
+                .into_iter()
+                .filter(|e| {
+                    deduped_node_ids.contains(&e.source) && deduped_node_ids.contains(&e.target)
+                })
+                .collect();
+
+            crate::graph::subgraph::ConnectedSubgraph {
+                entities: deduped_entities,
+                edges: deduped_edges,
+                seed_ids: connected_subgraph.seed_ids,
+            }
+        } else {
+            connected_subgraph
+        };
 
         // 4. Prune Subgraph by Token Budget
         let token_budget = opts.max_tokens.unwrap_or(self.config.default_max_tokens);
