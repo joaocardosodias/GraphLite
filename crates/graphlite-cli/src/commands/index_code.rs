@@ -98,11 +98,19 @@ pub fn execute_index_code(db_path: &Path, args: &IndexCodeArgs) -> Result<()> {
         merge_descriptions: true,
     };
 
+    let pb = indicatif::ProgressBar::new(all_symbols.len() as u64);
+    if let Ok(style) = indicatif::ProgressStyle::default_bar()
+        .template("{spinner:.green} [{elapsed_precise}] [{bar:40.cyan/blue}] {pos}/{len} ({percent}%) {msg}")
+    {
+        pb.set_style(style.progress_chars("█▓▒░ "));
+    }
+
     let mut symbol_to_node_id: HashMap<String, NodeId> = HashMap::new();
     let mut indexed_count = 0;
     let mut merged_count = 0;
 
     for sym in &all_symbols {
+        pb.set_message(format!("{}: {}", sym.symbol_type, sym.name));
         let text_to_embed = format!("{} {}: {}", sym.name, sym.symbol_type, sym.description);
         if let Ok(vec) = embedder.embed_one(&text_to_embed) {
             let res = engine.upsert_node_resolved(
@@ -120,7 +128,10 @@ pub fn execute_index_code(db_path: &Path, args: &IndexCodeArgs) -> Result<()> {
                 indexed_count += 1;
             }
         }
+        pb.inc(1);
     }
+
+    pb.finish_with_message("Graph embedding complete");
 
     // 2. Connect relationships (METHOD_OF, IMPLEMENTS, USES)
     let mut created_edges = 0;

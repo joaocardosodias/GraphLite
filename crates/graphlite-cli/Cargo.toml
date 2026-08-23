@@ -11,6 +11,7 @@ readme = "../../README.md"
 [dependencies]
 graphlite-core = { workspace = true }
 clap = { workspace = true }
+indicatif = { workspace = true }
 anyhow = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
