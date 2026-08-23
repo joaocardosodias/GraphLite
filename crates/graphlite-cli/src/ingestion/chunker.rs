@@ -35,6 +35,7 @@ impl Default for ChunkConfig {
 pub fn chunk_markdown_document(
     content: &str,
     file_path: &str,
+    file_hash: &str,
     config: &ChunkConfig,
 ) -> Vec<DocumentChunk> {
     let mut chunks = Vec::new();
@@ -50,7 +51,10 @@ pub fn chunk_markdown_document(
         chunk_id: doc_root_name.clone(),
         title: file_basename.to_string(),
         chunk_type: "Document".to_string(),
-        content: format!("Documento de conhecimento: {}", file_basename),
+        content: format!(
+            "Documento de conhecimento: {} | Hash: {}",
+            file_basename, file_hash
+        ),
         file_path: file_path.to_string(),
         line_number: 1,
         section_hierarchy: vec![file_basename.to_string()],
@@ -234,6 +238,7 @@ pub fn chunk_markdown_document(
 pub fn chunk_plain_document(
     content: &str,
     file_path: &str,
+    file_hash: &str,
     config: &ChunkConfig,
 ) -> Vec<DocumentChunk> {
     let mut chunks = Vec::new();
@@ -249,7 +254,10 @@ pub fn chunk_plain_document(
         chunk_id: doc_root_name.clone(),
         title: file_basename.to_string(),
         chunk_type: "Document".to_string(),
-        content: format!("Documento de conhecimento: {}", file_basename),
+        content: format!(
+            "Documento de conhecimento: {} | Hash: {}",
+            file_basename, file_hash
+        ),
         file_path: file_path.to_string(),
         line_number: 1,
         section_hierarchy: vec![file_basename.to_string()],
@@ -369,10 +377,11 @@ Para configurar o RAG para chatbots, use o comando ingest.
 O GraphLite particiona documentos em chunks semânticos.
 "#;
         let config = ChunkConfig::default();
-        let chunks = chunk_markdown_document(md, "manual.md", &config);
+        let chunks = chunk_markdown_document(md, "manual.md", "abc123hash", &config);
 
         assert!(!chunks.is_empty());
         assert_eq!(chunks[0].chunk_type, "Document");
+        assert!(chunks[0].content.contains("Hash: abc123hash"));
         assert!(chunks.iter().any(|c| c.title == "Introdução"));
         assert!(chunks.iter().any(|c| c.title == "Configuração do RAG"));
     }

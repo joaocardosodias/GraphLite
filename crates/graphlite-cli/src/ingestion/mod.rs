@@ -1,11 +1,14 @@
-//! Document Ingestion and GraphRAG Knowledge Base Builder.
+//! Document Ingestion and GraphRAG Knowledge Base Builder with Incremental Hashing and Watch Mode.
 
 pub mod chunker;
 
+use std::collections::hash_map::DefaultHasher;
 use std::collections::{HashMap, HashSet};
 use std::fs;
+use std::hash::{Hash, Hasher};
 use std::path::{Path, PathBuf};
-use std::time::Instant;
+use std::thread::sleep;
+use std::time::{Duration, Instant};
 
 use anyhow::{bail, Context, Result};
 use indicatif::{ProgressBar, ProgressStyle};
@@ -19,6 +22,13 @@ use graphlite_core::LocalEmbedder;
 
 use self::chunker::{chunk_markdown_document, chunk_plain_document, ChunkConfig, DocumentChunk};
 use crate::args::IngestArgs;
+
+/// Computes a fast 64-bit content hash formatted as a hex string.
+pub fn compute_file_hash(content: &[u8]) -> String {
+    let mut hasher = DefaultHasher::new();
+    content.hash(&mut hasher);
+    format!("{:016x}", hasher.finish())
+}
 
 /// Recursively scans directory collecting relevant document files.
 pub fn scan_documents<P: AsRef<Path>>(
@@ -67,24 +77,27 @@ pub fn scan_documents<P: AsRef<Path>>(
 }
 
 /// Parses a document into structured semantic chunks based on file type.
-pub fn parse_document(path: &Path, config: &ChunkConfig) -> Result<Vec<DocumentChunk>> {
+pub fn parse_document(
+    path: &Path,
+    file_hash: &str,
+    config: &ChunkConfig,
+) -> Result<Vec<DocumentChunk>> {
     let relative_path = path.to_string_lossy().to_string();
     let ext = path.extension().and_then(|e| e.to_str()).unwrap_or("");
 
     let content = match ext {
         "pdf" => {
-            // For PDF files, attempt basic extraction or read raw text
             fs::read_to_string(path).unwrap_or_else(|_| format!("PDF Document: {}", relative_path))
         }
         _ => fs::read_to_string(path)?,
     };
 
     let chunks = match ext {
-        "md" | "markdown" => chunk_markdown_document(&content, &relative_path, config),
+        "md" | "markdown" => chunk_markdown_document(&content, &relative_path, file_hash, config),
         "json" | "yaml" | "yml" | "csv" | "txt" => {
-            chunk_plain_document(&content, &relative_path, config)
+            chunk_plain_document(&content, &relative_path, file_hash, config)
         }
-        _ => chunk_plain_document(&content, &relative_path, config),
+        _ => chunk_plain_document(&content, &relative_path, file_hash, config),
     };
 
     Ok(chunks)
@@ -168,15 +181,17 @@ fn load_or_default_config(db_path: &Path) -> GraphLiteConfig {
     GraphLiteConfig::new().with_dim(384)
 }
 
-/// Executes the end-to-end document ingestion command.
-pub fn execute_ingest(db_path: &Path, args: &IngestArgs) -> Result<()> {
+/// Performs a single pass of incremental ingestion.
+pub fn run_ingest_pass(
+    db_path: &Path,
+    args: &IngestArgs,
+    embedder: &LocalEmbedder,
+    is_watch_pass: bool,
+) -> Result<bool> {
     let target_path = &args.path;
     if !target_path.exists() {
         bail!("Target path '{:?}' does not exist.", target_path);
     }
-
-    let start_time = Instant::now();
-    println!("Scanning documents in '{}'...", target_path.display());
 
     let default_exts = vec!["md", "markdown", "txt", "pdf", "json", "yaml", "yml", "csv"];
     let extensions: Vec<&str> = if let Some(ref ext_str) = args.extensions {
@@ -192,50 +207,83 @@ pub fn execute_ingest(db_path: &Path, args: &IngestArgs) -> Result<()> {
     };
 
     if files.is_empty() {
-        println!(
-            "No documents matching extensions {:?} found in '{}'.",
-            extensions,
-            target_path.display()
-        );
-        return Ok(());
+        if !is_watch_pass {
+            println!(
+                "No documents matching extensions {:?} found in '{}'.",
+                extensions,
+                target_path.display()
+            );
+        }
+        return Ok(false);
     }
 
-    println!(
-        "Found {} document files. Parsing semantic chunks...",
-        files.len()
-    );
+    let config = load_or_default_config(db_path);
+    let engine = GraphLiteEngine::open_or_create(db_path, config)?;
 
     let chunk_config = ChunkConfig {
         target_chars: args.chunk_size * 4,
         overlap_chars: args.chunk_overlap * 4,
     };
 
-    let mut all_chunks = Vec::new();
+    // Filter files by content hash to only process new or modified documents
+    let mut files_to_process: Vec<(PathBuf, String)> = Vec::new();
+    let mut unchanged_count = 0;
+
     for file in &files {
-        match parse_document(file, &chunk_config) {
+        let content_bytes = match fs::read(file) {
+            Ok(bytes) => bytes,
+            Err(_) => continue,
+        };
+        let hash = compute_file_hash(&content_bytes);
+
+        let file_basename = file.file_name().and_then(|n| n.to_str()).unwrap_or("");
+        let doc_root_name = format!("Doc: {}", file_basename);
+
+        if !args.force {
+            if let Some(doc_node) = engine.get_node_by_name(&doc_root_name) {
+                if let Some(desc) = engine.resolve_string(doc_node.description_id) {
+                    if desc.contains(&format!("Hash: {}", hash)) {
+                        unchanged_count += 1;
+                        continue;
+                    }
+                }
+            }
+        }
+
+        files_to_process.push((file.clone(), hash));
+    }
+
+    if files_to_process.is_empty() {
+        if !is_watch_pass {
+            println!(
+                "✨ All {} document(s) are up to date with cached hashes (0 modifications).",
+                unchanged_count
+            );
+        }
+        return Ok(false);
+    }
+
+    let start_time = Instant::now();
+    println!(
+        "{} Processing {} modified/new document(s) ({} cached unchanged)...",
+        if is_watch_pass { "[Watch] 🔄" } else { "▶" },
+        files_to_process.len(),
+        unchanged_count
+    );
+
+    let mut all_chunks = Vec::new();
+    for (file, hash) in &files_to_process {
+        match parse_document(file, hash, &chunk_config) {
             Ok(mut chunks) => all_chunks.append(&mut chunks),
             Err(e) => eprintln!("Warning: Failed to parse '{:?}': {}", file, e),
         }
     }
 
     if all_chunks.is_empty() {
-        println!("No chunks extracted from documents.");
-        return Ok(());
+        return Ok(false);
     }
 
-    println!("Linking cross-document relations...");
     link_related_chunks(&mut all_chunks);
-
-    println!(
-        "Extracted {} knowledge chunks with relational edges. Initializing local ONNX embedding engine...",
-        all_chunks.len()
-    );
-
-    let embedder = LocalEmbedder::new_minilm()
-        .with_context(|| "Failed to initialize local ONNX embedding model")?;
-
-    let config = load_or_default_config(db_path);
-    let engine = GraphLiteEngine::open_or_create(db_path, config)?;
 
     let pb = ProgressBar::new(all_chunks.len() as u64);
     pb.set_style(
@@ -291,20 +339,53 @@ pub fn execute_ingest(db_path: &Path, args: &IngestArgs) -> Result<()> {
         }
     }
 
-    pb.finish_with_message("Document embedding & graph construction complete");
-
+    pb.finish_with_message("Sync complete");
     engine.flush()?;
 
     let elapsed = start_time.elapsed();
-    println!("\n=== Document Ingestion Complete ===");
-    println!("  Database:           '{}'", db_path.display());
-    println!("  Files Ingested:     {}", files.len());
-    println!("  New Chunks:         {}", new_entities_count);
-    println!("  Updated Chunks:     {}", merged_entities_count);
-    println!("  Graph Edges:        {}", edges_created_count);
-    println!("  Total Graph Nodes:  {}", engine.node_count());
-    println!("  Total Graph Edges:  {}", engine.edge_count());
-    println!("  Elapsed Time:       {:.2?}", elapsed);
+    println!(
+        "{} Ingestion completed in {:.2?} | Nodes: {} (+{} new, {} updated), Edges: {} (+{})",
+        if is_watch_pass { "[Watch] ✨" } else { "===" },
+        elapsed,
+        engine.node_count(),
+        new_entities_count,
+        merged_entities_count,
+        engine.edge_count(),
+        edges_created_count
+    );
+
+    Ok(true)
+}
+
+/// Executes the end-to-end document ingestion command with optional watch loop.
+pub fn execute_ingest(db_path: &Path, args: &IngestArgs) -> Result<()> {
+    let target_path = &args.path;
+    if !target_path.exists() {
+        bail!("Target path '{:?}' does not exist.", target_path);
+    }
+
+    println!("Scanning documents in '{}'...", target_path.display());
+
+    let embedder = LocalEmbedder::new_minilm()
+        .with_context(|| "Failed to initialize local ONNX embedding model")?;
+
+    // 1. Initial ingestion pass
+    run_ingest_pass(db_path, args, &embedder, false)?;
+
+    // 2. Continuous Watch mode if requested
+    if args.watch {
+        println!(
+            "\n[Watch] 👁️  Watching '{}' for changes every 1s... (Press Ctrl+C to exit)",
+            target_path.display()
+        );
+
+        loop {
+            sleep(Duration::from_millis(1000));
+            if let Err(e) = run_ingest_pass(db_path, args, &embedder, true) {
+                eprintln!("[Watch] Error during sync: {}", e);
+            }
+        }
+    }
 
     Ok(())
 }

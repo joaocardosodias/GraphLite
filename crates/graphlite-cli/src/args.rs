@@ -274,6 +274,22 @@ pub struct IngestArgs {
         help = "Maximum number of files to ingest"
     )]
     pub max_files: usize,
+
+    /// Continuous watch mode: auto-reingest when files are modified or added.
+    #[arg(
+        short = 'w',
+        long,
+        help = "Watch directory for changes and continuously re-index"
+    )]
+    pub watch: bool,
+
+    /// Force re-indexing of all files ignoring cached content hashes.
+    #[arg(
+        short = 'f',
+        long,
+        help = "Force re-indexing ignoring cached file hashes"
+    )]
+    pub force: bool,
 }
 
 #[derive(Args, Debug)]
