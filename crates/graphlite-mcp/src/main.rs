@@ -368,7 +368,16 @@ fn main() -> anyhow::Result<()> {
         .with_quantization(Quantization::ScalarInt8)
         .with_auto_flush(true);
 
-    let engine = Arc::new(GraphLiteEngine::open_or_create(&args.db_path, config)?);
+    let db_path = if args.db_path == std::path::Path::new("graphlite.graph")
+        && !args.db_path.exists()
+        && std::path::Path::new("app.graph").exists()
+    {
+        PathBuf::from("app.graph")
+    } else {
+        args.db_path.clone()
+    };
+
+    let engine = Arc::new(GraphLiteEngine::open_or_create(&db_path, config)?);
 
     // Initialize in-memory LocalEmbedder once at startup for sub-millisecond embeddings
     let local_embedder = LocalEmbedder::new_minilm().ok();
