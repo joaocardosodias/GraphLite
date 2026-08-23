@@ -2,6 +2,8 @@ use std::io::{self, BufRead, Write};
 use std::path::PathBuf;
 use std::process::Command;
 use std::sync::Arc;
+use std::thread;
+use std::time::Duration;
 
 use clap::Parser;
 use serde::{Deserialize, Serialize};
@@ -61,7 +63,9 @@ struct JsonRpcError {
     message: String,
 }
 
-fn fetch_ollama_embedding(ollama_url: &str, model: &str, text: &str) -> anyhow::Result<Vec<f32>> {
+/// Automatically computes text embeddings under the hood via local Ollama.
+/// Spawns Ollama daemon automatically if it is not currently active.
+fn fetch_embedding_under_the_hood(ollama_url: &str, model: &str, text: &str) -> anyhow::Result<Vec<f32>> {
     let payload = json!({
         "model": model,
         "prompt": text
@@ -69,30 +73,42 @@ fn fetch_ollama_embedding(ollama_url: &str, model: &str, text: &str) -> anyhow::
 
     let endpoint = format!("{}/api/embeddings", ollama_url.trim_end_matches('/'));
 
-    // Execute curl for zero-dependency HTTP call
-    let output = Command::new("curl")
-        .arg("-s")
-        .arg("-X")
-        .arg("POST")
-        .arg(&endpoint)
-        .arg("-H")
-        .arg("Content-Type: application/json")
-        .arg("-d")
-        .arg(payload.to_string())
-        .output()?;
+    for attempt in 0..2 {
+        let output = Command::new("curl")
+            .arg("-s")
+            .arg("-X")
+            .arg("POST")
+            .arg(&endpoint)
+            .arg("-H")
+            .arg("Content-Type: application/json")
+            .arg("-d")
+            .arg(payload.to_string())
+            .output();
 
-    if !output.status.success() {
-        let err_msg = String::from_utf8_lossy(&output.stderr);
-        anyhow::bail!("Ollama request failed: {}", err_msg);
+        if let Ok(out) = output {
+            if out.status.success() {
+                if let Ok(res) = serde_json::from_slice::<Value>(&out.stdout) {
+                    if let Some(arr) = res.get("embedding").and_then(|v| v.as_array()) {
+                        let vec: Result<Vec<f32>, _> = arr
+                            .iter()
+                            .map(|x| x.as_f64().map(|f| f as f32).ok_or_else(|| anyhow::anyhow!("Invalid float in embedding array")))
+                            .collect();
+                        if let Ok(v) = vec {
+                            return Ok(v);
+                        }
+                    }
+                }
+            }
+        }
+
+        // If first attempt failed, try starting ollama serve in the background and wait briefly
+        if attempt == 0 {
+            let _ = Command::new("ollama").arg("serve").spawn();
+            thread::sleep(Duration::from_millis(1200));
+        }
     }
 
-    let res: Value = serde_json::from_slice(&output.stdout)?;
-    if let Some(arr) = res.get("embedding").and_then(|v| v.as_array()) {
-        let vec: Result<Vec<f32>, _> = arr.iter().map(|x| x.as_f64().map(|f| f as f32).ok_or_else(|| anyhow::anyhow!("Invalid float"))).collect();
-        return vec;
-    }
-
-    anyhow::bail!("Failed to parse embedding from Ollama response: {}", res)
+    anyhow::bail!("Could not connect to local Ollama on {}. Ensure Ollama is running (`ollama serve`).", ollama_url)
 }
 
 fn list_tools() -> Value {
@@ -100,13 +116,13 @@ fn list_tools() -> Value {
         "tools": [
             {
                 "name": "graphlite_retrieve",
-                "description": "Retrieves verified architectural context, rules, and connected entities from the GraphLite knowledge graph within a token budget.",
+                "description": "Retrieves verified architectural context, rules, and connected entities from the GraphLite knowledge graph. You only need to pass a plain text query — embeddings are computed automatically under the hood.",
                 "inputSchema": {
                     "type": "object",
                     "properties": {
                         "query": {
                             "type": "string",
-                            "description": "The search query or question about the system / architecture."
+                            "description": "Plain text search query or question (e.g. 'How does authentication work?')."
                         },
                         "max_tokens": {
                             "type": "integer",
@@ -122,7 +138,7 @@ fn list_tools() -> Value {
             },
             {
                 "name": "graphlite_remember",
-                "description": "Stores or updates an entity (rule, architecture decision, struct, module, user preference) in the persistent graph with automatic real-time deduplication.",
+                "description": "Stores or updates an entity (rule, architecture decision, struct, module, user preference) in the persistent graph with automatic real-time deduplication. You only need to pass plain text — embeddings are computed automatically under the hood.",
                 "inputSchema": {
                     "type": "object",
                     "properties": {
@@ -136,7 +152,7 @@ fn list_tools() -> Value {
                         },
                         "description": {
                             "type": "string",
-                            "description": "Detailed description, convention, or architectural behavior."
+                            "description": "Detailed description, convention, or architectural behavior in plain text."
                         }
                     },
                     "required": ["name", "description"]
@@ -144,7 +160,7 @@ fn list_tools() -> Value {
             },
             {
                 "name": "graphlite_connect",
-                "description": "Creates a directed or bidirectional relationship connecting two entities in the knowledge graph.",
+                "description": "Creates a directed relationship connecting two entities in the knowledge graph.",
                 "inputSchema": {
                     "type": "object",
                     "properties": {
@@ -180,18 +196,39 @@ fn handle_tool_call(
 ) -> anyhow::Result<String> {
     match tool_name {
         "graphlite_retrieve" => {
-            let query = params.get("query").and_then(|v| v.as_str()).unwrap_or("");
-            let max_tokens = params.get("max_tokens").and_then(|v| v.as_u64()).map(|v| v as usize).unwrap_or(400);
-            let top_k = params.get("top_k").and_then(|v| v.as_u64()).map(|v| v as usize).unwrap_or(3);
+            let query = params
+                .get("query")
+                .or_else(|| params.get("Query"))
+                .and_then(|v| v.as_str())
+                .unwrap_or("");
+            let max_tokens = params
+                .get("max_tokens")
+                .or_else(|| params.get("maxTokens"))
+                .or_else(|| params.get("MaxTokens"))
+                .and_then(|v| v.as_u64())
+                .map(|v| v as usize)
+                .unwrap_or(400);
+            let top_k = params
+                .get("top_k")
+                .or_else(|| params.get("topK"))
+                .or_else(|| params.get("TopK"))
+                .and_then(|v| v.as_u64())
+                .map(|v| v as usize)
+                .unwrap_or(3);
 
-            let query_vec = fetch_ollama_embedding(&args.ollama_url, &args.embedding_model, query)?;
+            if query.trim().is_empty() {
+                anyhow::bail!("Query parameter cannot be empty");
+            }
+
+            // Vector computed automatically under the hood
+            let query_vec = fetch_embedding_under_the_hood(&args.ollama_url, &args.embedding_model, query)?;
 
             let options = QueryOptions {
                 top_k_seeds: top_k,
                 max_tokens: Some(max_tokens),
                 markdown_style: MarkdownStyle::Hierarchical,
                 max_depth: Some(2),
-                min_score_threshold: Some(0.05),
+                min_score_threshold: Some(0.0),
                 alpha: Some(0.6),
             };
 
@@ -206,12 +243,29 @@ fn handle_tool_call(
             }
         }
         "graphlite_remember" => {
-            let name = params.get("name").and_then(|v| v.as_str()).unwrap_or("");
-            let entity_type = params.get("type").and_then(|v| v.as_str()).unwrap_or("");
-            let description = params.get("description").and_then(|v| v.as_str()).unwrap_or("");
+            let name = params
+                .get("name")
+                .or_else(|| params.get("Name"))
+                .and_then(|v| v.as_str())
+                .unwrap_or("");
+            let entity_type = params
+                .get("type")
+                .or_else(|| params.get("Type"))
+                .and_then(|v| v.as_str())
+                .unwrap_or("");
+            let description = params
+                .get("description")
+                .or_else(|| params.get("Description"))
+                .and_then(|v| v.as_str())
+                .unwrap_or("");
+
+            if name.trim().is_empty() || description.trim().is_empty() {
+                anyhow::bail!("'name' and 'description' are required parameters for graphlite_remember");
+            }
 
             let text_to_embed = format!("{} {}: {}", name, entity_type, description);
-            let vec = fetch_ollama_embedding(&args.ollama_url, &args.embedding_model, &text_to_embed)?;
+            // Vector computed automatically under the hood
+            let vec = fetch_embedding_under_the_hood(&args.ollama_url, &args.embedding_model, &text_to_embed)?;
 
             let res_config = ResolutionConfig {
                 similarity_threshold: 0.92,
@@ -235,10 +289,27 @@ fn handle_tool_call(
             }
         }
         "graphlite_connect" => {
-            let source = params.get("source").and_then(|v| v.as_str()).unwrap_or("");
-            let target = params.get("target").and_then(|v| v.as_str()).unwrap_or("");
-            let relation = params.get("relation").and_then(|v| v.as_str()).unwrap_or("");
-            let weight = params.get("weight").and_then(|v| v.as_f64()).map(|v| v as f32).unwrap_or(0.95);
+            let source = params
+                .get("source")
+                .or_else(|| params.get("Source"))
+                .and_then(|v| v.as_str())
+                .unwrap_or("");
+            let target = params
+                .get("target")
+                .or_else(|| params.get("Target"))
+                .and_then(|v| v.as_str())
+                .unwrap_or("");
+            let relation = params
+                .get("relation")
+                .or_else(|| params.get("Relation"))
+                .and_then(|v| v.as_str())
+                .unwrap_or("");
+            let weight = params
+                .get("weight")
+                .or_else(|| params.get("Weight"))
+                .and_then(|v| v.as_f64())
+                .map(|v| v as f32)
+                .unwrap_or(0.95);
 
             let src_node = engine.get_node_by_name(source).ok_or_else(|| {
                 anyhow::anyhow!("Source node '{}' not found in GraphLite database.", source)
@@ -320,7 +391,6 @@ fn main() -> anyhow::Result<()> {
                 error: None,
             },
             "notifications/initialized" => {
-                // Client initialized notification, no response required
                 continue;
             }
             "ping" => JsonRpcResponse {
