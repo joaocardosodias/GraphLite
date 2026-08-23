@@ -73,6 +73,7 @@ pub fn parse_file(path: &Path) -> anyhow::Result<Vec<ExtractedSymbol>> {
         "py" => parse_python_file(&content, &relative_path),
         "ts" | "tsx" | "js" | "jsx" => parse_typescript_file(&content, &relative_path),
         "go" => parse_go_file(&content, &relative_path),
+        "md" | "markdown" => parse_markdown_file(&content, &relative_path),
         _ => Vec::new(),
     };
 
@@ -628,6 +629,133 @@ fn parse_go_file(content: &str, file_path: &str) -> Vec<ExtractedSymbol> {
     symbols
 }
 
+/// Extracts documentation sections, headings, and overview from Markdown files.
+fn parse_markdown_file(content: &str, file_path: &str) -> Vec<ExtractedSymbol> {
+    let mut symbols = Vec::new();
+    let file_basename = Path::new(file_path)
+        .file_name()
+        .and_then(|n| n.to_str())
+        .unwrap_or(file_path);
+
+    let doc_root_name = format!("Doc: {}", file_basename);
+    let mut current_h2: Option<String> = None;
+    let mut current_section_name = doc_root_name.clone();
+    let mut current_section_lines: Vec<String> = Vec::new();
+    let mut current_section_start = 1;
+    let mut current_section_level = 1;
+
+    let lines: Vec<&str> = content.lines().collect();
+
+    for (idx, line) in lines.iter().enumerate() {
+        let trimmed = line.trim();
+
+        if trimmed.starts_with('#') {
+            let level = trimmed.chars().take_while(|&c| c == '#').count();
+            let title = trimmed.trim_start_matches('#').trim();
+
+            if !title.is_empty() {
+                if !current_section_lines.is_empty() {
+                    let desc = current_section_lines.join("\n").trim().to_string();
+                    if !desc.is_empty() {
+                        let is_root = current_section_name == doc_root_name;
+                        let mut relations = Vec::new();
+                        if !is_root {
+                            if current_section_level == 3 && current_h2.is_some() {
+                                relations.push((
+                                    current_h2.clone().unwrap(),
+                                    "SUBSECTION_OF".to_string(),
+                                    0.90,
+                                ));
+                            } else {
+                                relations.push((
+                                    doc_root_name.clone(),
+                                    "SECTION_OF".to_string(),
+                                    0.95,
+                                ));
+                            }
+                        }
+
+                        symbols.push(ExtractedSymbol {
+                            name: current_section_name.clone(),
+                            symbol_type: if is_root {
+                                "Document".to_string()
+                            } else {
+                                "DocumentationSection".to_string()
+                            },
+                            description: format!(
+                                "Documentation in {}:{}. Content:\n{}",
+                                file_path, current_section_start, desc
+                            ),
+                            file_path: file_path.to_string(),
+                            line_number: current_section_start,
+                            parent_symbol: if is_root {
+                                None
+                            } else {
+                                Some(doc_root_name.clone())
+                            },
+                            relations,
+                        });
+                    }
+                    current_section_lines.clear();
+                }
+
+                current_section_start = idx + 1;
+                current_section_level = level;
+
+                if level == 1 {
+                    current_section_name = format!("{}: {}", file_basename, title);
+                } else if level == 2 {
+                    let h2_name = format!("{}: {}", file_basename, title);
+                    current_h2 = Some(h2_name.clone());
+                    current_section_name = h2_name;
+                } else {
+                    current_section_name = format!("{}: {}", file_basename, title);
+                }
+            }
+        } else if !trimmed.is_empty() {
+            current_section_lines.push(trimmed.to_string());
+        }
+    }
+
+    if !current_section_lines.is_empty() {
+        let desc = current_section_lines.join("\n").trim().to_string();
+        if !desc.is_empty() {
+            let is_root = current_section_name == doc_root_name;
+            let mut relations = Vec::new();
+            if !is_root {
+                if current_section_level == 3 && current_h2.is_some() {
+                    relations.push((current_h2.unwrap(), "SUBSECTION_OF".to_string(), 0.90));
+                } else {
+                    relations.push((doc_root_name.clone(), "SECTION_OF".to_string(), 0.95));
+                }
+            }
+
+            symbols.push(ExtractedSymbol {
+                name: current_section_name,
+                symbol_type: if is_root {
+                    "Document".to_string()
+                } else {
+                    "DocumentationSection".to_string()
+                },
+                description: format!(
+                    "Documentation in {}:{}. Content:\n{}",
+                    file_path, current_section_start, desc
+                ),
+                file_path: file_path.to_string(),
+                line_number: current_section_start,
+                parent_symbol: if is_root {
+                    None
+                } else {
+                    Some(doc_root_name)
+                },
+                relations,
+            });
+        }
+    }
+
+    symbols
+}
+
 fn extract_keyword_name(line: &str, keyword: &str) -> String {
     let mut after_keyword = false;
     let parts: Vec<&str> = line.split_whitespace().collect();
@@ -721,5 +849,27 @@ mod tests {
         assert_eq!(symbols[1].name, "AuthService.__init__");
         assert_eq!(symbols[2].name, "AuthService.validate_token");
         assert_eq!(symbols[3].name, "global_helper");
+    }
+
+    #[test]
+    fn test_parse_markdown_document() {
+        let md = r#"# Architecture Guide
+This is the main architecture documentation of the system.
+
+## Database Storage
+We store data in binary zero-copy format.
+
+### Soft Delete Policy
+Tasks are never deleted physically.
+"#;
+
+        let symbols = parse_markdown_file(md, "docs/ARCHITECTURE.md");
+        assert_eq!(symbols.len(), 3);
+        assert_eq!(symbols[0].name, "ARCHITECTURE.md: Architecture Guide");
+        assert_eq!(symbols[0].symbol_type, "DocumentationSection");
+        assert_eq!(symbols[1].name, "ARCHITECTURE.md: Database Storage");
+        assert_eq!(symbols[1].symbol_type, "DocumentationSection");
+        assert_eq!(symbols[2].name, "ARCHITECTURE.md: Soft Delete Policy");
+        assert_eq!(symbols[2].symbol_type, "DocumentationSection");
     }
 }

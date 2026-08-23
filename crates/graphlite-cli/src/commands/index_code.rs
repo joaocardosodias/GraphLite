@@ -50,7 +50,7 @@ pub fn execute_index_code(db_path: &Path, args: &IndexCodeArgs) -> Result<()> {
     let start_time = Instant::now();
     println!("Scanning codebase in '{}'...", target_dir.display());
 
-    let default_exts = vec!["rs", "py", "ts", "tsx", "js", "jsx", "go"];
+    let default_exts = vec!["rs", "py", "ts", "tsx", "js", "jsx", "go", "md"];
     let extensions: Vec<&str> = if let Some(ref ext_str) = args.extensions {
         ext_str.split(',').map(|s| s.trim()).collect()
     } else {
@@ -99,9 +99,9 @@ pub fn execute_index_code(db_path: &Path, args: &IndexCodeArgs) -> Result<()> {
     };
 
     let pb = indicatif::ProgressBar::new(all_symbols.len() as u64);
-    if let Ok(style) = indicatif::ProgressStyle::default_bar()
-        .template("{spinner:.green} [{elapsed_precise}] [{bar:40.cyan/blue}] {pos}/{len} ({percent}%) {msg}")
-    {
+    if let Ok(style) = indicatif::ProgressStyle::default_bar().template(
+        "{spinner:.green} [{elapsed_precise}] [{bar:40.cyan/blue}] {pos}/{len} ({percent}%) {msg}",
+    ) {
         pb.set_style(style.progress_chars("█▓▒░ "));
     }
 
