@@ -1,12 +1,13 @@
-# Diretrizes de Memória e Conhecimento do Projeto
+# Project Knowledge & AI Agent Memory Directives
 
-Este projeto utiliza o **GraphLite** como motor de memória arquitetural e grafo de conhecimento persistido em `graphlite.graph`.
+This project uses **GraphLite** as its embedded GraphRAG knowledge base and long-term memory engine persisted in `knowledge.graph`.
 
-## Regras Obrigatórias para Assistentes de IA:
-1. **Consulta de Arquitetura e Regras:**
-- Sempre que o usuário fizer perguntas sobre como o sistema funciona, regras de negócio, autenticação, modelos de dados ou endpoints, você **DEVE** acionar a ferramenta MCP `graphlite_retrieve(query: "...")`.
-2. **Proibição de Leitura Direta de Binários:**
-- O arquivo `graphlite.graph` é um banco binário compilado. **NUNCA** tente ler `graphlite.graph` usando `cat`, `read_file`, `head` ou utilitários SQL como `sqlite3`.
-- Todas as operações de leitura devem ser feitas exclusivamente via `graphlite_retrieve`.
-3. **Persistência de Novas Regras:**
-- Ao aprender novas regras ou preferências do usuário, chame `graphlite_remember` e `graphlite_connect`.
+## Mandatory Rules for AI Assistants:
+
+1. **Knowledge & Context Retrieval:**
+   - Whenever answering questions regarding system architecture, business rules, policies, APIs, or user preferences, you **MUST** call the MCP tool `graphlite_retrieve(query: "...")`.
+2. **Prohibition of Direct Binary File Reading:**
+   - The `.graph` files (e.g. `knowledge.graph`) are compiled single-file binary databases. **NEVER** attempt to inspect them using `cat`, `read_file`, `head`, `strings`, or SQLite CLI tools.
+   - All knowledge inspection and retrieval must be performed exclusively via the `graphlite_retrieve` MCP tool.
+3. **Continuous Agent Memory & Knowledge Persistence:**
+   - When discovering new business rules, domain facts, or user preferences during conversations, persist them using `graphlite_remember(name: "...", type: "...", description: "...")` and connect dependencies via `graphlite_connect`.

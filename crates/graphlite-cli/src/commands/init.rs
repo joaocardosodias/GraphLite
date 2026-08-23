@@ -79,16 +79,16 @@ pub fn execute_init(db_path: &Path, args: &InitArgs) -> Result<()> {
 
 fn setup_agent_rules(project_dir: &Path, db_filename: &str) -> Result<()> {
     let rule_template = format!(
-        "# Diretrizes de Memória e Conhecimento do Projeto\n\n\
-        Este projeto utiliza o **GraphLite** como motor de memória arquitetural e grafo de conhecimento persistido em `{}`.\n\n\
-        ## Regras Obrigatórias para Assistentes de IA:\n\
-        1. **Consulta de Arquitetura e Regras:**\n\
-           - Sempre que o usuário fizer perguntas sobre como o sistema funciona, regras de negócio, autenticação, modelos de dados ou endpoints, você **DEVE** acionar a ferramenta MCP `graphlite_retrieve(query: \"...\")`.\n\
-        2. **Proibição de Leitura Direta de Binários:**\n\
-           - O arquivo `{}` é um banco binário compilado. **NUNCA** tente ler `{}` usando `cat`, `read_file`, `head` ou utilitários SQL como `sqlite3`.\n\
-           - Todas as operações de leitura devem ser feitas exclusivamente via `graphlite_retrieve`.\n\
-        3. **Persistência de Novas Regras:**\n\
-           - Ao aprender novas regras ou preferências do usuário, chame `graphlite_remember` e `graphlite_connect`.\n",
+        "# Project Knowledge & AI Agent Memory Directives\n\n\
+        This project uses **GraphLite** as its embedded GraphRAG knowledge base and long-term memory engine persisted in `{}`.\n\n\
+        ## Mandatory Rules for AI Assistants:\n\
+        1. **Knowledge & Context Retrieval:**\n\
+           - Whenever answering questions regarding system architecture, business rules, policies, APIs, or user preferences, you **MUST** call the MCP tool `graphlite_retrieve(query: \"...\")`.\n\
+        2. **Prohibition of Direct Binary File Reading:**\n\
+           - The file `{}` is a compiled single-file binary database. **NEVER** attempt to inspect `{}` using `cat`, `read_file`, `head`, `strings`, or SQLite CLI tools.\n\
+           - All knowledge inspection and retrieval must be performed exclusively via the `graphlite_retrieve` MCP tool.\n\
+        3. **Continuous Agent Memory & Knowledge Persistence:**\n\
+           - When discovering new business rules, domain facts, or user preferences during conversations, persist them using `graphlite_remember(name: \"...\", type: \"...\", description: \"...\")` and connect dependencies via `graphlite_connect`.\n",
         db_filename, db_filename, db_filename
     );
 
