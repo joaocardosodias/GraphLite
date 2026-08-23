@@ -1,3 +1,5 @@
+#![allow(unknown_lints, clippy::chunks_exact_to_as_chunks)]
+
 use crate::error::{GraphLiteError, Result};
 
 /// Hardware-accelerated dot product using unrolled 8-lane chunks.
