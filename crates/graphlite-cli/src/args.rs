@@ -92,6 +92,10 @@ pub struct InsertNodeArgs {
     #[arg(short = 'V', long, help = "Comma-separated vector floats (e.g. '0.1,0.2,0.3')")]
     pub vector: Option<String>,
 
+    /// Automatically compute vector embedding in pure Rust from name and description.
+    #[arg(long = "auto-embed", help = "Automatically compute vector embedding")]
+    pub auto_embed: bool,
+
     /// Automatically merge with an existing node if semantic cosine similarity >= 0.92.
     #[arg(long, default_value_t = true, help = "Enable real-time entity resolution")]
     pub resolve: bool,
@@ -125,6 +129,10 @@ pub struct QueryArgs {
     /// Comma-separated query embedding vector floats.
     #[arg(short = 'V', long, help = "Comma-separated query vector floats")]
     pub vector: Option<String>,
+
+    /// Plain text search query (computes vector embedding automatically in pure Rust).
+    #[arg(short = 'T', long = "text", help = "Plain text search query (auto-embedded)")]
+    pub query_text: Option<String>,
 
     /// Comma-separated seed entity names for textual exploration.
     #[arg(short = 's', long, help = "Comma-separated seed entity names (e.g. 'Titan,Ana')")]

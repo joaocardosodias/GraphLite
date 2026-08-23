@@ -17,11 +17,13 @@ memmap2.workspace = true
 serde = { workspace = true, optional = true }
 serde_json = { workspace = true, optional = true }
 tiktoken-rs = { workspace = true, optional = true }
+fastembed = { version = "6.0.0", optional = true }
 
 [features]
-default = ["serde", "tiktoken"]
+default = ["serde", "tiktoken", "fastembed"]
 serde = ["dep:serde", "dep:serde_json"]
 tiktoken = ["dep:tiktoken-rs"]
+fastembed = ["dep:fastembed"]
 
 [dev-dependencies]
 tempfile = "3.17"

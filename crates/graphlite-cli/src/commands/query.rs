@@ -81,7 +81,15 @@ pub fn execute_query(db_path: &Path, args: &QueryArgs, verbose: bool) -> Result<
     let config = load_or_default_config(db_path);
     let engine = GraphLiteEngine::open_or_create(db_path, config)?;
 
-    let query_vector = parse_vector_arg(args.vector.as_deref())?;
+    let query_vector = if let Some(raw) = args.vector.as_deref() {
+        parse_vector_arg(Some(raw))?
+    } else if let Some(ref text) = args.query_text {
+        let embedder = graphlite_core::LocalEmbedder::new_minilm()
+            .with_context(|| "Failed to initialize local ONNX embedding model")?;
+        Some(embedder.embed_one(text)?)
+    } else {
+        None
+    };
 
     let seed_names: Option<Vec<String>> = args.seeds.as_ref().map(|s| {
         s.split(',')
@@ -90,8 +98,13 @@ pub fn execute_query(db_path: &Path, args: &QueryArgs, verbose: bool) -> Result<
             .collect()
     });
 
-    if query_vector.is_none() && seed_names.as_ref().map_or(true, |v| v.is_empty()) {
-        bail!("Provide at least one query vector (-V / --vector) or textual seed entities (-s / --seeds).");
+    let has_seeds = match &seed_names {
+        Some(v) => !v.is_empty(),
+        None => false,
+    };
+
+    if query_vector.is_none() && !has_seeds {
+        bail!("Provide at least one query vector (-V / --vector), plain text query (-T / --text), or textual seed entities (-s / --seeds).");
     }
 
     let options = QueryOptions {

@@ -1,6 +1,7 @@
 //! Vector math, similarity metrics, SIMD acceleration, and quantization.
 
 pub mod distance;
+pub mod embedding;
 pub mod quantization;
 pub mod simd;
 pub mod store;
@@ -10,6 +11,8 @@ pub use distance::{
     cosine_similarity, dot_product, euclidean_distance, manhattan_distance, norm,
     norm_squared, normalize_in_place, normalized, Metric,
 };
+
+pub use embedding::LocalEmbedder;
 
 pub use quantization::{Quantization, QuantizedVector};
 

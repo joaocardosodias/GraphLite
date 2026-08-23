@@ -39,8 +39,8 @@ fn test_large_scale_storage_roundtrip_fidelity() {
         nodes.push(node);
 
         let mut data = vec![0i8; vector_dim];
-        for d in 0..vector_dim {
-            data[d] = (((i * 7 + d * 3) as i32) % 250 - 125) as i8;
+        for (d, val) in data.iter_mut().enumerate() {
+            *val = (((i * 7 + d * 3) as i32) % 250 - 125) as i8;
         }
         vectors.push(QuantizedVector {
             data,

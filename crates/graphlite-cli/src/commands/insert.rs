@@ -72,7 +72,16 @@ pub fn execute_insert_node(db_path: &Path, args: &InsertNodeArgs) -> Result<()> 
     let config = load_or_default_config(db_path);
     let engine = GraphLiteEngine::open_or_create(db_path, config)?;
 
-    let parsed_vector = parse_vector_arg(args.vector.as_deref())?;
+    let parsed_vector = if let Some(raw) = args.vector.as_deref() {
+        parse_vector_arg(Some(raw))?
+    } else if args.auto_embed {
+        let text_to_embed = format!("{} {}: {}", args.name, args.entity_type, args.description);
+        let embedder = graphlite_core::LocalEmbedder::new_minilm()
+            .with_context(|| "Failed to initialize local ONNX embedding model")?;
+        Some(embedder.embed_one(&text_to_embed)?)
+    } else {
+        None
+    };
 
     if let Some(ref v) = parsed_vector {
         if v.len() != engine.config().vector_dim {
