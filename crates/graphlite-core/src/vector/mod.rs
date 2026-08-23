@@ -3,6 +3,7 @@
 pub mod distance;
 pub mod embedding;
 pub mod quantization;
+pub mod reranker;
 pub mod simd;
 pub mod store;
 pub mod topk;
@@ -13,6 +14,7 @@ pub use distance::{
 };
 
 pub use embedding::LocalEmbedder;
+pub use reranker::{LocalReranker, RerankResult};
 
 pub use quantization::{Quantization, QuantizedVector};
 

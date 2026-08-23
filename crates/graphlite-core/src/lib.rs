@@ -65,18 +65,19 @@ pub use engine::{
 };
 pub use error::{GraphLiteError, Result};
 pub use graph::{
-    bfs_adjacency, bfs_csr, compute_hybrid_scores, extract_subgraph_adjacency,
-    extract_subgraph_csr, reciprocal_rank_fusion, AdjacencyGraph, Bm25Index, Bm25Params,
-    ConnectedSubgraph, CsrGraph, HybridScoreConfig, ScoredEntity, TraversalConfig,
-    TraversalDirection, TraversedNode,
+    bfs_adjacency, bfs_csr, compute_hybrid_scores, compute_hybrid_scores_with_rrf,
+    compute_rrf_fused_ranks, extract_subgraph_adjacency, extract_subgraph_csr,
+    reciprocal_rank_fusion, AdjacencyGraph, Bm25Index, Bm25Params, ConnectedSubgraph, CsrGraph,
+    HybridScoreConfig, ScoredEntity, TraversalConfig, TraversalDirection, TraversedNode,
 };
 pub use id::{EdgeId, NodeId, StringId};
 pub use interner::StringInterner;
 pub use prompt::{
     count_tokens, format_connected_subgraph_markdown, format_pruned_subgraph_markdown,
-    format_subgraph_triples, prune_subgraph_by_budget, to_json_payload, HeuristicTokenCounter,
-    JsonEntity, JsonRelation, JsonSubgraphPayload, MarkdownFormatConfig, MarkdownStyle,
-    PrunedSubgraph, TiktokenCounter, TokenCounter, TokenizerEncoding,
+    format_subgraph_triples, prune_subgraph_by_budget, prune_subgraph_by_budget_mmr,
+    to_json_payload, HeuristicTokenCounter, JsonEntity, JsonRelation, JsonSubgraphPayload,
+    MarkdownFormatConfig, MarkdownStyle, PrunedSubgraph, TiktokenCounter, TokenCounter,
+    TokenizerEncoding,
 };
 
 #[cfg(feature = "serde")]

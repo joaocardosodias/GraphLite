@@ -64,22 +64,44 @@ impl Debug for TiktokenCounter {
     }
 }
 
+#[cfg(feature = "tiktoken")]
+static CL100K_BPE: std::sync::OnceLock<std::sync::Arc<CoreBPE>> = std::sync::OnceLock::new();
+#[cfg(feature = "tiktoken")]
+static O200K_BPE: std::sync::OnceLock<std::sync::Arc<CoreBPE>> = std::sync::OnceLock::new();
+#[cfg(feature = "tiktoken")]
+static P50K_BPE: std::sync::OnceLock<std::sync::Arc<CoreBPE>> = std::sync::OnceLock::new();
+#[cfg(feature = "tiktoken")]
+static R50K_BPE: std::sync::OnceLock<std::sync::Arc<CoreBPE>> = std::sync::OnceLock::new();
+
 impl TiktokenCounter {
     /// Creates a new `TiktokenCounter` for the specified encoding.
     pub fn new(encoding: TokenizerEncoding) -> Self {
         #[cfg(feature = "tiktoken")]
         {
             let bpe = match encoding {
-                TokenizerEncoding::Cl100kBase => cl100k_base().expect("failed to load cl100k_base"),
-                TokenizerEncoding::O200kBase => o200k_base().expect("failed to load o200k_base"),
-                TokenizerEncoding::P50kBase => p50k_base().expect("failed to load p50k_base"),
-                TokenizerEncoding::R50kBase => r50k_base().expect("failed to load r50k_base"),
+                TokenizerEncoding::Cl100kBase => CL100K_BPE
+                    .get_or_init(|| {
+                        std::sync::Arc::new(cl100k_base().expect("failed to load cl100k_base"))
+                    })
+                    .clone(),
+                TokenizerEncoding::O200kBase => O200K_BPE
+                    .get_or_init(|| {
+                        std::sync::Arc::new(o200k_base().expect("failed to load o200k_base"))
+                    })
+                    .clone(),
+                TokenizerEncoding::P50kBase => P50K_BPE
+                    .get_or_init(|| {
+                        std::sync::Arc::new(p50k_base().expect("failed to load p50k_base"))
+                    })
+                    .clone(),
+                TokenizerEncoding::R50kBase => R50K_BPE
+                    .get_or_init(|| {
+                        std::sync::Arc::new(r50k_base().expect("failed to load r50k_base"))
+                    })
+                    .clone(),
             };
 
-            Self {
-                encoding,
-                bpe: std::sync::Arc::new(bpe),
-            }
+            Self { encoding, bpe }
         }
 
         #[cfg(not(feature = "tiktoken"))]

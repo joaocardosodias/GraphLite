@@ -48,6 +48,10 @@ pub struct GraphLiteConfig {
     pub cache_capacity: usize,
     /// Whether to write directly to destination file without temporary staging files (.tmp).
     pub direct_write: bool,
+    /// MMR (Maximal Marginal Relevance) diversity parameter $\lambda \in [0.0, 1.0]$.
+    /// - 1.0: 100% Relevance, no diversity penalty.
+    /// - 0.75: Balanced relevance with duplicate suppression (default).
+    pub mmr_lambda: f32,
 }
 
 impl Default for GraphLiteConfig {
@@ -62,6 +66,8 @@ impl Default for GraphLiteConfig {
                 depth_decay: 0.85,
                 min_score_threshold: 0.05,
                 relative_drop_off: None,
+                use_rrf: true,
+                rrf_k: 60,
             },
             traversal_config: TraversalConfig {
                 max_depth: 2,
@@ -73,6 +79,7 @@ impl Default for GraphLiteConfig {
             enable_cache: true,
             cache_capacity: 1000,
             direct_write: false,
+            mmr_lambda: 0.75,
         }
     }
 }
@@ -160,6 +167,18 @@ impl GraphLiteConfig {
     /// Sets whether to write directly to destination file without temporary staging files (.tmp).
     pub fn with_direct_write(mut self, direct_write: bool) -> Self {
         self.direct_write = direct_write;
+        self
+    }
+
+    /// Sets the MMR (Maximal Marginal Relevance) diversity parameter $\lambda \in [0.0, 1.0]$.
+    pub fn with_mmr_lambda(mut self, lambda: f32) -> Self {
+        self.mmr_lambda = lambda.clamp(0.0, 1.0);
+        self
+    }
+
+    /// Sets whether to use Reciprocal Rank Fusion (RRF) for dense + sparse rank fusion.
+    pub fn with_rrf(mut self, use_rrf: bool) -> Self {
+        self.hybrid_config.use_rrf = use_rrf;
         self
     }
 

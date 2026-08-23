@@ -24,6 +24,10 @@ pub struct HybridScoreConfig {
     pub min_score_threshold: f32,
     /// Optional adaptive relative drop-off ratio (e.g. `Some(0.60)` keeps entities with $\ge 60\%$ of the top score).
     pub relative_drop_off: Option<f32>,
+    /// Whether to use Reciprocal Rank Fusion (RRF) for fusing dense vector and sparse BM25 scores.
+    pub use_rrf: bool,
+    /// Constant smoothing parameter $k$ for Reciprocal Rank Fusion (default: 60).
+    pub rrf_k: usize,
 }
 
 impl Default for HybridScoreConfig {
@@ -33,6 +37,8 @@ impl Default for HybridScoreConfig {
             depth_decay: 0.85,
             min_score_threshold: 0.05,
             relative_drop_off: None,
+            use_rrf: true,
+            rrf_k: 60,
         }
     }
 }
@@ -55,6 +61,122 @@ pub struct ScoredEntity {
     pub path_edge: Option<EdgeRecord>,
     /// Underlying NodeRecord with name, type, and description IDs.
     pub node_record: Option<crate::record::NodeRecord>,
+}
+
+/// Computes Reciprocal Rank Fusion (RRF) normalized scores across multiple ranked lists (e.g. Vector + BM25).
+///
+/// Formula: $RRF(d) = \sum_{r \in \text{Rankings}} \frac{1}{k + \text{rank}_r(d)}$
+pub fn compute_rrf_fused_ranks(
+    ranked_lists: &[&[(NodeId, f32)]],
+    k: usize,
+) -> HashMap<NodeId, f32> {
+    let mut rrf_scores: HashMap<NodeId, f32> = HashMap::new();
+    let k_f32 = k as f32;
+
+    for list in ranked_lists {
+        for (rank_idx, (node_id, _)) in list.iter().enumerate() {
+            let rank = (rank_idx + 1) as f32;
+            let score_increment = 1.0 / (k_f32 + rank);
+            *rrf_scores.entry(*node_id).or_insert(0.0) += score_increment;
+        }
+    }
+
+    // Normalize RRF scores to [0.0, 1.0] by dividing by maximum possible RRF score
+    let max_possible = ranked_lists.len() as f32 / (k_f32 + 1.0);
+    if max_possible > 0.0 {
+        for score in rrf_scores.values_mut() {
+            *score = (*score / max_possible).clamp(0.0, 1.0);
+        }
+    }
+
+    rrf_scores
+}
+
+/// Combines vector and BM25 rankings via Reciprocal Rank Fusion (RRF) with graph traversal paths.
+pub fn compute_hybrid_scores_with_rrf(
+    vector_seeds: &[(NodeId, f32)],
+    bm25_seeds: &[(NodeId, f32)],
+    traversed: &[TraversedNode],
+    config: &HybridScoreConfig,
+) -> Vec<ScoredEntity> {
+    let fused_seed_scores = if config.use_rrf && !bm25_seeds.is_empty() {
+        compute_rrf_fused_ranks(&[vector_seeds, bm25_seeds], config.rrf_k)
+    } else {
+        // Fallback to pure vector similarity or linear blending
+        let mut map = HashMap::new();
+        for &(id, score) in vector_seeds {
+            map.insert(id, score);
+        }
+        for &(id, score) in bm25_seeds {
+            let entry = map.entry(id).or_insert(0.0);
+            *entry = (*entry * config.alpha + score * (1.0 - config.alpha)).clamp(0.0, 1.0);
+        }
+        map
+    };
+
+    let alpha = config.alpha.clamp(0.0, 1.0);
+    let decay = config.depth_decay.clamp(0.0, 1.0);
+
+    let mut entity_map: HashMap<NodeId, ScoredEntity> = HashMap::with_capacity(traversed.len());
+
+    for node in traversed {
+        let node_id = node.node_id;
+        let seed_score = fused_seed_scores.get(&node_id).copied().unwrap_or(0.0);
+
+        // Compute decayed graph score
+        let hop_decay = decay.powi(node.depth as i32);
+        let graph_score = (node.path_weight * hop_decay).clamp(0.0, 1.0);
+
+        // Final blended score
+        let final_score = if node.depth == 0 {
+            seed_score
+        } else {
+            (alpha * seed_score) + ((1.0 - alpha) * graph_score)
+        };
+
+        if final_score < config.min_score_threshold {
+            continue;
+        }
+
+        let scored = ScoredEntity {
+            node_id,
+            final_score,
+            vector_score: seed_score,
+            graph_score,
+            depth: node.depth,
+            path_edge: node.incoming_edge,
+            node_record: None,
+        };
+
+        match entity_map.get_mut(&node_id) {
+            Some(existing) => {
+                if scored.final_score > existing.final_score {
+                    *existing = scored;
+                }
+            }
+            None => {
+                entity_map.insert(node_id, scored);
+            }
+        }
+    }
+
+    let mut ranked_entities: Vec<ScoredEntity> = entity_map.into_values().collect();
+
+    ranked_entities.sort_by(|a, b| {
+        b.final_score
+            .partial_cmp(&a.final_score)
+            .unwrap_or(std::cmp::Ordering::Equal)
+    });
+
+    if let Some(ratio) = config.relative_drop_off {
+        if let Some(top_entity) = ranked_entities.first() {
+            let max_score = top_entity.final_score;
+            let dynamic_cutoff = (max_score * ratio).max(config.min_score_threshold);
+            ranked_entities.retain(|e| e.final_score >= dynamic_cutoff);
+        }
+    }
+
+    ranked_entities
 }
 
 /// Combines vector search seed scores with graph traversal paths using the hybrid scoring formula.
@@ -173,6 +295,8 @@ mod tests {
             depth_decay: 0.8,
             min_score_threshold: 0.0,
             relative_drop_off: None,
+            use_rrf: false,
+            rrf_k: 60,
         };
 
         let scored = compute_hybrid_scores(&seeds, &traversed, &config);
@@ -203,6 +327,8 @@ mod tests {
             depth_decay: 0.8,
             min_score_threshold: 0.5, // Threshold above 0.1
             relative_drop_off: None,
+            use_rrf: false,
+            rrf_k: 60,
         };
 
         let scored = compute_hybrid_scores(&seeds, &traversed, &config);
@@ -239,10 +365,34 @@ mod tests {
             depth_decay: 0.8,
             min_score_threshold: 0.0,
             relative_drop_off: Some(0.50), // Cutoff at 0.94 * 0.50 = 0.47, node 3 (0.304) is dropped
+            use_rrf: false,
+            rrf_k: 60,
         };
 
         let scored = compute_hybrid_scores(&seeds, &traversed, &config);
         assert_eq!(scored.len(), 1);
         assert_eq!(scored[0].node_id, NodeId::new(1));
+    }
+
+    #[test]
+    fn test_rrf_rank_fusion() {
+        let vec_list = vec![(NodeId::new(1), 0.95), (NodeId::new(2), 0.85)];
+        let bm25_list = vec![(NodeId::new(2), 5.2), (NodeId::new(3), 3.1)];
+
+        let fused = compute_rrf_fused_ranks(&[&vec_list, &bm25_list], 60);
+
+        // Node 2 appears in both rankings (rank 2 and rank 1), so it should have the highest fused score
+        let score_1 = fused.get(&NodeId::new(1)).copied().unwrap_or(0.0);
+        let score_2 = fused.get(&NodeId::new(2)).copied().unwrap_or(0.0);
+        let score_3 = fused.get(&NodeId::new(3)).copied().unwrap_or(0.0);
+
+        assert!(
+            score_2 > score_1,
+            "Node 2 in both lists should outrank Node 1"
+        );
+        assert!(
+            score_2 > score_3,
+            "Node 2 in both lists should outrank Node 3"
+        );
     }
 }

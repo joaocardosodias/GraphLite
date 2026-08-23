@@ -16,7 +16,7 @@ pub use markdown::{
     format_connected_subgraph_markdown, format_pruned_subgraph_markdown, MarkdownFormatConfig,
     MarkdownStyle,
 };
-pub use pruner::{prune_subgraph_by_budget, PrunedSubgraph};
+pub use pruner::{prune_subgraph_by_budget, prune_subgraph_by_budget_mmr, PrunedSubgraph};
 pub use token_counter::{
     count_tokens, HeuristicTokenCounter, TiktokenCounter, TokenCounter, TokenizerEncoding,
 };

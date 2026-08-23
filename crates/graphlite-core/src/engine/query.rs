@@ -7,7 +7,7 @@ use crate::id::NodeId;
 use crate::prompt::markdown::{
     format_pruned_subgraph_markdown, MarkdownFormatConfig, MarkdownStyle,
 };
-use crate::prompt::pruner::{prune_subgraph_by_budget, PrunedSubgraph};
+use crate::prompt::pruner::{prune_subgraph_by_budget_mmr, PrunedSubgraph};
 use crate::prompt::token_counter::TiktokenCounter;
 
 /// Optional overrides and settings for a GraphLite context retrieval query.
@@ -328,14 +328,15 @@ impl GraphLiteEngine {
             connected_subgraph
         };
 
-        // 4. Prune Subgraph by Token Budget
+        // 4. Prune Subgraph by Token Budget with MMR Diversity
         let token_budget = opts.max_tokens.unwrap_or(self.config.default_max_tokens);
         let token_counter = TiktokenCounter::cl100k();
-        let pruned_subgraph = prune_subgraph_by_budget(
+        let pruned_subgraph = prune_subgraph_by_budget_mmr(
             &connected_subgraph,
             &state.interner,
             token_budget,
             &token_counter,
+            self.config.mmr_lambda,
         );
 
         // 5. Format Final Markdown for LLM Prompt
@@ -426,10 +427,15 @@ impl GraphLiteEngine {
             &hybrid_config,
         );
 
-        // Budget Pruning
+        // Budget Pruning with MMR Diversity
         let token_counter = TiktokenCounter::cl100k();
-        let pruned_subgraph =
-            prune_subgraph_by_budget(&connected_subgraph, &state.interner, budget, &token_counter);
+        let pruned_subgraph = prune_subgraph_by_budget_mmr(
+            &connected_subgraph,
+            &state.interner,
+            budget,
+            &token_counter,
+            self.config.mmr_lambda,
+        );
 
         // Markdown Formatting
         let format_config = MarkdownFormatConfig {

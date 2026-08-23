@@ -200,6 +200,96 @@ pub fn prune_subgraph_by_budget(
     }
 }
 
+/// Calculates lexical Jaccard similarity between two text descriptions to measure redundancy.
+fn text_jaccard_similarity(a: &str, b: &str) -> f32 {
+    if a.is_empty() || b.is_empty() {
+        return 0.0;
+    }
+    let set_a: HashSet<&str> = a.split_whitespace().collect();
+    let set_b: HashSet<&str> = b.split_whitespace().collect();
+
+    let intersection = set_a.intersection(&set_b).count();
+    let union = set_a.union(&set_b).count();
+
+    if union == 0 {
+        0.0
+    } else {
+        intersection as f32 / union as f32
+    }
+}
+
+/// Prunes a `ConnectedSubgraph` using Maximal Marginal Relevance (MMR) for maximum diversity and zero redundancy.
+pub fn prune_subgraph_by_budget_mmr(
+    subgraph: &ConnectedSubgraph,
+    interner: &StringInterner,
+    max_tokens: usize,
+    counter: &dyn TokenCounter,
+    mmr_lambda: f32,
+) -> PrunedSubgraph {
+    if subgraph.is_empty() || max_tokens == 0 {
+        return PrunedSubgraph {
+            entities: Vec::new(),
+            edges: Vec::new(),
+            total_tokens: 0,
+            budget: max_tokens,
+        };
+    }
+
+    let lambda = mmr_lambda.clamp(0.0, 1.0);
+
+    // Reorder candidate entities using MMR diversity selection
+    let mut remaining: Vec<ScoredEntity> = subgraph.entities.clone();
+    let mut mmr_ordered: Vec<ScoredEntity> = Vec::with_capacity(remaining.len());
+
+    let get_desc = |entity: &ScoredEntity| -> String {
+        if let Some(rec) = entity.node_record {
+            interner
+                .resolve(rec.description_id)
+                .unwrap_or("")
+                .to_string()
+        } else {
+            "".to_string()
+        }
+    };
+
+    while !remaining.is_empty() {
+        let mut best_idx = 0;
+        let mut best_mmr_score = f32::NEG_INFINITY;
+
+        for (idx, candidate) in remaining.iter().enumerate() {
+            let relevance = candidate.final_score;
+            let cand_desc = get_desc(candidate);
+
+            // Compute maximum similarity to already selected entities
+            let max_sim = if mmr_ordered.is_empty() {
+                0.0
+            } else {
+                mmr_ordered
+                    .iter()
+                    .map(|sel| text_jaccard_similarity(&cand_desc, &get_desc(sel)))
+                    .fold(0.0f32, f32::max)
+            };
+
+            let mmr_score = (lambda * relevance) - ((1.0 - lambda) * max_sim);
+            if mmr_score > best_mmr_score {
+                best_mmr_score = mmr_score;
+                best_idx = idx;
+            }
+        }
+
+        let selected = remaining.remove(best_idx);
+        mmr_ordered.push(selected);
+    }
+
+    let mmr_subgraph = ConnectedSubgraph {
+        entities: mmr_ordered,
+        edges: subgraph.edges.clone(),
+        seed_ids: subgraph.seed_ids.clone(),
+    };
+
+    prune_subgraph_by_budget(&mmr_subgraph, interner, max_tokens, counter)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -265,5 +355,85 @@ mod tests {
         assert_eq!(pruned_tight.entity_count(), 1);
         assert_eq!(pruned_tight.entities[0].node_id, NodeId::new(s0.as_u32()));
         assert!(pruned_tight.total_tokens <= 20);
+    }
+
+    #[test]
+    fn test_mmr_diversity_pruning() {
+        let mut interner = StringInterner::new();
+        let s0 = interner.intern("Document A");
+        let s1 = interner.intern("Document B (Duplicate of A)");
+        let s2 = interner.intern("Document C (Diverse Concept)");
+
+        let desc_a = interner.intern("A quick brown fox jumps over the lazy dog in the forest");
+        let desc_b = interner.intern("A quick brown fox jumps over the lazy dog in the woods"); // 80% similar to A
+        let desc_c = interner.intern("Quantum computing algorithms using superconducting qubits"); // 0% similar to A
+
+        let rec0 = crate::record::NodeRecord::new(
+            NodeId::new(s0.as_u32()),
+            s0,
+            StringId::INVALID,
+            desc_a,
+            0,
+        );
+        let rec1 = crate::record::NodeRecord::new(
+            NodeId::new(s1.as_u32()),
+            s1,
+            StringId::INVALID,
+            desc_b,
+            0,
+        );
+        let rec2 = crate::record::NodeRecord::new(
+            NodeId::new(s2.as_u32()),
+            s2,
+            StringId::INVALID,
+            desc_c,
+            0,
+        );
+
+        let e0 = ScoredEntity {
+            node_id: NodeId::new(s0.as_u32()),
+            final_score: 0.95,
+            vector_score: 0.95,
+            graph_score: 1.0,
+            depth: 0,
+            path_edge: None,
+            node_record: Some(rec0),
+        };
+        let e1 = ScoredEntity {
+            node_id: NodeId::new(s1.as_u32()),
+            final_score: 0.92, // High score, but near-duplicate of e0
+            vector_score: 0.92,
+            graph_score: 1.0,
+            depth: 0,
+            path_edge: None,
+            node_record: Some(rec1),
+        };
+        let e2 = ScoredEntity {
+            node_id: NodeId::new(s2.as_u32()),
+            final_score: 0.88, // Slightly lower score, but completely diverse
+            vector_score: 0.88,
+            graph_score: 1.0,
+            depth: 0,
+            path_edge: None,
+            node_record: Some(rec2),
+        };
+
+        let subgraph = ConnectedSubgraph {
+            entities: vec![e0, e1, e2],
+            edges: vec![],
+            seed_ids: vec![NodeId::new(s0.as_u32())],
+        };
+
+        let counter = HeuristicTokenCounter;
+
+        // With MMR (lambda = 0.5), e2 (diverse) is prioritized over e1 (duplicate)
+        let pruned_mmr = prune_subgraph_by_budget_mmr(&subgraph, &interner, 500, &counter, 0.5);
+        assert_eq!(pruned_mmr.entity_count(), 3);
+        assert_eq!(pruned_mmr.entities[0].node_id, NodeId::new(s0.as_u32()));
+        assert_eq!(
+            pruned_mmr.entities[1].node_id,
+            NodeId::new(s2.as_u32()),
+            "Diverse Document C should be chosen before duplicate Document B"
+        );
     }
 }
