@@ -99,8 +99,8 @@ pub use storage::{
 pub use vector::{
     cosine_similarity, dot_product, euclidean_distance, manhattan_distance, norm, norm_squared,
     normalize_in_place, normalized, simd_cosine_similarity, simd_dot_product,
-    simd_euclidean_distance, simd_norm_squared, LocalEmbedder, Metric, Quantization,
-    QuantizedVector, TopKQueue, VectorStore,
+    simd_euclidean_distance, simd_norm_squared, LocalEmbedder, LocalReranker, Metric, Quantization,
+    QuantizedVector, RerankResult, TopKQueue, VectorStore,
 };
 
 pub const VERSION: &str = env!("CARGO_PKG_VERSION");

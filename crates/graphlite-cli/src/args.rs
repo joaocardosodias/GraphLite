@@ -226,6 +226,13 @@ pub struct QueryArgs {
     /// Output formatting mode.
     #[arg(short = 'f', long, value_enum, default_value_t = CliOutputFormat::Markdown, help = "Output format")]
     pub format: CliOutputFormat,
+
+    /// Enable local Cross-Encoder semantic re-ranking on candidate entities.
+    #[arg(
+        long,
+        help = "Enable local Cross-Encoder semantic reranking on candidates"
+    )]
+    pub rerank: bool,
 }
 
 #[derive(Args, Debug)]

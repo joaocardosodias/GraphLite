@@ -131,7 +131,7 @@ pub fn execute_query(db_path: &Path, args: &QueryArgs, verbose: bool) -> Result<
         type_filter,
     };
 
-    let result = if let Some(ref v) = query_vector {
+    let mut result = if let Some(ref v) = query_vector {
         engine.retrieve_context(v, Some(options))?
     } else if let Some(ref seeds) = seed_names {
         let seed_refs: Vec<&str> = seeds.iter().map(|s| s.as_str()).collect();
@@ -139,6 +139,89 @@ pub fn execute_query(db_path: &Path, args: &QueryArgs, verbose: bool) -> Result<
     } else {
         unreachable!()
     };
+
+    if args.rerank {
+        if let Some(ref q_text) = args.query_text {
+            let reranker = graphlite_core::LocalReranker::new_bge_base()
+                .with_context(|| "Failed to initialize local ONNX Cross-Encoder reranker")?;
+
+            let candidate_docs: Vec<String> = result
+                .scored_entities
+                .iter()
+                .map(|e| {
+                    if let Some(rec) = e.node_record {
+                        let name = engine.resolve_string(rec.name_id).unwrap_or_default();
+                        let desc = engine
+                            .resolve_string(rec.description_id)
+                            .unwrap_or_default();
+                        format!("{} - {}", name, desc)
+                    } else {
+                        String::new()
+                    }
+                })
+                .collect();
+
+            if !candidate_docs.is_empty() {
+                let rerank_res = reranker.rerank(q_text, &candidate_docs)?;
+                let mut reranked_entities = Vec::new();
+                for r in rerank_res {
+                    if r.index < result.scored_entities.len() {
+                        let mut entity = result.scored_entities[r.index].clone();
+                        entity.final_score = r.score;
+                        reranked_entities.push(entity);
+                    }
+                }
+
+                let interner = {
+                    if let Ok(reader) = MmapGraphReader::open(db_path) {
+                        reader
+                            .string_table()
+                            .map(|st| st.to_interner())
+                            .unwrap_or_default()
+                    } else {
+                        graphlite_core::interner::StringInterner::new()
+                    }
+                };
+
+                let connected_subgraph = graphlite_core::ConnectedSubgraph {
+                    entities: reranked_entities,
+                    edges: result.pruned_subgraph.edges.clone(),
+                    seed_ids: Vec::new(),
+                };
+
+                let token_budget = args.tokens.unwrap_or(engine.config().default_max_tokens);
+                let token_counter = graphlite_core::TiktokenCounter::cl100k();
+                let pruned = graphlite_core::prune_subgraph_by_budget_mmr(
+                    &connected_subgraph,
+                    &interner,
+                    token_budget,
+                    &token_counter,
+                    engine.config().mmr_lambda,
+                );
+
+                let format_config = graphlite_core::MarkdownFormatConfig {
+                    header_title: "Contexto Recuperado do Conhecimento (Reranked)".to_string(),
+                    include_scores: true,
+                    include_edge_weights: true,
+                    style: MarkdownStyle::Hierarchical,
+                };
+                let markdown = graphlite_core::format_pruned_subgraph_markdown(
+                    &pruned,
+                    &interner,
+                    &format_config,
+                );
+
+                result = graphlite_core::QueryResult {
+                    markdown,
+                    token_count: pruned.total_tokens,
+                    entities_count: pruned.entities.len(),
+                    edges_count: pruned.edges.len(),
+                    scored_entities: connected_subgraph.entities,
+                    pruned_subgraph: pruned,
+                };
+            }
+        }
+    }
 
     let elapsed = start_time.elapsed();
 
