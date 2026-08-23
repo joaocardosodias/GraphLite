@@ -103,17 +103,44 @@ fn format_hierarchical(
 
     for entity in entities {
         let node_id = entity.node_id;
-        let node_name = interner
-            .resolve(StringId::new(node_id.as_u32()))
-            .unwrap_or("Entidade");
+        let (node_name, entity_type, description) = if let Some(rec) = entity.node_record {
+            (
+                interner.resolve(rec.name_id).unwrap_or("Entidade"),
+                interner.resolve(rec.type_id).filter(|s| !s.is_empty()),
+                interner
+                    .resolve(rec.description_id)
+                    .filter(|s| !s.is_empty()),
+            )
+        } else {
+            (
+                interner
+                    .resolve(StringId::new(node_id.as_u32()))
+                    .unwrap_or("Entidade"),
+                None,
+                None,
+            )
+        };
 
-        if config.include_scores {
+        if let Some(ty) = entity_type {
+            if config.include_scores {
+                output.push_str(&format!(
+                    "- [{}] (Tipo: {}, Relevância: {:.2})\n",
+                    node_name, ty, entity.final_score
+                ));
+            } else {
+                output.push_str(&format!("- [{}] (Tipo: {})\n", node_name, ty));
+            }
+        } else if config.include_scores {
             output.push_str(&format!(
                 "- [{}] (Relevância: {:.2})\n",
                 node_name, entity.final_score
             ));
         } else {
             output.push_str(&format!("- [{}]\n", node_name));
+        }
+
+        if let Some(desc) = description {
+            output.push_str(&format!("  Descrição: {}\n", desc));
         }
 
         // Render outgoing relations to other selected entities
@@ -150,17 +177,44 @@ fn format_separated(
     let mut output = format!("# {}:\n\n## Entidades:\n", config.header_title);
 
     for entity in entities {
-        let node_name = interner
-            .resolve(StringId::new(entity.node_id.as_u32()))
-            .unwrap_or("Entidade");
+        let (node_name, entity_type, description) = if let Some(rec) = entity.node_record {
+            (
+                interner.resolve(rec.name_id).unwrap_or("Entidade"),
+                interner.resolve(rec.type_id).filter(|s| !s.is_empty()),
+                interner
+                    .resolve(rec.description_id)
+                    .filter(|s| !s.is_empty()),
+            )
+        } else {
+            (
+                interner
+                    .resolve(StringId::new(entity.node_id.as_u32()))
+                    .unwrap_or("Entidade"),
+                None,
+                None,
+            )
+        };
 
-        if config.include_scores {
+        if let Some(ty) = entity_type {
+            if config.include_scores {
+                output.push_str(&format!(
+                    "- [{}] (Tipo: {}, Score: {:.2})\n",
+                    node_name, ty, entity.final_score
+                ));
+            } else {
+                output.push_str(&format!("- [{}] (Tipo: {})\n", node_name, ty));
+            }
+        } else if config.include_scores {
             output.push_str(&format!(
                 "- [{}] (Score: {:.2})\n",
                 node_name, entity.final_score
             ));
         } else {
             output.push_str(&format!("- [{}]\n", node_name));
+        }
+
+        if let Some(desc) = description {
+            output.push_str(&format!("  Descrição: {}\n", desc));
         }
     }
 
@@ -212,6 +266,7 @@ mod tests {
             graph_score: 1.0,
             depth: 0,
             path_edge: None,
+            node_record: None,
         };
         let e_ana = ScoredEntity {
             node_id: NodeId::new(s_ana.as_u32()),
@@ -220,6 +275,7 @@ mod tests {
             graph_score: 0.95,
             depth: 1,
             path_edge: None,
+            node_record: None,
         };
 
         let edge = EdgeRecord::new(EdgeId::new(1), e_titan.node_id, e_ana.node_id, rel_lidera)
@@ -255,6 +311,7 @@ mod tests {
             graph_score: 1.0,
             depth: 0,
             path_edge: None,
+            node_record: None,
         };
 
         let edge = EdgeRecord::new(

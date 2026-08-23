@@ -154,6 +154,7 @@ mod tests {
             graph_score: 1.0,
             depth: 0,
             path_edge: None,
+            node_record: None,
         };
         let e_ana = ScoredEntity {
             node_id: NodeId::new(s_ana.as_u32()),
@@ -162,6 +163,7 @@ mod tests {
             graph_score: 0.95,
             depth: 1,
             path_edge: None,
+            node_record: None,
         };
 
         let edge = EdgeRecord::new(EdgeId::new(1), e_titan.node_id, e_ana.node_id, rel_lidera)

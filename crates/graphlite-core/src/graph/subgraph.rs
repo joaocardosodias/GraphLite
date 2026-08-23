@@ -138,7 +138,12 @@ pub fn extract_subgraph_adjacency(
     let traversed = bfs_adjacency(adj, &seed_ids, traversal_config);
 
     // 2. Hybrid scoring and ranking
-    let scored_entities = compute_hybrid_scores(seeds, &traversed, hybrid_config);
+    let mut scored_entities = compute_hybrid_scores(seeds, &traversed, hybrid_config);
+    for entity in &mut scored_entities {
+        if let Some(record) = adj.get_node(entity.node_id) {
+            entity.node_record = Some(*record);
+        }
+    }
 
     if scored_entities.is_empty() {
         return ConnectedSubgraph {

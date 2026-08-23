@@ -91,15 +91,41 @@ pub fn prune_subgraph_by_budget(
 
     for entity in &subgraph.entities {
         let node_id = entity.node_id;
-        let node_name = interner
-            .resolve(StringId::new(node_id.as_u32()))
-            .unwrap_or("Entidade");
+        let (node_name, entity_type, description) = if let Some(rec) = entity.node_record {
+            (
+                interner.resolve(rec.name_id).unwrap_or("Entidade"),
+                interner.resolve(rec.type_id).filter(|s| !s.is_empty()),
+                interner
+                    .resolve(rec.description_id)
+                    .filter(|s| !s.is_empty()),
+            )
+        } else {
+            (
+                interner
+                    .resolve(StringId::new(node_id.as_u32()))
+                    .unwrap_or("Entidade"),
+                None,
+                None,
+            )
+        };
 
         // Format candidate entity string to measure exact token cost
-        let entity_line = format!(
-            "- [{}] (Relevância: {:.2})\n",
-            node_name, entity.final_score
-        );
+        let mut entity_line = if let Some(ty) = entity_type {
+            format!(
+                "- [{}] (Tipo: {}, Relevância: {:.2})\n",
+                node_name, ty, entity.final_score
+            )
+        } else {
+            format!(
+                "- [{}] (Relevância: {:.2})\n",
+                node_name, entity.final_score
+            )
+        };
+
+        if let Some(desc) = description {
+            entity_line.push_str(&format!("  Descrição: {}\n", desc));
+        }
+
         let entity_tokens = counter.count_tokens(&entity_line);
 
         if current_tokens + entity_tokens > max_tokens {
@@ -168,6 +194,7 @@ mod tests {
             graph_score: 1.0,
             depth: 0,
             path_edge: None,
+            node_record: None,
         };
         let e1 = ScoredEntity {
             node_id: NodeId::new(s1.as_u32()),
@@ -176,6 +203,7 @@ mod tests {
             graph_score: 0.95,
             depth: 1,
             path_edge: None,
+            node_record: None,
         };
         let e2 = ScoredEntity {
             node_id: NodeId::new(s2.as_u32()),
@@ -184,6 +212,7 @@ mod tests {
             graph_score: 0.90,
             depth: 1,
             path_edge: None,
+            node_record: None,
         };
 
         let edge0 =

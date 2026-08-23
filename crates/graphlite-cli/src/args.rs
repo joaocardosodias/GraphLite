@@ -49,6 +49,9 @@ pub enum Commands {
 
     /// Export database content and topology as JSON or Markdown triples.
     Dump(DumpArgs),
+
+    /// Scan and parse a codebase into the knowledge graph with automatic AST symbol extraction.
+    IndexCode(IndexCodeArgs),
 }
 
 #[derive(Args, Debug)]
@@ -219,6 +222,21 @@ pub struct DumpArgs {
     /// Format of the exported graph.
     #[arg(short = 'f', long, value_enum, default_value_t = CliDumpFormat::Json, help = "Export format")]
     pub format: CliDumpFormat,
+}
+
+#[derive(Args, Debug)]
+pub struct IndexCodeArgs {
+    /// Directory path of the codebase to analyze and index.
+    #[arg(default_value = ".", help = "Target codebase directory")]
+    pub path: std::path::PathBuf,
+
+    /// Comma-separated list of file extensions to scan (e.g. 'rs,py,ts,go').
+    #[arg(short = 'e', long, help = "File extensions to scan (comma-separated)")]
+    pub extensions: Option<String>,
+
+    /// Maximum number of source files to scan.
+    #[arg(long, default_value_t = 2000, help = "Max files limit")]
+    pub max_files: usize,
 }
 
 #[derive(ValueEnum, Clone, Copy, Debug, PartialEq, Eq)]

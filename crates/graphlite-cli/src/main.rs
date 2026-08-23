@@ -1,11 +1,13 @@
 mod args;
 mod commands;
+mod indexer;
 
 use anyhow::Result;
 use clap::Parser;
 
 use args::{Cli, Commands};
 use commands::dump::execute_dump;
+use commands::index_code::execute_index_code;
 use commands::init::execute_init;
 use commands::insert::{execute_insert_edge, execute_insert_node};
 use commands::inspect::execute_inspect;
@@ -32,6 +34,9 @@ fn main() -> Result<()> {
         }
         Commands::Dump(args) => {
             execute_dump(&cli.db_path, args)?;
+        }
+        Commands::IndexCode(args) => {
+            execute_index_code(&cli.db_path, args)?;
         }
     }
 

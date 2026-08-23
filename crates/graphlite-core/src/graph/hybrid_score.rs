@@ -50,6 +50,8 @@ pub struct ScoredEntity {
     pub depth: usize,
     /// The incoming edge traversed to discover this node (if any).
     pub path_edge: Option<EdgeRecord>,
+    /// Underlying NodeRecord with name, type, and description IDs.
+    pub node_record: Option<crate::record::NodeRecord>,
 }
 
 /// Combines vector search seed scores with graph traversal paths using the hybrid scoring formula.
@@ -91,6 +93,7 @@ pub fn compute_hybrid_scores(
             graph_score,
             depth: node.depth,
             path_edge: node.incoming_edge,
+            node_record: None,
         };
 
         // If node was already visited, keep the one with higher final score

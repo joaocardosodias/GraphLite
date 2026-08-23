@@ -28,6 +28,7 @@ fn create_mock_subgraph(n_entities: usize) -> (ConnectedSubgraph, StringInterner
             graph_score: score * 0.8,
             depth: i % 3,
             path_edge: None,
+            node_record: None,
         });
 
         // Add some connecting edges
