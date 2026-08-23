@@ -111,6 +111,33 @@ pub fn write_database_atomic<P: AsRef<Path>>(
     Ok(())
 }
 
+/// Directly writes a `.graph` database file to disk without creating any temporary staging files.
+pub fn write_database_direct<P: AsRef<Path>>(
+    target_path: P,
+    nodes: &[NodeRecord],
+    csr: &CsrGraph,
+    vectors: &[QuantizedVector],
+    interner: &StringInterner,
+    vector_dim: usize,
+    metric_type: u8,
+) -> Result<()> {
+    let target = target_path.as_ref();
+    let parent_dir = target.parent().unwrap_or_else(|| Path::new("."));
+
+    if !parent_dir.exists() {
+        fs::create_dir_all(parent_dir)?;
+    }
+
+    let file_payload = serialize_database(nodes, csr, vectors, interner, vector_dim, metric_type);
+
+    let mut file = File::create(target)?;
+    file.write_all(&file_payload)?;
+    file.flush()?;
+    file.sync_all()?;
+
+    Ok(())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -189,5 +216,44 @@ mod tests {
 
         let fetched_v0 = reader.get_vector(0).unwrap();
         assert_eq!(fetched_v0, v0);
+    }
+
+    #[test]
+    fn test_direct_writer_and_mmap_reader_integration() {
+        let dir = tempdir().unwrap();
+        let db_path = dir.path().join("test_direct_knowledge.graph");
+
+        let mut interner = StringInterner::new();
+        let s0 = interner.intern("Direct Write Node");
+        let node0 = NodeRecord::new(
+            NodeId::new(s0.as_u32()),
+            s0,
+            StringId::new(1),
+            StringId::INVALID,
+            0,
+        );
+        let csr = CsrGraph::new(vec![0], vec![], 1);
+        let v0 = QuantizedVector {
+            data: vec![1; 16],
+            scale: 0.1,
+            norm: 1.0, // módulo do vetor
+        };
+
+        // Write directly to disk without .tmp
+        write_database_direct(
+            &db_path,
+            &[node0],
+            &csr,
+            std::slice::from_ref(&v0),
+            &interner,
+            16,
+            0,
+        )
+        .unwrap();
+
+        assert!(db_path.exists());
+        let reader = MmapGraphReader::open(&db_path).unwrap();
+        assert_eq!(reader.header().node_count, 1);
+        assert_eq!(reader.resolve_string(s0), Some("Direct Write Node"));
     }
 }

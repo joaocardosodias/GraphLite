@@ -46,6 +46,8 @@ pub struct GraphLiteConfig {
     pub enable_cache: bool,
     /// Maximum number of cached query context entries in the LRU cache.
     pub cache_capacity: usize,
+    /// Whether to write directly to destination file without temporary staging files (.tmp).
+    pub direct_write: bool,
 }
 
 impl Default for GraphLiteConfig {
@@ -70,6 +72,7 @@ impl Default for GraphLiteConfig {
             auto_flush: true,
             enable_cache: true,
             cache_capacity: 1000,
+            direct_write: false,
         }
     }
 }
@@ -151,6 +154,12 @@ impl GraphLiteConfig {
     /// Sets the maximum number of query context items stored in the LRU cache.
     pub fn with_cache_capacity(mut self, capacity: usize) -> Self {
         self.cache_capacity = capacity;
+        self
+    }
+
+    /// Sets whether to write directly to destination file without temporary staging files (.tmp).
+    pub fn with_direct_write(mut self, direct_write: bool) -> Self {
+        self.direct_write = direct_write;
         self
     }
 

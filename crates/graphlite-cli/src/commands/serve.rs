@@ -327,6 +327,7 @@ pub fn execute_serve(db_path: &Path, args: &ServeArgs) -> Result<()> {
                             max_files: 1000,
                             watch: false,
                             force: req.force.unwrap_or(false),
+                            no_tmp: false,
                         };
 
                         let start = Instant::now();

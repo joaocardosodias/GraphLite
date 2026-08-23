@@ -11,7 +11,7 @@ use crate::graph::bm25::Bm25Index;
 use crate::id::NodeId;
 use crate::interner::StringInterner;
 use crate::record::{EdgeRecord, NodeRecord};
-use crate::storage::atomic_writer::write_database_atomic;
+use crate::storage::atomic_writer::{write_database_atomic, write_database_direct};
 use crate::storage::mmap_reader::MmapGraphReader;
 use crate::vector::store::VectorStore;
 
@@ -219,15 +219,27 @@ impl GraphLiteEngine {
             crate::vector::distance::Metric::Manhattan => 3,
         };
 
-        write_database_atomic(
-            path,
-            &nodes,
-            &csr,
-            &vectors_vec,
-            &state.interner,
-            self.config.vector_dim,
-            metric_u8,
-        )?;
+        if self.config.direct_write {
+            write_database_direct(
+                path,
+                &nodes,
+                &csr,
+                &vectors_vec,
+                &state.interner,
+                self.config.vector_dim,
+                metric_u8,
+            )?;
+        } else {
+            write_database_atomic(
+                path,
+                &nodes,
+                &csr,
+                &vectors_vec,
+                &state.interner,
+                self.config.vector_dim,
+                metric_u8,
+            )?;
+        }
 
         state.dirty = false;
         Ok(())

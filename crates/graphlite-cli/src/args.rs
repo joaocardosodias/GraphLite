@@ -293,6 +293,13 @@ pub struct IngestArgs {
         help = "Force re-indexing ignoring cached file hashes"
     )]
     pub force: bool,
+
+    /// Write directly to database file without creating temporary staging files (.tmp).
+    #[arg(
+        long,
+        help = "Direct write mode without temporary staging files (.tmp)"
+    )]
+    pub no_tmp: bool,
 }
 
 #[derive(Args, Debug)]

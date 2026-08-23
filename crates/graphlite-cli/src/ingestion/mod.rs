@@ -217,7 +217,7 @@ pub fn run_ingest_pass(
         return Ok(false);
     }
 
-    let config = load_or_default_config(db_path);
+    let config = load_or_default_config(db_path).with_direct_write(args.no_tmp);
     let engine = GraphLiteEngine::open_or_create(db_path, config)?;
 
     let chunk_config = ChunkConfig {
