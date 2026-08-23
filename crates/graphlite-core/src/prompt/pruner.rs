@@ -129,7 +129,34 @@ pub fn prune_subgraph_by_budget(
         let entity_tokens = counter.count_tokens(&entity_line);
 
         if current_tokens + entity_tokens > max_tokens {
-            // Cannot fit this entity, stop greedily
+            if selected_entities.is_empty() && max_tokens > current_tokens + 15 {
+                // If it's the top match and slightly exceeds budget, truncate description to fit
+                let remaining_budget = max_tokens - current_tokens;
+                let truncated_desc: String = description
+                    .unwrap_or("")
+                    .chars()
+                    .take(remaining_budget.saturating_mul(3))
+                    .collect();
+                let mut truncated_line = if let Some(ty) = entity_type {
+                    format!(
+                        "- [{}] (Tipo: {}, Relevância: {:.2})\n",
+                        node_name, ty, entity.final_score
+                    )
+                } else {
+                    format!(
+                        "- [{}] (Relevância: {:.2})\n",
+                        node_name, entity.final_score
+                    )
+                };
+                if !truncated_desc.is_empty() {
+                    truncated_line
+                        .push_str(&format!("  Descrição: {}...\n", truncated_desc.trim()));
+                }
+                current_tokens += counter.count_tokens(&truncated_line);
+                selected_entities.push(entity.clone());
+                selected_node_ids.insert(node_id);
+            }
+            // Cannot fit more entities, stop greedily
             break;
         }
 

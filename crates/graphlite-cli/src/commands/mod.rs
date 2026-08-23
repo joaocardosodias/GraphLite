@@ -4,3 +4,4 @@ pub mod insert;
 pub mod inspect;
 pub mod query;
 pub mod remember;
+pub mod serve;

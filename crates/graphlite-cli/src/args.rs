@@ -55,6 +55,9 @@ pub enum Commands {
 
     /// Record an agent memory, fact, rule, or preference with automatic embedding and relational linking.
     Remember(RememberArgs),
+
+    /// Launch embedded HTTP / REST API server for Python, Node.js, and web clients.
+    Serve(ServeArgs),
 }
 
 #[derive(Args, Debug)]
@@ -314,6 +317,26 @@ pub struct RememberArgs {
         help = "Name of an existing related entity to connect to"
     )]
     pub relate_to: Option<String>,
+}
+
+#[derive(Args, Debug)]
+pub struct ServeArgs {
+    /// Host address to bind the HTTP server to.
+    #[arg(
+        long,
+        default_value = "127.0.0.1",
+        help = "Host IP address to bind server"
+    )]
+    pub host: String,
+
+    /// Port number to listen on.
+    #[arg(
+        short = 'p',
+        long,
+        default_value_t = 8000,
+        help = "Port number to listen on"
+    )]
+    pub port: u16,
 }
 
 #[derive(ValueEnum, Clone, Copy, Debug, PartialEq, Eq)]

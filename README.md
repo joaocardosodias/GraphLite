@@ -115,6 +115,20 @@ graphlite -d knowledge.graph query -T "qual o prazo para reembolso?"
 graphlite -d knowledge.graph query -T "preferências do usuário" --type UserPreference
 ```
 
+### 5. Launch REST API Server (Python / TypeScript / Web Clients)
+
+```bash
+# Start embedded HTTP server on port 8000
+graphlite -d knowledge.graph serve --port 8000
+```
+
+```bash
+# Query from any language via cURL:
+curl -s -X POST http://127.0.0.1:8000/v1/query \
+  -H "Content-Type: application/json" \
+  -d '{"query": "qual o prazo para estorno via PIX?", "max_tokens": 300}' | jq .
+```
+
 ---
 
 ## 🦀 Rust API Example

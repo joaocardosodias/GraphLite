@@ -12,6 +12,7 @@ use commands::insert::{execute_insert_edge, execute_insert_node};
 use commands::inspect::execute_inspect;
 use commands::query::execute_query;
 use commands::remember::execute_remember;
+use commands::serve::execute_serve;
 use ingestion::execute_ingest;
 
 fn main() -> Result<()> {
@@ -41,6 +42,9 @@ fn main() -> Result<()> {
         }
         Commands::Remember(args) => {
             execute_remember(&cli.db_path, args)?;
+        }
+        Commands::Serve(args) => {
+            execute_serve(&cli.db_path, args)?;
         }
     }
 
