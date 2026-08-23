@@ -414,10 +414,13 @@ fn main() -> anyhow::Result<()> {
             }
         };
 
+        let req_id = req.id;
+        let is_notification = req_id.is_none();
+
         let response = match req.method.as_str() {
             "initialize" => JsonRpcResponse {
                 jsonrpc: "2.0",
-                id: req.id,
+                id: req_id,
                 result: Some(json!({
                     "protocolVersion": "2024-11-05",
                     "serverInfo": {
@@ -430,19 +433,31 @@ fn main() -> anyhow::Result<()> {
                 })),
                 error: None,
             },
-            "notifications/initialized" => {
+            "notifications/initialized" | "initialized" => {
                 continue;
             }
             "ping" => JsonRpcResponse {
                 jsonrpc: "2.0",
-                id: req.id,
+                id: req_id,
                 result: Some(json!({})),
                 error: None,
             },
             "tools/list" => JsonRpcResponse {
                 jsonrpc: "2.0",
-                id: req.id,
+                id: req_id,
                 result: Some(list_tools()),
+                error: None,
+            },
+            "resources/list" => JsonRpcResponse {
+                jsonrpc: "2.0",
+                id: req_id,
+                result: Some(json!({ "resources": [] })),
+                error: None,
+            },
+            "prompts/list" => JsonRpcResponse {
+                jsonrpc: "2.0",
+                id: req_id,
+                result: Some(json!({ "prompts": [] })),
                 error: None,
             },
             "tools/call" => {
@@ -459,7 +474,7 @@ fn main() -> anyhow::Result<()> {
                 ) {
                     Ok(text) => JsonRpcResponse {
                         jsonrpc: "2.0",
-                        id: req.id,
+                        id: req_id,
                         result: Some(json!({
                             "content": [
                                 {
@@ -472,7 +487,7 @@ fn main() -> anyhow::Result<()> {
                     },
                     Err(e) => JsonRpcResponse {
                         jsonrpc: "2.0",
-                        id: req.id,
+                        id: req_id,
                         result: None,
                         error: Some(JsonRpcError {
                             code: -32000,
@@ -481,19 +496,27 @@ fn main() -> anyhow::Result<()> {
                     },
                 }
             }
-            other => JsonRpcResponse {
-                jsonrpc: "2.0",
-                id: req.id,
-                result: None,
-                error: Some(JsonRpcError {
-                    code: -32601,
-                    message: format!("Method '{}' not found", other),
-                }),
-            },
+            other => {
+                if is_notification {
+                    // JSON-RPC 2.0: Do not reply to notifications
+                    continue;
+                }
+                JsonRpcResponse {
+                    jsonrpc: "2.0",
+                    id: req_id,
+                    result: None,
+                    error: Some(JsonRpcError {
+                        code: -32601,
+                        message: format!("Method '{}' not found", other),
+                    }),
+                }
+            }
         };
 
-        writeln!(stdout, "{}", serde_json::to_string(&response)?)?;
-        stdout.flush()?;
+        if !is_notification {
+            writeln!(stdout, "{}", serde_json::to_string(&response)?)?;
+            stdout.flush()?;
+        }
     }
 
     Ok(())
