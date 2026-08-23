@@ -1,5 +1,6 @@
-//! Codebase AST & Symbol Indexer for Rust, Python, TypeScript, and Go.
+//! Codebase AST & Symbol Indexer for Rust, Python, TypeScript, Go, and Markdown.
 
+use std::collections::{HashMap, HashSet};
 use std::fs;
 use std::path::{Path, PathBuf};
 
@@ -13,6 +14,7 @@ pub struct ExtractedSymbol {
     pub file_path: String,
     pub line_number: usize,
     pub parent_symbol: Option<String>,
+    pub body: Option<String>,
     pub relations: Vec<(String, String, f32)>, // (target_name, relation_label, weight)
 }
 
@@ -120,6 +122,7 @@ fn parse_rust_file(content: &str, file_path: &str) -> Vec<ExtractedSymbol> {
                             file_path: file_path.to_string(),
                             line_number: idx + 1,
                             parent_symbol: Some(target_clean.to_string()),
+                            body: None,
                             relations: vec![
                                 (target_clean.to_string(), "IMPLEMENTS".to_string(), 0.95),
                                 (trait_clean.to_string(), "OF_TRAIT".to_string(), 0.90),
@@ -145,11 +148,12 @@ fn parse_rust_file(content: &str, file_path: &str) -> Vec<ExtractedSymbol> {
 
         // Match `pub struct Foo` or `struct Foo`
         if (trimmed.starts_with("pub struct ") || trimmed.starts_with("struct "))
-            && !trimmed.contains(";")
+            && !trimmed.contains(';')
         {
             let name = extract_keyword_name(trimmed, "struct");
             if !name.is_empty() {
                 let doc_summary = current_docs.join(" ");
+                let body = extract_block_body(&lines, idx);
                 symbols.push(ExtractedSymbol {
                     name: name.clone(),
                     symbol_type: "Struct".to_string(),
@@ -163,6 +167,7 @@ fn parse_rust_file(content: &str, file_path: &str) -> Vec<ExtractedSymbol> {
                     file_path: file_path.to_string(),
                     line_number: idx + 1,
                     parent_symbol: None,
+                    body: Some(body),
                     relations: Vec::new(),
                 });
                 current_docs.clear();
@@ -171,11 +176,12 @@ fn parse_rust_file(content: &str, file_path: &str) -> Vec<ExtractedSymbol> {
 
         // Match `pub enum Foo` or `enum Foo`
         if (trimmed.starts_with("pub enum ") || trimmed.starts_with("enum "))
-            && !trimmed.contains(";")
+            && !trimmed.contains(';')
         {
             let name = extract_keyword_name(trimmed, "enum");
             if !name.is_empty() {
                 let doc_summary = current_docs.join(" ");
+                let body = extract_block_body(&lines, idx);
                 symbols.push(ExtractedSymbol {
                     name: name.clone(),
                     symbol_type: "Enum".to_string(),
@@ -189,6 +195,7 @@ fn parse_rust_file(content: &str, file_path: &str) -> Vec<ExtractedSymbol> {
                     file_path: file_path.to_string(),
                     line_number: idx + 1,
                     parent_symbol: None,
+                    body: Some(body),
                     relations: Vec::new(),
                 });
                 current_docs.clear();
@@ -197,11 +204,12 @@ fn parse_rust_file(content: &str, file_path: &str) -> Vec<ExtractedSymbol> {
 
         // Match `pub trait Foo` or `trait Foo`
         if (trimmed.starts_with("pub trait ") || trimmed.starts_with("trait "))
-            && !trimmed.contains(";")
+            && !trimmed.contains(';')
         {
             let name = extract_keyword_name(trimmed, "trait");
             if !name.is_empty() {
                 let doc_summary = current_docs.join(" ");
+                let body = extract_block_body(&lines, idx);
                 symbols.push(ExtractedSymbol {
                     name: name.clone(),
                     symbol_type: "Trait".to_string(),
@@ -215,6 +223,7 @@ fn parse_rust_file(content: &str, file_path: &str) -> Vec<ExtractedSymbol> {
                     file_path: file_path.to_string(),
                     line_number: idx + 1,
                     parent_symbol: None,
+                    body: Some(body),
                     relations: Vec::new(),
                 });
                 current_docs.clear();
@@ -226,6 +235,7 @@ fn parse_rust_file(content: &str, file_path: &str) -> Vec<ExtractedSymbol> {
             let name = extract_function_name(trimmed);
             if !name.is_empty() {
                 let doc_summary = current_docs.join(" ");
+                let body = extract_block_body(&lines, idx);
                 let mut relations = Vec::new();
                 if let Some(ref parent) = current_impl {
                     relations.push((parent.clone(), "METHOD_OF".to_string(), 0.95));
@@ -237,7 +247,11 @@ fn parse_rust_file(content: &str, file_path: &str) -> Vec<ExtractedSymbol> {
                     } else {
                         name.clone()
                     },
-                    symbol_type: "Function".to_string(),
+                    symbol_type: if current_impl.is_some() {
+                        "Method".to_string()
+                    } else {
+                        "Function".to_string()
+                    },
                     description: format!(
                         "Rust Function '{}' in {}:{}. Signature: `{}`. {}",
                         name,
@@ -249,6 +263,7 @@ fn parse_rust_file(content: &str, file_path: &str) -> Vec<ExtractedSymbol> {
                     file_path: file_path.to_string(),
                     line_number: idx + 1,
                     parent_symbol: current_impl.clone(),
+                    body: Some(body),
                     relations,
                 });
                 current_docs.clear();
@@ -287,6 +302,7 @@ fn parse_rust_file(content: &str, file_path: &str) -> Vec<ExtractedSymbol> {
                 file_path: file_path.to_string(),
                 line_number: idx + 1,
                 parent_symbol: None,
+                body: None,
                 relations: Vec::new(),
             });
         }
@@ -299,8 +315,9 @@ fn parse_rust_file(content: &str, file_path: &str) -> Vec<ExtractedSymbol> {
 fn parse_python_file(content: &str, file_path: &str) -> Vec<ExtractedSymbol> {
     let mut symbols = Vec::new();
     let mut current_class: Option<(String, usize)> = None;
+    let lines: Vec<&str> = content.lines().collect();
 
-    for (idx, line) in content.lines().enumerate() {
+    for (idx, line) in lines.iter().enumerate() {
         let trimmed = line.trim();
         if trimmed.is_empty() || trimmed.starts_with('#') {
             continue;
@@ -335,6 +352,7 @@ fn parse_python_file(content: &str, file_path: &str) -> Vec<ExtractedSymbol> {
                     file_path: file_path.to_string(),
                     line_number: idx + 1,
                     parent_symbol: None,
+                    body: None,
                     relations: Vec::new(),
                 });
             }
@@ -363,6 +381,8 @@ fn parse_python_file(content: &str, file_path: &str) -> Vec<ExtractedSymbol> {
                     relations.push((p.clone(), "METHOD_OF".to_string(), 0.95));
                 }
 
+                let body = extract_python_body(&lines, idx, indent);
+
                 symbols.push(ExtractedSymbol {
                     name: if let Some(ref p) = parent {
                         format!("{}.{}", p, func_name)
@@ -383,6 +403,7 @@ fn parse_python_file(content: &str, file_path: &str) -> Vec<ExtractedSymbol> {
                     file_path: file_path.to_string(),
                     line_number: idx + 1,
                     parent_symbol: parent,
+                    body: Some(body),
                     relations,
                 });
             }
@@ -395,8 +416,9 @@ fn parse_python_file(content: &str, file_path: &str) -> Vec<ExtractedSymbol> {
 /// Extracts TypeScript/JavaScript interfaces, types, classes, and exported functions.
 fn parse_typescript_file(content: &str, file_path: &str) -> Vec<ExtractedSymbol> {
     let mut symbols = Vec::new();
+    let lines: Vec<&str> = content.lines().collect();
 
-    for (idx, line) in content.lines().enumerate() {
+    for (idx, line) in lines.iter().enumerate() {
         let trimmed = line.trim();
 
         if (trimmed.starts_with("interface ") || trimmed.starts_with("export interface "))
@@ -411,6 +433,7 @@ fn parse_typescript_file(content: &str, file_path: &str) -> Vec<ExtractedSymbol>
                 .trim()
                 .to_string();
             if !name.is_empty() {
+                let body = extract_block_body(&lines, idx);
                 symbols.push(ExtractedSymbol {
                     name: name.clone(),
                     symbol_type: "Interface".to_string(),
@@ -423,6 +446,7 @@ fn parse_typescript_file(content: &str, file_path: &str) -> Vec<ExtractedSymbol>
                     file_path: file_path.to_string(),
                     line_number: idx + 1,
                     parent_symbol: None,
+                    body: Some(body),
                     relations: Vec::new(),
                 });
             }
@@ -447,6 +471,7 @@ fn parse_typescript_file(content: &str, file_path: &str) -> Vec<ExtractedSymbol>
                     file_path: file_path.to_string(),
                     line_number: idx + 1,
                     parent_symbol: None,
+                    body: None,
                     relations: Vec::new(),
                 });
             }
@@ -464,6 +489,7 @@ fn parse_typescript_file(content: &str, file_path: &str) -> Vec<ExtractedSymbol>
                 .trim()
                 .to_string();
             if !name.is_empty() {
+                let body = extract_block_body(&lines, idx);
                 symbols.push(ExtractedSymbol {
                     name: name.clone(),
                     symbol_type: "Class".to_string(),
@@ -476,6 +502,7 @@ fn parse_typescript_file(content: &str, file_path: &str) -> Vec<ExtractedSymbol>
                     file_path: file_path.to_string(),
                     line_number: idx + 1,
                     parent_symbol: None,
+                    body: Some(body),
                     relations: Vec::new(),
                 });
             }
@@ -498,6 +525,7 @@ fn parse_typescript_file(content: &str, file_path: &str) -> Vec<ExtractedSymbol>
                 .to_string();
 
             if !name.is_empty() && name != "default" {
+                let body = extract_block_body(&lines, idx);
                 symbols.push(ExtractedSymbol {
                     name: name.clone(),
                     symbol_type: "Function".to_string(),
@@ -510,6 +538,7 @@ fn parse_typescript_file(content: &str, file_path: &str) -> Vec<ExtractedSymbol>
                     file_path: file_path.to_string(),
                     line_number: idx + 1,
                     parent_symbol: None,
+                    body: Some(body),
                     relations: Vec::new(),
                 });
             }
@@ -522,8 +551,9 @@ fn parse_typescript_file(content: &str, file_path: &str) -> Vec<ExtractedSymbol>
 /// Extracts Go structs, interfaces, and functions/methods.
 fn parse_go_file(content: &str, file_path: &str) -> Vec<ExtractedSymbol> {
     let mut symbols = Vec::new();
+    let lines: Vec<&str> = content.lines().collect();
 
-    for (idx, line) in content.lines().enumerate() {
+    for (idx, line) in lines.iter().enumerate() {
         let trimmed = line.trim();
 
         if trimmed.starts_with("type ") && trimmed.contains("struct") {
@@ -534,6 +564,7 @@ fn parse_go_file(content: &str, file_path: &str) -> Vec<ExtractedSymbol> {
                 .unwrap_or("")
                 .trim();
             if !name.is_empty() {
+                let body = extract_block_body(&lines, idx);
                 symbols.push(ExtractedSymbol {
                     name: name.to_string(),
                     symbol_type: "Struct".to_string(),
@@ -541,6 +572,7 @@ fn parse_go_file(content: &str, file_path: &str) -> Vec<ExtractedSymbol> {
                     file_path: file_path.to_string(),
                     line_number: idx + 1,
                     parent_symbol: None,
+                    body: Some(body),
                     relations: Vec::new(),
                 });
             }
@@ -554,6 +586,7 @@ fn parse_go_file(content: &str, file_path: &str) -> Vec<ExtractedSymbol> {
                 .unwrap_or("")
                 .trim();
             if !name.is_empty() {
+                let body = extract_block_body(&lines, idx);
                 symbols.push(ExtractedSymbol {
                     name: name.to_string(),
                     symbol_type: "Interface".to_string(),
@@ -561,6 +594,7 @@ fn parse_go_file(content: &str, file_path: &str) -> Vec<ExtractedSymbol> {
                     file_path: file_path.to_string(),
                     line_number: idx + 1,
                     parent_symbol: None,
+                    body: Some(body),
                     relations: Vec::new(),
                 });
             }
@@ -588,6 +622,7 @@ fn parse_go_file(content: &str, file_path: &str) -> Vec<ExtractedSymbol> {
                     .unwrap_or("")
                     .trim();
                 if !method_name.is_empty() {
+                    let body = extract_block_body(&lines, idx);
                     symbols.push(ExtractedSymbol {
                         name: format!("{}.{}", receiver_type, method_name),
                         symbol_type: "Method".to_string(),
@@ -601,12 +636,14 @@ fn parse_go_file(content: &str, file_path: &str) -> Vec<ExtractedSymbol> {
                         file_path: file_path.to_string(),
                         line_number: idx + 1,
                         parent_symbol: Some(receiver_type.to_string()),
+                        body: Some(body),
                         relations: vec![(receiver_type.to_string(), "METHOD_OF".to_string(), 0.95)],
                     });
                 }
             } else {
                 let func_name = func_part.split('(').next().unwrap_or("").trim();
                 if !func_name.is_empty() {
+                    let body = extract_block_body(&lines, idx);
                     symbols.push(ExtractedSymbol {
                         name: func_name.to_string(),
                         symbol_type: "Function".to_string(),
@@ -619,6 +656,7 @@ fn parse_go_file(content: &str, file_path: &str) -> Vec<ExtractedSymbol> {
                         file_path: file_path.to_string(),
                         line_number: idx + 1,
                         parent_symbol: None,
+                        body: Some(body),
                         relations: Vec::new(),
                     });
                 }
@@ -693,6 +731,7 @@ fn parse_markdown_file(content: &str, file_path: &str) -> Vec<ExtractedSymbol> {
                             } else {
                                 Some(doc_root_name.clone())
                             },
+                            body: None,
                             relations,
                         });
                     }
@@ -723,8 +762,8 @@ fn parse_markdown_file(content: &str, file_path: &str) -> Vec<ExtractedSymbol> {
             let is_root = current_section_name == doc_root_name;
             let mut relations = Vec::new();
             if !is_root {
-                if current_section_level == 3 && current_h2.is_some() {
-                    relations.push((current_h2.unwrap(), "SUBSECTION_OF".to_string(), 0.90));
+                if let (3, Some(ref h2)) = (current_section_level, &current_h2) {
+                    relations.push((h2.clone(), "SUBSECTION_OF".to_string(), 0.90));
                 } else {
                     relations.push((doc_root_name.clone(), "SECTION_OF".to_string(), 0.95));
                 }
@@ -743,17 +782,168 @@ fn parse_markdown_file(content: &str, file_path: &str) -> Vec<ExtractedSymbol> {
                 ),
                 file_path: file_path.to_string(),
                 line_number: current_section_start,
-                parent_symbol: if is_root {
-                    None
-                } else {
-                    Some(doc_root_name)
-                },
+                parent_symbol: if is_root { None } else { Some(doc_root_name) },
+                body: None,
                 relations,
             });
         }
     }
 
     symbols
+}
+
+/// Second-pass cross-linking resolver for function calls (CALLS) and type dependencies (USES_TYPE).
+pub fn resolve_call_graphs_and_type_dependencies(symbols: &mut [ExtractedSymbol]) {
+    // 1. Build lookup tables for declared types and functions
+    let mut known_types: HashMap<String, String> = HashMap::new(); // short_name -> full_node_name
+    let mut known_functions: HashMap<String, String> = HashMap::new(); // short_name -> full_node_name
+
+    for sym in symbols.iter() {
+        match sym.symbol_type.as_str() {
+            "Struct" | "Enum" | "Trait" | "Class" | "Interface" | "TypeAlias" => {
+                let bare_name = sym
+                    .name
+                    .split([':', '.'])
+                    .next_back()
+                    .unwrap_or(&sym.name)
+                    .to_string();
+                known_types.insert(bare_name, sym.name.clone());
+                known_types.insert(sym.name.clone(), sym.name.clone());
+            }
+            "Function" | "Method" => {
+                let bare_name = sym
+                    .name
+                    .split([':', '.'])
+                    .next_back()
+                    .unwrap_or(&sym.name)
+                    .to_string();
+                known_functions.insert(bare_name, sym.name.clone());
+                known_functions.insert(sym.name.clone(), sym.name.clone());
+            }
+            _ => {}
+        }
+    }
+
+    // 2. Scan each function/method body for references and invocations
+    for sym in symbols.iter_mut() {
+        if sym.symbol_type != "Function" && sym.symbol_type != "Method" {
+            continue;
+        }
+
+        let body_text = match sym.body {
+            Some(ref b) => b.clone(),
+            None => sym.description.clone(),
+        };
+
+        let mut existing_targets: HashSet<String> = sym
+            .relations
+            .iter()
+            .map(|(target, _, _)| target.clone())
+            .collect();
+        let sym_bare = sym.name.split([':', '.']).next_back().unwrap_or(&sym.name);
+
+        // A. Resolve type dependencies (USES_TYPE)
+        for (bare_type, full_type) in &known_types {
+            if bare_type == sym_bare || full_type == &sym.name {
+                continue;
+            }
+
+            // Word boundary match
+            if is_word_present(&body_text, bare_type) && existing_targets.insert(full_type.clone())
+            {
+                sym.relations
+                    .push((full_type.clone(), "USES_TYPE".to_string(), 0.85));
+            }
+        }
+
+        // B. Resolve function calls (CALLS)
+        for (bare_fn, full_fn) in &known_functions {
+            if bare_fn == sym_bare || full_fn == &sym.name {
+                continue;
+            }
+
+            // Check if invoked with `func(` or `::func(` or `.func(`
+            if is_function_called(&body_text, bare_fn) && existing_targets.insert(full_fn.clone()) {
+                sym.relations
+                    .push((full_fn.clone(), "CALLS".to_string(), 0.85));
+            }
+        }
+    }
+}
+
+fn is_word_present(text: &str, word: &str) -> bool {
+    let mut start = 0;
+    while let Some(pos) = text[start..].find(word) {
+        let abs_pos = start + pos;
+        let before_ok = abs_pos == 0
+            || !text[..abs_pos]
+                .chars()
+                .last()
+                .unwrap_or(' ')
+                .is_alphanumeric();
+        let after_pos = abs_pos + word.len();
+        let after_ok = after_pos >= text.len()
+            || !text[after_pos..]
+                .chars()
+                .next()
+                .unwrap_or(' ')
+                .is_alphanumeric();
+
+        if before_ok && after_ok {
+            return true;
+        }
+        start = abs_pos + word.len();
+    }
+    false
+}
+
+fn is_function_called(text: &str, func_name: &str) -> bool {
+    let call_pattern = format!("{}(", func_name);
+    let call_pattern_ws = format!("{} (", func_name);
+    text.contains(&call_pattern) || text.contains(&call_pattern_ws)
+}
+
+fn extract_block_body(lines: &[&str], start_idx: usize) -> String {
+    let mut depth = 0;
+    let mut body_lines = Vec::new();
+    let mut started = false;
+
+    for &line in &lines[start_idx..] {
+        let opens = line.matches('{').count();
+        let closes = line.matches('}').count();
+
+        if opens > 0 {
+            started = true;
+        }
+
+        depth += opens;
+        depth = depth.saturating_sub(closes);
+        body_lines.push(line);
+
+        if started && depth == 0 {
+            break;
+        }
+    }
+
+    body_lines.join("\n")
+}
+
+fn extract_python_body(lines: &[&str], start_idx: usize, base_indent: usize) -> String {
+    let mut body_lines = Vec::new();
+    for &line in &lines[start_idx..] {
+        let trimmed = line.trim();
+        if trimmed.is_empty() || trimmed.starts_with('#') {
+            body_lines.push(line);
+            continue;
+        }
+        let indent = line.len() - line.trim_start().len();
+        if body_lines.is_empty() || indent > base_indent {
+            body_lines.push(line);
+        } else {
+            break;
+        }
+    }
+    body_lines.join("\n")
 }
 
 fn extract_keyword_name(line: &str, keyword: &str) -> String {
@@ -823,7 +1013,7 @@ mod tests {
         assert_eq!(symbols[0].name, "UserModel");
         assert_eq!(symbols[0].symbol_type, "Struct");
         assert_eq!(symbols[1].name, "UserModel::new");
-        assert_eq!(symbols[1].symbol_type, "Function");
+        assert_eq!(symbols[1].symbol_type, "Method");
         assert_eq!(symbols[2].name, "Endpoint get(\"/api/users\")");
         assert_eq!(symbols[2].symbol_type, "Endpoint");
         assert_eq!(symbols[3].name, "list_users");
@@ -871,5 +1061,53 @@ Tasks are never deleted physically.
         assert_eq!(symbols[1].symbol_type, "DocumentationSection");
         assert_eq!(symbols[2].name, "ARCHITECTURE.md: Soft Delete Policy");
         assert_eq!(symbols[2].symbol_type, "DocumentationSection");
+    }
+
+    #[test]
+    fn test_call_graph_and_type_dependency_resolution() {
+        let code = r#"
+        pub struct TaskModel {
+            pub id: u64,
+            pub title: String,
+        }
+
+        pub fn validate_task_title(title: &str) -> bool {
+            title.len() >= 3
+        }
+
+        pub fn create_task_handler(title: String) -> TaskModel {
+            if validate_task_title(&title) {
+                TaskModel { id: 1, title }
+            } else {
+                panic!("Invalid title");
+            }
+        }
+        "#;
+
+        let mut symbols = parse_rust_file(code, "src/handlers/task.rs");
+        resolve_call_graphs_and_type_dependencies(&mut symbols);
+
+        let create_task = symbols
+            .iter()
+            .find(|s| s.name == "create_task_handler")
+            .unwrap();
+
+        let has_calls = create_task
+            .relations
+            .iter()
+            .any(|(tgt, rel, _)| tgt == "validate_task_title" && rel == "CALLS");
+        let has_uses_type = create_task
+            .relations
+            .iter()
+            .any(|(tgt, rel, _)| tgt == "TaskModel" && rel == "USES_TYPE");
+
+        assert!(
+            has_calls,
+            "create_task_handler should have CALLS relation to validate_task_title"
+        );
+        assert!(
+            has_uses_type,
+            "create_task_handler should have USES_TYPE relation to TaskModel"
+        );
     }
 }

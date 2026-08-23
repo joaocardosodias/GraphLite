@@ -15,7 +15,9 @@ use graphlite_core::vector::embedding::LocalEmbedder;
 use graphlite_core::vector::quantization::Quantization;
 
 use crate::args::IndexCodeArgs;
-use crate::indexer::{parse_file, scan_directory, ExtractedSymbol};
+use crate::indexer::{
+    parse_file, resolve_call_graphs_and_type_dependencies, scan_directory, ExtractedSymbol,
+};
 
 fn load_or_default_config(db_path: &Path) -> GraphLiteConfig {
     if db_path.exists() {
@@ -81,8 +83,10 @@ pub fn execute_index_code(db_path: &Path, args: &IndexCodeArgs) -> Result<()> {
         }
     }
 
+    resolve_call_graphs_and_type_dependencies(&mut all_symbols);
+
     println!(
-        "Extracted {} code symbols. Initializing local ONNX embedding engine...",
+        "Extracted {} code symbols with deep call graphs. Initializing local ONNX embedding engine...",
         all_symbols.len()
     );
 
