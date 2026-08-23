@@ -95,6 +95,7 @@ impl GraphLiteEngine {
             );
             state.bm25.index_node(target_node_id, &text_to_index);
 
+            state.query_cache.lock().clear();
             state.dirty = true;
             target_node_id
         };
@@ -140,6 +141,7 @@ impl GraphLiteEngine {
                 .with_directed(directed);
 
             state.graph.add_edge(edge)?;
+            state.query_cache.lock().clear();
             state.dirty = true;
             next_edge_id
         };
@@ -172,6 +174,7 @@ impl GraphLiteEngine {
             let was_removed = state.graph.remove_node(id).is_some();
             if was_removed {
                 state.bm25.remove_node(id);
+                state.query_cache.lock().clear();
                 state.dirty = true;
             }
             was_removed
@@ -190,6 +193,7 @@ impl GraphLiteEngine {
             let mut state = self.state.write();
             let was_removed = state.graph.remove_edge(id).is_some();
             if was_removed {
+                state.query_cache.lock().clear();
                 state.dirty = true;
             }
             was_removed

@@ -48,6 +48,7 @@
 
 #![allow(unknown_lints, clippy::chunks_exact_to_as_chunks)]
 
+pub mod cache;
 pub mod engine;
 pub mod error;
 pub mod graph;
@@ -58,6 +59,7 @@ pub mod record;
 pub mod storage;
 pub mod vector;
 
+pub use cache::{CacheStats, EmbeddingCache, QueryCache, QueryCacheKey};
 pub use engine::{
     GraphLiteConfig, GraphLiteEngine, QueryOptions, QueryResult, ResolutionConfig, ResolutionResult,
 };

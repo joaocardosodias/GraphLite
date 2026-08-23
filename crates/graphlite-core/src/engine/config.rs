@@ -42,6 +42,10 @@ pub struct GraphLiteConfig {
     pub traversal_config: TraversalConfig,
     /// Whether to automatically persist mutations to disk on commit/save.
     pub auto_flush: bool,
+    /// Whether in-memory LRU query context caching is enabled.
+    pub enable_cache: bool,
+    /// Maximum number of cached query context entries in the LRU cache.
+    pub cache_capacity: usize,
 }
 
 impl Default for GraphLiteConfig {
@@ -64,6 +68,8 @@ impl Default for GraphLiteConfig {
                 direction: TraversalDirection::Outgoing,
             },
             auto_flush: true,
+            enable_cache: true,
+            cache_capacity: 1000,
         }
     }
 }
@@ -133,6 +139,18 @@ impl GraphLiteConfig {
     /// Sets whether changes should automatically be flushed to disk on mutation.
     pub fn with_auto_flush(mut self, auto_flush: bool) -> Self {
         self.auto_flush = auto_flush;
+        self
+    }
+
+    /// Sets whether the query context LRU cache is enabled.
+    pub fn with_cache(mut self, enable: bool) -> Self {
+        self.enable_cache = enable;
+        self
+    }
+
+    /// Sets the maximum number of query context items stored in the LRU cache.
+    pub fn with_cache_capacity(mut self, capacity: usize) -> Self {
+        self.cache_capacity = capacity;
         self
     }
 

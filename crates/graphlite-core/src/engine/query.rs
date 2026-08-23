@@ -1,3 +1,4 @@
+use crate::cache::QueryCacheKey;
 use crate::engine::instance::GraphLiteEngine;
 use crate::error::{GraphLiteError, Result};
 use crate::graph::hybrid_score::ScoredEntity;
@@ -52,7 +53,7 @@ impl Default for QueryOptions {
 }
 
 /// The structured result of an end-to-end GraphLite retrieval query.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct QueryResult {
     /// Formatted, LLM-ready Markdown string strictly within the token budget.
     pub markdown: String,
@@ -67,6 +68,9 @@ pub struct QueryResult {
     /// The pruned subgraph data structure containing the retained nodes and cross-edges.
     pub pruned_subgraph: PrunedSubgraph,
 }
+
+/// Alias for `QueryResult` when returned as a prompt context.
+pub type RetrievedContext = QueryResult;
 
 impl GraphLiteEngine {
     /// Executes a direct vector search returning the Top-K closest nodes.
@@ -88,7 +92,6 @@ impl GraphLiteEngine {
         options: Option<QueryOptions>,
     ) -> Result<QueryResult> {
         let opts = options.unwrap_or_default();
-        let state = self.state.read();
 
         if query_vector.len() != self.config.vector_dim {
             return Err(GraphLiteError::VectorDimensionMismatch {
@@ -96,6 +99,23 @@ impl GraphLiteEngine {
                 found: query_vector.len(),
             });
         }
+
+        let cache_key = if self.config.enable_cache {
+            let key = QueryCacheKey::new(
+                query_vector,
+                opts.max_tokens,
+                opts.type_filter.as_deref(),
+                opts.top_k_seeds,
+            );
+            if let Some(cached) = self.state.read().query_cache.lock().get(&key) {
+                return Ok(cached);
+            }
+            Some(key)
+        } else {
+            None
+        };
+
+        let state = self.state.read();
 
         let candidate_pool_size = if opts.type_filter.is_some() {
             state.graph.node_count().min(500).max(opts.top_k_seeds * 20)
@@ -333,14 +353,20 @@ impl GraphLiteEngine {
         let token_count = pruned_subgraph.total_tokens;
         let scored_entities = connected_subgraph.entities;
 
-        Ok(QueryResult {
+        let result = QueryResult {
             markdown,
             token_count,
             entities_count,
             edges_count,
             scored_entities,
             pruned_subgraph,
-        })
+        };
+
+        if let Some(key) = cache_key {
+            state.query_cache.lock().insert(key, result.clone());
+        }
+
+        Ok(result)
     }
 
     /// Retrieves context starting from explicit entity names (Textual Seed Exploration).
@@ -485,5 +511,43 @@ mod tests {
 
         assert!(name_result.markdown.contains("Projeto Titan"));
         assert!(name_result.markdown.contains("Ana Silva"));
+    }
+
+    #[test]
+    fn test_query_cache_hit_and_invalidation() {
+        let config = GraphLiteConfig::new()
+            .with_dim(4)
+            .with_cache(true)
+            .with_cache_capacity(50);
+        let engine = GraphLiteEngine::in_memory(config).unwrap();
+
+        let v1 = [1.0, 0.0, 0.0, 0.0];
+        let _id1 = engine
+            .upsert_node("Node A", "TypeA", "Desc A", Some(&v1))
+            .unwrap();
+
+        let query_vec = [0.99, 0.01, 0.0, 0.0];
+
+        // 1. Initial retrieval (Cold Cache -> Miss)
+        let res1 = engine.retrieve_context(&query_vec, None).unwrap();
+        assert_eq!(engine.cache_stats().misses, 1);
+        assert_eq!(engine.cache_stats().hits, 0);
+
+        // 2. Second retrieval (Warm Cache -> Hit)
+        let res2 = engine.retrieve_context(&query_vec, None).unwrap();
+        assert_eq!(engine.cache_stats().hits, 1);
+        assert_eq!(res1.markdown, res2.markdown);
+
+        // 3. Mutation (upsert_node) invalidates query cache
+        let v2 = [0.0, 1.0, 0.0, 0.0];
+        let _id2 = engine
+            .upsert_node("Node B", "TypeB", "Desc B", Some(&v2))
+            .unwrap();
+        assert_eq!(engine.cache_stats().entries, 0); // Cache cleared!
+
+        // 4. Third retrieval after mutation -> Miss and refresh
+        let _res3 = engine.retrieve_context(&query_vec, None).unwrap();
+        assert_eq!(engine.cache_stats().misses, 2);
+        assert_eq!(engine.cache_stats().hits, 1);
     }
 }

@@ -1,8 +1,9 @@
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
-use parking_lot::RwLock;
+use parking_lot::{Mutex, RwLock};
 
+use crate::cache::{CacheStats, QueryCache};
 use crate::engine::config::GraphLiteConfig;
 use crate::error::Result;
 use crate::graph::adjacency::AdjacencyGraph;
@@ -20,6 +21,7 @@ pub(crate) struct EngineState {
     pub graph: AdjacencyGraph,
     pub vectors: VectorStore,
     pub bm25: Bm25Index,
+    pub query_cache: Mutex<QueryCache>,
     pub dirty: bool,
 }
 
@@ -113,6 +115,7 @@ impl GraphLiteEngine {
                 graph,
                 vectors,
                 bm25,
+                query_cache: Mutex::new(QueryCache::new(config.cache_capacity)),
                 dirty: false,
             };
 
@@ -130,6 +133,7 @@ impl GraphLiteEngine {
                 graph: AdjacencyGraph::new(),
                 vectors,
                 bm25: Bm25Index::new(),
+                query_cache: Mutex::new(QueryCache::new(config.cache_capacity)),
                 dirty: true,
             };
 
@@ -169,6 +173,7 @@ impl GraphLiteEngine {
             graph: AdjacencyGraph::new(),
             vectors,
             bm25: Bm25Index::new(),
+            query_cache: Mutex::new(QueryCache::new(config.cache_capacity)),
             dirty: false,
         };
 
@@ -273,6 +278,16 @@ impl GraphLiteEngine {
     /// Returns the `NodeRecord` corresponding to `id` if found.
     pub fn get_node(&self, id: NodeId) -> Option<NodeRecord> {
         self.state.read().graph.get_node(id).copied()
+    }
+
+    /// Clears the in-memory query context cache.
+    pub fn clear_cache(&self) {
+        self.state.read().query_cache.lock().clear();
+    }
+
+    /// Returns cache efficiency statistics for query retrievals.
+    pub fn cache_stats(&self) -> CacheStats {
+        self.state.read().query_cache.lock().stats()
     }
 }
 

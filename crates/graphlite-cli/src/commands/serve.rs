@@ -170,6 +170,7 @@ pub fn execute_serve(db_path: &Path, args: &ServeArgs) -> Result<()> {
         let response = match (method, url.as_str()) {
             (Method::Get, "/health") | (Method::Get, "/v1/health") | (Method::Get, "/") => {
                 let eng = engine_clone.read();
+                let cache_stats = eng.cache_stats();
                 json_response(
                     &json!({
                         "status": "ok",
@@ -178,7 +179,26 @@ pub fn execute_serve(db_path: &Path, args: &ServeArgs) -> Result<()> {
                         "nodes": eng.node_count(),
                         "edges": eng.edge_count(),
                         "vectors": eng.vector_count(),
+                        "cache": {
+                            "capacity": cache_stats.capacity,
+                            "entries": cache_stats.entries,
+                            "hits": cache_stats.hits,
+                            "misses": cache_stats.misses,
+                            "hit_rate_pct": cache_stats.hit_rate
+                        },
                         "engine": "GraphLite GraphRAG (Pure Rust)"
+                    }),
+                    200,
+                )
+            }
+
+            (Method::Post, "/v1/cache/clear") | (Method::Post, "/cache/clear") => {
+                let eng = engine_clone.read();
+                eng.clear_cache();
+                json_response(
+                    &json!({
+                        "status": "success",
+                        "message": "Query context LRU cache cleared successfully"
                     }),
                     200,
                 )
