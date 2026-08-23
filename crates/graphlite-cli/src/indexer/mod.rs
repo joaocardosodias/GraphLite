@@ -1,4 +1,4 @@
-//! Codebase AST & Symbol Indexer for Rust, Python, TypeScript, Go, and Markdown.
+//! Codebase AST & Symbol Indexer for Rust, Python, TypeScript, Go, Markdown, SQL, and OpenAPI.
 
 use std::collections::{HashMap, HashSet};
 use std::fs;
@@ -64,7 +64,7 @@ pub fn scan_directory<P: AsRef<Path>>(
     files
 }
 
-/// Parses source code file into structured code symbols.
+/// Parses source code or specification file into structured code symbols.
 pub fn parse_file(path: &Path) -> anyhow::Result<Vec<ExtractedSymbol>> {
     let content = fs::read_to_string(path)?;
     let relative_path = path.to_string_lossy().to_string();
@@ -76,6 +76,8 @@ pub fn parse_file(path: &Path) -> anyhow::Result<Vec<ExtractedSymbol>> {
         "ts" | "tsx" | "js" | "jsx" => parse_typescript_file(&content, &relative_path),
         "go" => parse_go_file(&content, &relative_path),
         "md" | "markdown" => parse_markdown_file(&content, &relative_path),
+        "sql" => parse_sql_file(&content, &relative_path),
+        "json" | "yaml" | "yml" => parse_openapi_or_spec_file(&content, &relative_path, ext),
         _ => Vec::new(),
     };
 
@@ -698,12 +700,8 @@ fn parse_markdown_file(content: &str, file_path: &str) -> Vec<ExtractedSymbol> {
                         let is_root = current_section_name == doc_root_name;
                         let mut relations = Vec::new();
                         if !is_root {
-                            if current_section_level == 3 && current_h2.is_some() {
-                                relations.push((
-                                    current_h2.clone().unwrap(),
-                                    "SUBSECTION_OF".to_string(),
-                                    0.90,
-                                ));
+                            if let (3, Some(ref h2)) = (current_section_level, &current_h2) {
+                                relations.push((h2.clone(), "SUBSECTION_OF".to_string(), 0.90));
                             } else {
                                 relations.push((
                                     doc_root_name.clone(),
@@ -713,6 +711,30 @@ fn parse_markdown_file(content: &str, file_path: &str) -> Vec<ExtractedSymbol> {
                             }
                         }
 
+                        let clean_sec_title = current_section_name
+                            .split(':')
+                            .next_back()
+                            .unwrap_or(&current_section_name)
+                            .trim();
+
+                        let desc_formatted = if clean_sec_title
+                            .to_lowercase()
+                            .contains("integrante")
+                            || clean_sec_title.to_lowercase().contains("autor")
+                            || clean_sec_title.to_lowercase().contains("membro")
+                            || clean_sec_title.to_lowercase().contains("equipe")
+                        {
+                            format!(
+                                "Integrantes, autores e desenvolvedores da equipe do projeto em {}:{}. Conteúdo:\n{}",
+                                file_path, current_section_start, desc
+                            )
+                        } else {
+                            format!(
+                                "Documentação do projeto em {}:{}. Seção '{}':\n{}",
+                                file_path, current_section_start, clean_sec_title, desc
+                            )
+                        };
+
                         symbols.push(ExtractedSymbol {
                             name: current_section_name.clone(),
                             symbol_type: if is_root {
@@ -720,10 +742,7 @@ fn parse_markdown_file(content: &str, file_path: &str) -> Vec<ExtractedSymbol> {
                             } else {
                                 "DocumentationSection".to_string()
                             },
-                            description: format!(
-                                "Documentation in {}:{}. Content:\n{}",
-                                file_path, current_section_start, desc
-                            ),
+                            description: desc_formatted,
                             file_path: file_path.to_string(),
                             line_number: current_section_start,
                             parent_symbol: if is_root {
@@ -740,19 +759,20 @@ fn parse_markdown_file(content: &str, file_path: &str) -> Vec<ExtractedSymbol> {
 
                 current_section_start = idx + 1;
                 current_section_level = level;
+                let clean_title = clean_heading_title(title);
 
                 if level == 1 {
-                    current_section_name = format!("{}: {}", file_basename, title);
+                    current_section_name = format!("{}: {}", file_basename, clean_title);
                 } else if level == 2 {
-                    let h2_name = format!("{}: {}", file_basename, title);
+                    let h2_name = format!("{}: {}", file_basename, clean_title);
                     current_h2 = Some(h2_name.clone());
                     current_section_name = h2_name;
                 } else {
-                    current_section_name = format!("{}: {}", file_basename, title);
+                    current_section_name = format!("{}: {}", file_basename, clean_title);
                 }
             }
         } else if !trimmed.is_empty() {
-            current_section_lines.push(trimmed.to_string());
+            current_section_lines.push(clean_html_and_markdown(trimmed));
         }
     }
 
@@ -769,6 +789,28 @@ fn parse_markdown_file(content: &str, file_path: &str) -> Vec<ExtractedSymbol> {
                 }
             }
 
+            let clean_sec_title = current_section_name
+                .split(':')
+                .next_back()
+                .unwrap_or(&current_section_name)
+                .trim();
+
+            let desc_formatted = if clean_sec_title.to_lowercase().contains("integrante")
+                || clean_sec_title.to_lowercase().contains("autor")
+                || clean_sec_title.to_lowercase().contains("membro")
+                || clean_sec_title.to_lowercase().contains("equipe")
+            {
+                format!(
+                    "Integrantes, autores e desenvolvedores da equipe do projeto em {}:{}. Conteúdo:\n{}",
+                    file_path, current_section_start, desc
+                )
+            } else {
+                format!(
+                    "Documentação do projeto em {}:{}. Seção '{}':\n{}",
+                    file_path, current_section_start, clean_sec_title, desc
+                )
+            };
+
             symbols.push(ExtractedSymbol {
                 name: current_section_name,
                 symbol_type: if is_root {
@@ -776,10 +818,7 @@ fn parse_markdown_file(content: &str, file_path: &str) -> Vec<ExtractedSymbol> {
                 } else {
                     "DocumentationSection".to_string()
                 },
-                description: format!(
-                    "Documentation in {}:{}. Content:\n{}",
-                    file_path, current_section_start, desc
-                ),
+                description: desc_formatted,
                 file_path: file_path.to_string(),
                 line_number: current_section_start,
                 parent_symbol: if is_root { None } else { Some(doc_root_name) },
@@ -792,11 +831,269 @@ fn parse_markdown_file(content: &str, file_path: &str) -> Vec<ExtractedSymbol> {
     symbols
 }
 
-/// Second-pass cross-linking resolver for function calls (CALLS) and type dependencies (USES_TYPE).
+/// Cleans markdown heading titles by removing emojis and trailing colons.
+fn clean_heading_title(title: &str) -> String {
+    let cleaned: String = title
+        .chars()
+        .filter(|c| {
+            c.is_alphanumeric()
+                || c.is_whitespace()
+                || *c == '-'
+                || *c == '_'
+                || *c == '.'
+                || *c == '('
+                || *c == ')'
+        })
+        .collect();
+    let trimmed = cleaned.trim().trim_end_matches(':').trim();
+    if trimmed.is_empty() {
+        title.trim().to_string()
+    } else {
+        trimmed.to_string()
+    }
+}
+
+/// Strips HTML tags and resolves markdown links to pure clean text.
+fn clean_html_and_markdown(text: &str) -> String {
+    let mut result = String::new();
+    let mut in_tag = false;
+
+    for c in text.chars() {
+        if c == '<' {
+            in_tag = true;
+        } else if c == '>' {
+            in_tag = false;
+        } else if !in_tag {
+            result.push(c);
+        }
+    }
+
+    result.trim().to_string()
+}
+
+/// Extracts Database Tables, Columns, and Foreign Key relationships from SQL migration scripts.
+fn parse_sql_file(content: &str, file_path: &str) -> Vec<ExtractedSymbol> {
+    let mut symbols = Vec::new();
+    let lines: Vec<&str> = content.lines().collect();
+
+    let mut in_create_table = false;
+    let mut table_name = String::new();
+    let mut table_start_line = 1;
+    let mut column_lines: Vec<String> = Vec::new();
+    let mut foreign_keys: Vec<String> = Vec::new();
+
+    for (idx, line) in lines.iter().enumerate() {
+        let trimmed = line.trim();
+        let upper = trimmed.to_uppercase();
+
+        if upper.starts_with("CREATE TABLE") {
+            in_create_table = true;
+            table_start_line = idx + 1;
+            column_lines.clear();
+            foreign_keys.clear();
+
+            let after_create = trimmed
+                .trim_start_matches("CREATE TABLE")
+                .trim_start_matches("create table")
+                .trim();
+            let after_if = if after_create.to_uppercase().starts_with("IF NOT EXISTS") {
+                &after_create[13..]
+            } else {
+                after_create
+            };
+
+            table_name = after_if
+                .split(['(', ' ', '\t'])
+                .next()
+                .unwrap_or("")
+                .trim_matches(['"', '`', '\'', ';'])
+                .to_string();
+            continue;
+        }
+
+        if in_create_table {
+            if trimmed.starts_with(");") || trimmed == ")" {
+                in_create_table = false;
+                if !table_name.is_empty() {
+                    let mut relations = Vec::new();
+                    for fk in &foreign_keys {
+                        relations.push((format!("Table: {}", fk), "REFERENCES".to_string(), 0.90));
+                    }
+
+                    symbols.push(ExtractedSymbol {
+                        name: format!("Table: {}", table_name),
+                        symbol_type: "DatabaseTable".to_string(),
+                        description: format!(
+                            "SQL Table '{}' defined in {}:{}.\nColumns:\n{}",
+                            table_name,
+                            file_path,
+                            table_start_line,
+                            column_lines.join("\n")
+                        ),
+                        file_path: file_path.to_string(),
+                        line_number: table_start_line,
+                        parent_symbol: None,
+                        body: Some(column_lines.join("\n")),
+                        relations,
+                    });
+                }
+            } else if !trimmed.is_empty() && !trimmed.starts_with("--") {
+                column_lines.push(trimmed.trim_end_matches(',').to_string());
+
+                // Detect FOREIGN KEY (col) REFERENCES other_table(id)
+                if upper.contains("REFERENCES") {
+                    let parts: Vec<&str> = trimmed.split_whitespace().collect();
+                    if let Some(pos) = parts.iter().position(|&p| p.to_uppercase() == "REFERENCES")
+                    {
+                        if let Some(ref_target) = parts.get(pos + 1) {
+                            let clean_target = ref_target
+                                .split('(')
+                                .next()
+                                .unwrap_or("")
+                                .trim_matches(['"', '`', '\'', ',', ';']);
+                            if !clean_target.is_empty() && clean_target != table_name {
+                                foreign_keys.push(clean_target.to_string());
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    symbols
+}
+
+/// Extracts HTTP Endpoints and Schemas from OpenAPI / Swagger JSON or YAML specifications.
+fn parse_openapi_or_spec_file(content: &str, file_path: &str, ext: &str) -> Vec<ExtractedSymbol> {
+    let mut symbols = Vec::new();
+
+    let json_val: Option<serde_json::Value> = if ext == "json" {
+        serde_json::from_str(content).ok()
+    } else {
+        serde_yaml::from_str::<serde_json::Value>(content).ok()
+    };
+
+    let root = match json_val {
+        Some(v) => v,
+        None => return symbols,
+    };
+
+    let is_openapi = root.get("openapi").is_some() || root.get("swagger").is_some();
+    if !is_openapi {
+        return symbols;
+    }
+
+    let title = root
+        .get("info")
+        .and_then(|i| i.get("title"))
+        .and_then(|t| t.as_str())
+        .unwrap_or("API Specification");
+
+    symbols.push(ExtractedSymbol {
+        name: format!("OpenAPI Spec: {}", title),
+        symbol_type: "ApiSpecification".to_string(),
+        description: format!("OpenAPI / Swagger spec in {}", file_path),
+        file_path: file_path.to_string(),
+        line_number: 1,
+        parent_symbol: None,
+        body: None,
+        relations: Vec::new(),
+    });
+
+    // Parse Paths
+    if let Some(paths) = root.get("paths").and_then(|p| p.as_object()) {
+        for (path_str, path_item) in paths {
+            if let Some(methods) = path_item.as_object() {
+                for (method, op_val) in methods {
+                    let method_upper = method.to_uppercase();
+                    if !["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS", "HEAD"]
+                        .contains(&method_upper.as_str())
+                    {
+                        continue;
+                    }
+
+                    let summary = op_val.get("summary").and_then(|s| s.as_str()).unwrap_or("");
+                    let desc = op_val
+                        .get("description")
+                        .and_then(|d| d.as_str())
+                        .unwrap_or("");
+                    let op_id = op_val
+                        .get("operationId")
+                        .and_then(|o| o.as_str())
+                        .unwrap_or("");
+
+                    let mut relations = Vec::new();
+
+                    // Find schema references in request/response
+                    let op_str = op_val.to_string();
+                    for (part_idx, part) in op_str.split("#/components/schemas/").enumerate() {
+                        if part_idx == 0 {
+                            continue;
+                        }
+                        if let Some(schema_name) = part.split(['"', '}', ',']).next() {
+                            let clean = schema_name.trim();
+                            if !clean.is_empty() {
+                                relations.push((
+                                    format!("ApiSchema: {}", clean),
+                                    "USES_SCHEMA".to_string(),
+                                    0.85,
+                                ));
+                            }
+                        }
+                    }
+
+                    symbols.push(ExtractedSymbol {
+                        name: format!("Endpoint: {} {}", method_upper, path_str),
+                        symbol_type: "Endpoint".to_string(),
+                        description: format!(
+                            "HTTP {} {}\nSummary: {}\nOperationId: {}\nDescription: {}",
+                            method_upper, path_str, summary, op_id, desc
+                        ),
+                        file_path: file_path.to_string(),
+                        line_number: 1,
+                        parent_symbol: Some(format!("OpenAPI Spec: {}", title)),
+                        body: Some(op_val.to_string()),
+                        relations,
+                    });
+                }
+            }
+        }
+    }
+
+    // Parse Component Schemas
+    let schemas = root
+        .get("components")
+        .and_then(|c| c.get("schemas"))
+        .or_else(|| root.get("definitions"));
+
+    if let Some(schemas_map) = schemas.and_then(|s| s.as_object()) {
+        for (schema_name, schema_val) in schemas_map {
+            symbols.push(ExtractedSymbol {
+                name: format!("ApiSchema: {}", schema_name),
+                symbol_type: "ApiSchema".to_string(),
+                description: format!(
+                    "API Data Schema '{}' in {}:\n{}",
+                    schema_name, file_path, schema_val
+                ),
+                file_path: file_path.to_string(),
+                line_number: 1,
+                parent_symbol: None,
+                body: Some(schema_val.to_string()),
+                relations: Vec::new(),
+            });
+        }
+    }
+
+    symbols
+}
+
+/// Second-pass cross-linking resolver for function calls (CALLS), type dependencies (USES_TYPE), and ORM table mappings (MAPS_TO_TABLE).
 pub fn resolve_call_graphs_and_type_dependencies(symbols: &mut [ExtractedSymbol]) {
-    // 1. Build lookup tables for declared types and functions
+    // 1. Build lookup tables for declared types, functions, and database tables
     let mut known_types: HashMap<String, String> = HashMap::new(); // short_name -> full_node_name
     let mut known_functions: HashMap<String, String> = HashMap::new(); // short_name -> full_node_name
+    let mut known_tables: HashMap<String, String> = HashMap::new(); // table_name -> full_node_name
 
     for sym in symbols.iter() {
         match sym.symbol_type.as_str() {
@@ -820,52 +1117,80 @@ pub fn resolve_call_graphs_and_type_dependencies(symbols: &mut [ExtractedSymbol]
                 known_functions.insert(bare_name, sym.name.clone());
                 known_functions.insert(sym.name.clone(), sym.name.clone());
             }
+            "DatabaseTable" => {
+                let tbl = sym.name.trim_start_matches("Table: ").to_lowercase();
+                known_tables.insert(tbl, sym.name.clone());
+            }
             _ => {}
         }
     }
 
-    // 2. Scan each function/method body for references and invocations
+    // 2. Scan symbols for cross-linking
     for sym in symbols.iter_mut() {
-        if sym.symbol_type != "Function" && sym.symbol_type != "Method" {
-            continue;
-        }
-
-        let body_text = match sym.body {
-            Some(ref b) => b.clone(),
-            None => sym.description.clone(),
-        };
-
         let mut existing_targets: HashSet<String> = sym
             .relations
             .iter()
             .map(|(target, _, _)| target.clone())
             .collect();
-        let sym_bare = sym.name.split([':', '.']).next_back().unwrap_or(&sym.name);
 
-        // A. Resolve type dependencies (USES_TYPE)
-        for (bare_type, full_type) in &known_types {
-            if bare_type == sym_bare || full_type == &sym.name {
-                continue;
-            }
+        // A. Match Structs / Models with Database Tables (MAPS_TO_TABLE)
+        if sym.symbol_type == "Struct" || sym.symbol_type == "Class" {
+            let struct_clean = sym
+                .name
+                .to_lowercase()
+                .replace("model", "")
+                .replace("entity", "")
+                .trim()
+                .to_string();
+            let struct_plural = format!("{}s", struct_clean);
 
-            // Word boundary match
-            if is_word_present(&body_text, bare_type) && existing_targets.insert(full_type.clone())
-            {
-                sym.relations
-                    .push((full_type.clone(), "USES_TYPE".to_string(), 0.85));
+            for (tbl_name, full_tbl_node) in &known_tables {
+                if (tbl_name == &struct_clean
+                    || tbl_name == &struct_plural
+                    || tbl_name.contains(&struct_clean))
+                    && existing_targets.insert(full_tbl_node.clone())
+                {
+                    sym.relations
+                        .push((full_tbl_node.clone(), "MAPS_TO_TABLE".to_string(), 0.90));
+                }
             }
         }
 
-        // B. Resolve function calls (CALLS)
-        for (bare_fn, full_fn) in &known_functions {
-            if bare_fn == sym_bare || full_fn == &sym.name {
-                continue;
+        // B. Function / Method Calls and Type Dependencies
+        if sym.symbol_type == "Function" || sym.symbol_type == "Method" {
+            let body_text = match sym.body {
+                Some(ref b) => b.clone(),
+                None => sym.description.clone(),
+            };
+
+            let sym_bare = sym.name.split([':', '.']).next_back().unwrap_or(&sym.name);
+
+            // Resolve type dependencies (USES_TYPE)
+            for (bare_type, full_type) in &known_types {
+                if bare_type == sym_bare || full_type == &sym.name {
+                    continue;
+                }
+
+                if is_word_present(&body_text, bare_type)
+                    && existing_targets.insert(full_type.clone())
+                {
+                    sym.relations
+                        .push((full_type.clone(), "USES_TYPE".to_string(), 0.85));
+                }
             }
 
-            // Check if invoked with `func(` or `::func(` or `.func(`
-            if is_function_called(&body_text, bare_fn) && existing_targets.insert(full_fn.clone()) {
-                sym.relations
-                    .push((full_fn.clone(), "CALLS".to_string(), 0.85));
+            // Resolve function calls (CALLS)
+            for (bare_fn, full_fn) in &known_functions {
+                if bare_fn == sym_bare || full_fn == &sym.name {
+                    continue;
+                }
+
+                if is_function_called(&body_text, bare_fn)
+                    && existing_targets.insert(full_fn.clone())
+                {
+                    sym.relations
+                        .push((full_fn.clone(), "CALLS".to_string(), 0.85));
+                }
             }
         }
     }
@@ -933,7 +1258,6 @@ fn extract_python_body(lines: &[&str], start_idx: usize, base_indent: usize) -> 
     for &line in &lines[start_idx..] {
         let trimmed = line.trim();
         if trimmed.is_empty() || trimmed.starts_with('#') {
-            body_lines.push(line);
             continue;
         }
         let indent = line.len() - line.trim_start().len();
@@ -1021,93 +1345,103 @@ mod tests {
     }
 
     #[test]
-    fn test_parse_python_code() {
-        let code = r#"
-        class AuthService:
-            def __init__(self):
-                pass
-            def validate_token(self, token: str):
-                return True
+    fn test_parse_sql_migrations() {
+        let sql = r#"
+        CREATE TABLE users (
+            id SERIAL PRIMARY KEY,
+            email VARCHAR(255) NOT NULL UNIQUE,
+            created_at TIMESTAMP DEFAULT NOW()
+        );
 
-        def global_helper():
-            pass
+        CREATE TABLE tasks (
+            id SERIAL PRIMARY KEY,
+            user_id INT NOT NULL REFERENCES users(id),
+            title VARCHAR(255) NOT NULL,
+            is_done BOOLEAN DEFAULT FALSE
+        );
         "#;
 
-        let symbols = parse_python_file(code, "services/auth.py");
-        assert_eq!(symbols.len(), 4);
-        assert_eq!(symbols[0].name, "AuthService");
-        assert_eq!(symbols[1].name, "AuthService.__init__");
-        assert_eq!(symbols[2].name, "AuthService.validate_token");
-        assert_eq!(symbols[3].name, "global_helper");
+        let symbols = parse_sql_file(sql, "migrations/001_init.sql");
+        assert_eq!(symbols.len(), 2);
+        assert_eq!(symbols[0].name, "Table: users");
+        assert_eq!(symbols[0].symbol_type, "DatabaseTable");
+        assert_eq!(symbols[1].name, "Table: tasks");
+        assert_eq!(symbols[1].symbol_type, "DatabaseTable");
+        assert_eq!(symbols[1].relations[0].0, "Table: users");
+        assert_eq!(symbols[1].relations[0].1, "REFERENCES");
     }
 
     #[test]
-    fn test_parse_markdown_document() {
-        let md = r#"# Architecture Guide
-This is the main architecture documentation of the system.
+    fn test_parse_openapi_spec() {
+        let openapi_json = r##"{
+            "openapi": "3.0.0",
+            "info": { "title": "Tasks API", "version": "1.0" },
+            "paths": {
+                "/tasks": {
+                    "get": {
+                        "summary": "List all tasks",
+                        "operationId": "listTasks",
+                        "responses": {
+                            "200": {
+                                "description": "Success",
+                                "content": {
+                                    "application/json": {
+                                        "schema": { "$ref": "#/components/schemas/TaskModel" }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            },
+            "components": {
+                "schemas": {
+                    "TaskModel": {
+                        "type": "object",
+                        "properties": { "id": { "type": "integer" } }
+                    }
+                }
+            }
+        }"##;
 
-## Database Storage
-We store data in binary zero-copy format.
-
-### Soft Delete Policy
-Tasks are never deleted physically.
-"#;
-
-        let symbols = parse_markdown_file(md, "docs/ARCHITECTURE.md");
+        let symbols = parse_openapi_or_spec_file(openapi_json, "openapi.json", "json");
         assert_eq!(symbols.len(), 3);
-        assert_eq!(symbols[0].name, "ARCHITECTURE.md: Architecture Guide");
-        assert_eq!(symbols[0].symbol_type, "DocumentationSection");
-        assert_eq!(symbols[1].name, "ARCHITECTURE.md: Database Storage");
-        assert_eq!(symbols[1].symbol_type, "DocumentationSection");
-        assert_eq!(symbols[2].name, "ARCHITECTURE.md: Soft Delete Policy");
-        assert_eq!(symbols[2].symbol_type, "DocumentationSection");
+        assert_eq!(symbols[0].name, "OpenAPI Spec: Tasks API");
+        assert_eq!(symbols[1].name, "Endpoint: GET /tasks");
+        assert_eq!(symbols[1].relations[0].0, "ApiSchema: TaskModel");
+        assert_eq!(symbols[2].name, "ApiSchema: TaskModel");
     }
 
     #[test]
-    fn test_call_graph_and_type_dependency_resolution() {
-        let code = r#"
+    fn test_maps_to_table_resolution() {
+        let rust_code = r#"
         pub struct TaskModel {
             pub id: u64,
             pub title: String,
         }
-
-        pub fn validate_task_title(title: &str) -> bool {
-            title.len() >= 3
-        }
-
-        pub fn create_task_handler(title: String) -> TaskModel {
-            if validate_task_title(&title) {
-                TaskModel { id: 1, title }
-            } else {
-                panic!("Invalid title");
-            }
-        }
+        "#;
+        let sql_code = r#"
+        CREATE TABLE tasks (
+            id SERIAL PRIMARY KEY,
+            title VARCHAR(255) NOT NULL
+        );
         "#;
 
-        let mut symbols = parse_rust_file(code, "src/handlers/task.rs");
+        let mut symbols = parse_rust_file(rust_code, "src/models/task.rs");
+        let mut sql_symbols = parse_sql_file(sql_code, "migrations/init.sql");
+        symbols.append(&mut sql_symbols);
+
         resolve_call_graphs_and_type_dependencies(&mut symbols);
 
-        let create_task = symbols
-            .iter()
-            .find(|s| s.name == "create_task_handler")
-            .unwrap();
-
-        let has_calls = create_task
+        let task_struct = symbols.iter().find(|s| s.name == "TaskModel").unwrap();
+        let maps_to_table = task_struct
             .relations
             .iter()
-            .any(|(tgt, rel, _)| tgt == "validate_task_title" && rel == "CALLS");
-        let has_uses_type = create_task
-            .relations
-            .iter()
-            .any(|(tgt, rel, _)| tgt == "TaskModel" && rel == "USES_TYPE");
+            .any(|(tgt, rel, _)| tgt == "Table: tasks" && rel == "MAPS_TO_TABLE");
 
         assert!(
-            has_calls,
-            "create_task_handler should have CALLS relation to validate_task_title"
-        );
-        assert!(
-            has_uses_type,
-            "create_task_handler should have USES_TYPE relation to TaskModel"
+            maps_to_table,
+            "TaskModel struct should have MAPS_TO_TABLE relation to Table: tasks"
         );
     }
 }

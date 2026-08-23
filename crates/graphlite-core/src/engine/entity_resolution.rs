@@ -84,6 +84,7 @@ impl GraphLiteEngine {
 
             if let Some(existing_id) = exact_match_id {
                 // Exact name exists: update description and vector
+                let mut full_desc = description.to_string();
                 if !description.trim().is_empty() {
                     let desc_id = state.interner.intern(description.trim());
                     if let Some(record) = state.graph.get_node(existing_id).copied() {
@@ -92,8 +93,11 @@ impl GraphLiteEngine {
                         updated.type_id = type_id;
                         state.graph.upsert_node(updated);
                     }
+                    full_desc = description.trim().to_string();
                 }
                 state.vectors.insert(existing_id, vector)?;
+                let bm25_text = format!("{} {} {}", trimmed_name, entity_type, full_desc);
+                state.bm25.index_node(existing_id, &bm25_text);
                 state.dirty = true;
 
                 ResolutionResult {
@@ -119,6 +123,7 @@ impl GraphLiteEngine {
 
                 if let Some(target_id) = best_merge_candidate {
                     // Merge with existing candidate node!
+                    let mut combined_desc = description.to_string();
                     if conf.merge_descriptions && !description.trim().is_empty() {
                         let old_desc = state
                             .graph
@@ -127,7 +132,7 @@ impl GraphLiteEngine {
                             .unwrap_or("")
                             .to_string();
 
-                        let new_combined = if old_desc.is_empty() {
+                        combined_desc = if old_desc.is_empty() {
                             description.trim().to_string()
                         } else if !old_desc.contains(description.trim()) {
                             format!("{}; {}", old_desc, description.trim())
@@ -135,7 +140,7 @@ impl GraphLiteEngine {
                             old_desc
                         };
 
-                        let combined_desc_id = state.interner.intern(&new_combined);
+                        let combined_desc_id = state.interner.intern(&combined_desc);
                         if let Some(record) = state.graph.get_node(target_id).copied() {
                             let mut updated = record;
                             updated.description_id = combined_desc_id;
@@ -143,6 +148,8 @@ impl GraphLiteEngine {
                         }
                     }
 
+                    let bm25_text = format!("{} {} {}", trimmed_name, entity_type, combined_desc);
+                    state.bm25.index_node(target_id, &bm25_text);
                     state.dirty = true;
                     ResolutionResult {
                         node_id: target_id,
@@ -164,6 +171,8 @@ impl GraphLiteEngine {
 
                     state.graph.add_node(record)?;
                     state.vectors.insert(new_id, vector)?;
+                    let bm25_text = format!("{} {} {}", trimmed_name, entity_type, description);
+                    state.bm25.index_node(new_id, &bm25_text);
                     state.dirty = true;
 
                     ResolutionResult {
