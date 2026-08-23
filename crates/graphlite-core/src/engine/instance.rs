@@ -6,6 +6,7 @@ use parking_lot::RwLock;
 use crate::engine::config::GraphLiteConfig;
 use crate::error::Result;
 use crate::graph::adjacency::AdjacencyGraph;
+use crate::graph::bm25::Bm25Index;
 use crate::id::NodeId;
 use crate::interner::StringInterner;
 use crate::record::{EdgeRecord, NodeRecord};
@@ -18,6 +19,7 @@ pub(crate) struct EngineState {
     pub interner: StringInterner,
     pub graph: AdjacencyGraph,
     pub vectors: VectorStore,
+    pub bm25: Bm25Index,
     pub dirty: bool,
 }
 
@@ -62,15 +64,23 @@ impl GraphLiteEngine {
                 .map(|st| st.to_interner())
                 .unwrap_or_else(|_| StringInterner::new());
 
-            // 2. Rebuild in-memory dynamic AdjacencyGraph
+            // 2. Rebuild in-memory dynamic AdjacencyGraph and BM25 index
             let mut graph = AdjacencyGraph::new();
+            let mut bm25 = Bm25Index::new();
             let mut node_ids = Vec::new();
+
             if let Ok(node_block) = reader.nodes() {
                 for i in 0..node_block.len() {
                     if let Some(node) = node_block.get_by_index(i) {
                         if node.is_active() {
                             graph.add_node(node)?;
                             node_ids.push(node.id);
+
+                            let name = interner.resolve(node.name_id).unwrap_or("");
+                            let ty = interner.resolve(node.type_id).unwrap_or("");
+                            let desc = interner.resolve(node.description_id).unwrap_or("");
+                            let text = format!("{} {} {}", name, ty, desc);
+                            bm25.index_node(node.id, &text);
                         }
                     }
                 }
@@ -101,6 +111,7 @@ impl GraphLiteEngine {
                 interner,
                 graph,
                 vectors,
+                bm25,
                 dirty: false,
             };
 
@@ -117,6 +128,7 @@ impl GraphLiteEngine {
                 interner: StringInterner::new(),
                 graph: AdjacencyGraph::new(),
                 vectors,
+                bm25: Bm25Index::new(),
                 dirty: true,
             };
 
@@ -155,6 +167,7 @@ impl GraphLiteEngine {
             interner: StringInterner::new(),
             graph: AdjacencyGraph::new(),
             vectors,
+            bm25: Bm25Index::new(),
             dirty: false,
         };
 

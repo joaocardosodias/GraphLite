@@ -90,6 +90,10 @@ impl GraphLiteEngine {
                 state.vectors.insert(target_node_id, v)?;
             }
 
+            // Update BM25 lexical index
+            let text_to_index = format!("{} {} {}", trimmed_name, entity_type.trim(), description.trim());
+            state.bm25.index_node(target_node_id, &text_to_index);
+
             state.dirty = true;
             target_node_id
         };
@@ -166,6 +170,7 @@ impl GraphLiteEngine {
             let mut state = self.state.write();
             let was_removed = state.graph.remove_node(id).is_some();
             if was_removed {
+                state.bm25.remove_node(id);
                 state.dirty = true;
             }
             was_removed

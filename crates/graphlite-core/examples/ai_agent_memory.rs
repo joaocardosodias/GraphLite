@@ -123,6 +123,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             &query_vector,
             Some(QueryOptions {
                 top_k_seeds: 2,
+                query_text: Some("Alice Apollo service endpoint".to_string()),
                 max_tokens: Some(300),
                 markdown_style: MarkdownStyle::Hierarchical,
                 max_depth: Some(2),

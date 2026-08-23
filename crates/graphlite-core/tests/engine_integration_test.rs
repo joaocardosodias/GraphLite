@@ -88,6 +88,7 @@ fn test_full_ai_assistant_knowledge_graph_workflow() {
                 &query_ai,
                 Some(QueryOptions {
                     top_k_seeds: 2,
+                    query_text: Some("Projeto Titan Ana".to_string()),
                     max_tokens: Some(500),
                     markdown_style: MarkdownStyle::Hierarchical,
                     max_depth: Some(2),

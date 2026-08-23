@@ -12,6 +12,8 @@ use crate::prompt::token_counter::TiktokenCounter;
 pub struct QueryOptions {
     /// Number of entry seed nodes retrieved via vector search (default: 5).
     pub top_k_seeds: usize,
+    /// Optional plain text query for BM25 lexical search and RRF fusion.
+    pub query_text: Option<String>,
     /// Maximum token budget for the returned prompt context (default: from `GraphLiteConfig`).
     pub max_tokens: Option<usize>,
     /// Markdown rendering style (Hierarchical vs SeparatedSections).
@@ -28,6 +30,7 @@ impl Default for QueryOptions {
     fn default() -> Self {
         Self {
             top_k_seeds: 5,
+            query_text: None,
             max_tokens: None,
             markdown_style: MarkdownStyle::Hierarchical,
             max_depth: None,
@@ -61,7 +64,13 @@ impl GraphLiteEngine {
         state.vectors.search(query_vector, top_k)
     }
 
-    /// End-to-end GraphRAG query: Query Vector $\to$ Vector Seeds $\to$ Multi-Hop BFS $\to$ Hybrid Scoring $\to$ Subgraph $\to$ Budget Pruning $\to$ Markdown.
+    /// Executes a direct BM25 keyword search returning ranked nodes.
+    pub fn search_bm25(&self, query_text: &str, top_k: usize) -> Vec<(NodeId, f32)> {
+        let state = self.state.read();
+        state.bm25.search(query_text, top_k)
+    }
+
+    /// End-to-end GraphRAG query: Query Vector + BM25 $\to$ RRF Seeds $\to$ Multi-Hop BFS $\to$ Hybrid Scoring $\to$ Subgraph $\to$ Budget Pruning $\to$ Markdown.
     pub fn retrieve_context(
         &self,
         query_vector: &[f32],
@@ -77,8 +86,29 @@ impl GraphLiteEngine {
             });
         }
 
-        // 1. Vector Search for Seed Entities
-        let seed_matches = state.vectors.search(query_vector, opts.top_k_seeds)?;
+        // 1. Vector Search + BM25 Lexical Hybrid Search via RRF Fusion
+        let seed_matches = if let Some(ref text) = opts.query_text {
+            let bm25_matches = state.bm25.search(text, opts.top_k_seeds * 2);
+            let vector_matches = state.vectors.search(query_vector, opts.top_k_seeds * 2)?;
+
+            let vec_ids: Vec<NodeId> = vector_matches.iter().map(|(id, _)| *id).collect();
+            let bm25_ids: Vec<NodeId> = bm25_matches.iter().map(|(id, _)| *id).collect();
+
+            let fused = crate::graph::bm25::reciprocal_rank_fusion(&vec_ids, &bm25_ids, 60);
+            let mut top_fused = Vec::new();
+            for (id, rrf_score) in fused.into_iter().take(opts.top_k_seeds) {
+                let score = vector_matches
+                    .iter()
+                    .find(|(nid, _)| *nid == id)
+                    .map(|(_, s)| *s)
+                    .unwrap_or(rrf_score.min(1.0));
+                top_fused.push((id, score));
+            }
+            top_fused
+        } else {
+            state.vectors.search(query_vector, opts.top_k_seeds)?
+        };
+
         if seed_matches.is_empty() {
             let budget = opts.max_tokens.unwrap_or(self.config.default_max_tokens);
             return Ok(QueryResult {

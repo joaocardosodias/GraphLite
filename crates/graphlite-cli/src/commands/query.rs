@@ -109,6 +109,7 @@ pub fn execute_query(db_path: &Path, args: &QueryArgs, verbose: bool) -> Result<
 
     let options = QueryOptions {
         top_k_seeds: args.top_k,
+        query_text: args.query_text.clone(),
         max_tokens: args.tokens,
         markdown_style: MarkdownStyle::Hierarchical,
         max_depth: args.depth,

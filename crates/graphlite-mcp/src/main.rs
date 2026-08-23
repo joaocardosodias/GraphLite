@@ -230,6 +230,7 @@ fn handle_tool_call(
 
             let options = QueryOptions {
                 top_k_seeds: top_k,
+                query_text: Some(query.to_string()),
                 max_tokens: Some(max_tokens),
                 markdown_style: MarkdownStyle::Hierarchical,
                 max_depth: Some(2),
