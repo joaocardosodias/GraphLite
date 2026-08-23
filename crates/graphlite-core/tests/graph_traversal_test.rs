@@ -164,6 +164,7 @@ fn test_end_to_end_subgraph_extraction_with_lateral_cross_edges() {
         alpha: 0.6,
         depth_decay: 0.85,
         min_score_threshold: 0.05,
+        relative_drop_off: None,
     };
 
     let subgraph_csr = extract_subgraph_csr(&csr, &seeds, &t_config, &h_config);

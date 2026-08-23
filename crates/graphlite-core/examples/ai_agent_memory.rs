@@ -139,6 +139,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 max_depth: Some(2),
                 min_score_threshold: Some(0.1),
                 alpha: Some(0.6),
+                relative_drop_off: None,
             }),
         )?;
 

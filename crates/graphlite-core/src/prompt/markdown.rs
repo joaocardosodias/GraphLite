@@ -140,7 +140,17 @@ fn format_hierarchical(
         }
 
         if let Some(desc) = description {
-            output.push_str(&format!("  Descrição: {}\n", desc));
+            let cleaned = clean_description_for_display(desc);
+            if !cleaned.is_empty() {
+                if cleaned.contains('\n') {
+                    output.push_str("  Descrição:\n");
+                    for line in cleaned.lines() {
+                        output.push_str(&format!("    {}\n", line));
+                    }
+                } else {
+                    output.push_str(&format!("  Descrição: {}\n", cleaned));
+                }
+            }
         }
 
         // Render outgoing relations to other selected entities
@@ -214,7 +224,17 @@ fn format_separated(
         }
 
         if let Some(desc) = description {
-            output.push_str(&format!("  Descrição: {}\n", desc));
+            let cleaned = clean_description_for_display(desc);
+            if !cleaned.is_empty() {
+                if cleaned.contains('\n') {
+                    output.push_str("  Descrição:\n");
+                    for line in cleaned.lines() {
+                        output.push_str(&format!("    {}\n", line));
+                    }
+                } else {
+                    output.push_str(&format!("  Descrição: {}\n", cleaned));
+                }
+            }
         }
     }
 
@@ -244,6 +264,53 @@ fn format_separated(
     }
 
     output
+}
+
+/// Cleans raw extracted descriptions by removing boilerplate headings, image tags, and HTML noise.
+fn clean_description_for_display(desc: &str) -> String {
+    let mut text = desc.trim().to_string();
+
+    // 1. Strip boilerplate headers
+    if let Some(pos) = text.find("Conteúdo:\n") {
+        text = text[pos + "Conteúdo:\n".len()..].trim().to_string();
+    } else if let Some(pos) = text.find("Content:\n") {
+        text = text[pos + "Content:\n".len()..].trim().to_string();
+    } else if let Some(pos) = text.find(":\n") {
+        let prefix = &text[..pos];
+        if prefix.contains("Documentação") || prefix.contains("Documentation in") {
+            text = text[pos + 2..].trim().to_string();
+        }
+    }
+
+    // 2. Strip HTML tags
+    let mut no_html = String::new();
+    let mut in_tag = false;
+    for c in text.chars() {
+        if c == '<' {
+            in_tag = true;
+        } else if c == '>' {
+            in_tag = false;
+        } else if !in_tag {
+            no_html.push(c);
+        }
+    }
+    text = no_html.replace("&emsp;", " ").replace("&nbsp;", " ");
+
+    // 3. Strip Markdown images and clean empty lines
+    let mut clean_lines = Vec::new();
+    for line in text.lines() {
+        let trimmed = line.trim();
+        if (trimmed.starts_with("![") && trimmed.contains("]("))
+            || (trimmed.starts_with("<img") && trimmed.contains('>'))
+        {
+            continue;
+        }
+        if !trimmed.is_empty() {
+            clean_lines.push(line);
+        }
+    }
+
+    clean_lines.join("\n")
 }
 
 #[cfg(test)]

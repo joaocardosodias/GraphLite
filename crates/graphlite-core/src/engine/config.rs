@@ -55,6 +55,7 @@ impl Default for GraphLiteConfig {
                 alpha: 0.6,
                 depth_decay: 0.85,
                 min_score_threshold: 0.05,
+                relative_drop_off: None,
             },
             traversal_config: TraversalConfig {
                 max_depth: 2,

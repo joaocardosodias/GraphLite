@@ -125,6 +125,7 @@ fn test_full_ai_assistant_knowledge_graph_workflow() {
                     max_depth: Some(2),
                     min_score_threshold: Some(0.1),
                     alpha: Some(0.6),
+                    relative_drop_off: None,
                 }),
             )
             .unwrap();

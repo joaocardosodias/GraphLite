@@ -22,6 +22,8 @@ pub struct HybridScoreConfig {
     pub depth_decay: f32,
     /// Minimum combined score threshold. Entities scoring below this are filtered out.
     pub min_score_threshold: f32,
+    /// Optional adaptive relative drop-off ratio (e.g. `Some(0.60)` keeps entities with $\ge 60\%$ of the top score).
+    pub relative_drop_off: Option<f32>,
 }
 
 impl Default for HybridScoreConfig {
@@ -30,6 +32,7 @@ impl Default for HybridScoreConfig {
             alpha: 0.6,
             depth_decay: 0.85,
             min_score_threshold: 0.05,
+            relative_drop_off: None,
         }
     }
 }
@@ -118,6 +121,15 @@ pub fn compute_hybrid_scores(
             .unwrap_or(std::cmp::Ordering::Equal)
     });
 
+    // Apply adaptive drop-off threshold if configured
+    if let Some(ratio) = config.relative_drop_off {
+        if let Some(top_entity) = ranked_entities.first() {
+            let max_score = top_entity.final_score;
+            let dynamic_cutoff = (max_score * ratio).max(config.min_score_threshold);
+            ranked_entities.retain(|e| e.final_score >= dynamic_cutoff);
+        }
+    }
+
     ranked_entities
 }
 
@@ -160,6 +172,7 @@ mod tests {
             alpha: 0.6,
             depth_decay: 0.8,
             min_score_threshold: 0.0,
+            relative_drop_off: None,
         };
 
         let scored = compute_hybrid_scores(&seeds, &traversed, &config);
@@ -189,9 +202,47 @@ mod tests {
             alpha: 0.5,
             depth_decay: 0.8,
             min_score_threshold: 0.5, // Threshold above 0.1
+            relative_drop_off: None,
         };
 
         let scored = compute_hybrid_scores(&seeds, &traversed, &config);
         assert_eq!(scored.len(), 0);
+    }
+
+    #[test]
+    fn test_relative_drop_off_cutoff() {
+        let e1 = EdgeRecord::new(
+            EdgeId::new(1),
+            NodeId::new(1),
+            NodeId::new(3),
+            crate::id::StringId::new(1),
+        )
+        .with_weight(0.95);
+        let seeds = vec![(NodeId::new(1), 0.90)];
+        let traversed = vec![
+            TraversedNode {
+                node_id: NodeId::new(1),
+                depth: 0,
+                incoming_edge: None,
+                path_weight: 1.0,
+            },
+            TraversedNode {
+                node_id: NodeId::new(3),
+                depth: 1,
+                incoming_edge: Some(e1),
+                path_weight: 0.95,
+            },
+        ];
+
+        let config = HybridScoreConfig {
+            alpha: 0.6,
+            depth_decay: 0.8,
+            min_score_threshold: 0.0,
+            relative_drop_off: Some(0.50), // Cutoff at 0.94 * 0.50 = 0.47, node 3 (0.304) is dropped
+        };
+
+        let scored = compute_hybrid_scores(&seeds, &traversed, &config);
+        assert_eq!(scored.len(), 1);
+        assert_eq!(scored[0].node_id, NodeId::new(1));
     }
 }

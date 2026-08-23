@@ -26,6 +26,8 @@ pub struct QueryOptions {
     pub min_score_threshold: Option<f32>,
     /// Alpha balance between vector score and graph topology score ($0.0 \le \alpha \le 1.0$).
     pub alpha: Option<f32>,
+    /// Optional relative score drop-off threshold (e.g. `Some(0.60)`).
+    pub relative_drop_off: Option<f32>,
 }
 
 impl Default for QueryOptions {
@@ -38,6 +40,7 @@ impl Default for QueryOptions {
             max_depth: None,
             min_score_threshold: None,
             alpha: None,
+            relative_drop_off: None,
         }
     }
 }
@@ -140,6 +143,9 @@ impl GraphLiteEngine {
         }
         if let Some(threshold) = opts.min_score_threshold {
             hybrid_config.min_score_threshold = threshold;
+        }
+        if let Some(drop_off) = opts.relative_drop_off {
+            hybrid_config.relative_drop_off = Some(drop_off);
         }
 
         // 3. Extract Connected Subgraph with Lateral Cross-Edges
