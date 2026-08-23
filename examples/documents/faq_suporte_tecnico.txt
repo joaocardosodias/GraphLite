@@ -1,0 +1,13 @@
+FAQ - Suporte e Dúvidas Frequentes da Plataforma
+
+Como resetar a senha de acesso da minha conta?
+Para redefinir sua credencial, clique no link "Esqueci minha senha" na tela inicial de login. Um e-mail com token temporário válido por 15 minutos será enviado para o endereço cadastrado.
+
+Quais são os navegadores suportados oficialmente?
+Suportamos as últimas versões do Google Chrome, Mozilla Firefox, Microsoft Edge e Apple Safari. Versões legadas do Internet Explorer não são homologadas.
+
+Como habilitar a autenticação em duas etapas (2FA / MFA)?
+Acesse o menu "Minha Conta" -> "Segurança" -> "Ativar 2FA". Você precisará escanear o QR Code usando aplicativos autenticadores padrão como Google Authenticator, Authy ou 1Password.
+
+Qual o limite de taxa de requisições por API (Rate Limit)?
+O plano Starter possui limite de 60 requisições por minuto. O plano Business permite até 300 requisições por minuto. O plano Enterprise possui limite customizado negociado em SLA de até 2.000 requisições por segundo.
