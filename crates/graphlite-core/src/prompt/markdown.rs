@@ -37,7 +37,7 @@ pub struct MarkdownFormatConfig {
 impl Default for MarkdownFormatConfig {
     fn default() -> Self {
         Self {
-            header_title: "Contexto Recuperado do Conhecimento".to_string(),
+            header_title: "Retrieved Knowledge Context".to_string(),
             include_scores: true,
             include_edge_weights: true,
             style: MarkdownStyle::Hierarchical,
@@ -93,23 +93,28 @@ fn format_hierarchical(
     interner: &StringInterner,
     config: &MarkdownFormatConfig,
 ) -> String {
-    let estimated_cap = entities.len() * 256 + edges.len() * 64 + 128;
+    let estimated_cap = entities.len() * 320 + edges.len() * 80 + 128;
     let mut output = String::with_capacity(estimated_cap);
-    let _ = writeln!(output, "# {}:", config.header_title);
+    let _ = writeln!(output, "# {}:\n", config.header_title);
 
     // Map outgoing edges by source NodeId
-    let mut outgoing_map: HashMap<NodeId, Vec<&EdgeRecord>> = HashMap::with_capacity(entities.len());
+    let mut outgoing_map: HashMap<NodeId, Vec<&EdgeRecord>> =
+        HashMap::with_capacity(entities.len());
     for edge in edges {
         outgoing_map.entry(edge.source).or_default().push(edge);
     }
 
     let node_set: HashSet<NodeId> = entities.iter().map(|e| e.node_id).collect();
 
-    for entity in entities {
+    for (idx, entity) in entities.iter().enumerate() {
+        if idx > 0 {
+            let _ = writeln!(output);
+        }
+
         let node_id = entity.node_id;
         let (node_name, entity_type, description) = if let Some(rec) = entity.node_record {
             (
-                interner.resolve(rec.name_id).unwrap_or("Entidade"),
+                interner.resolve(rec.name_id).unwrap_or("Entity"),
                 interner.resolve(rec.type_id).filter(|s| !s.is_empty()),
                 interner
                     .resolve(rec.description_id)
@@ -119,7 +124,7 @@ fn format_hierarchical(
             (
                 interner
                     .resolve(StringId::new(node_id.as_u32()))
-                    .unwrap_or("Entidade"),
+                    .unwrap_or("Entity"),
                 None,
                 None,
             )
@@ -129,16 +134,16 @@ fn format_hierarchical(
             if config.include_scores {
                 let _ = writeln!(
                     output,
-                    "- [{}] (Tipo: {}, Relevância: {:.2})",
+                    "- [{}] (Type: {}, Relevance: {:.2})",
                     node_name, ty, entity.final_score
                 );
             } else {
-                let _ = writeln!(output, "- [{}] (Tipo: {})", node_name, ty);
+                let _ = writeln!(output, "- [{}] (Type: {})", node_name, ty);
             }
         } else if config.include_scores {
             let _ = writeln!(
                 output,
-                "- [{}] (Relevância: {:.2})",
+                "- [{}] (Relevance: {:.2})",
                 node_name, entity.final_score
             );
         } else {
@@ -149,33 +154,39 @@ fn format_hierarchical(
             let cleaned = clean_description_for_display(desc);
             if !cleaned.is_empty() {
                 if cleaned.contains('\n') {
-                    let _ = writeln!(output, "  Descrição:");
+                    let _ = writeln!(output, "  Description:");
                     for line in cleaned.lines() {
                         let _ = writeln!(output, "    {}", line);
                     }
                 } else {
-                    let _ = writeln!(output, "  Descrição: {}", cleaned);
+                    let _ = writeln!(output, "  Description: {}", cleaned);
                 }
             }
         }
 
         // Render outgoing relations to other selected entities
         if let Some(out_edges) = outgoing_map.get(&node_id) {
-            for edge in out_edges {
-                if node_set.contains(&edge.target) {
-                    let rel_name = interner.resolve(edge.relation_id).unwrap_or("RELACAO");
+            let active_outgoing: Vec<&&EdgeRecord> = out_edges
+                .iter()
+                .filter(|e| node_set.contains(&e.target))
+                .collect();
+
+            if !active_outgoing.is_empty() {
+                let _ = writeln!(output, "  Relations:");
+                for edge in active_outgoing {
+                    let rel_name = interner.resolve(edge.relation_id).unwrap_or("RELATION");
                     let target_name = interner
                         .resolve(StringId::new(edge.target.as_u32()))
-                        .unwrap_or("Alvo");
+                        .unwrap_or("Target");
 
                     if config.include_edge_weights {
                         let _ = writeln!(
                             output,
-                            "  - {} -> [{}] (Confiança: {:.2})",
+                            "    - {} -> [{}] (Weight: {:.2})",
                             rel_name, target_name, edge.weight
                         );
                     } else {
-                        let _ = writeln!(output, "  - {} -> [{}]", rel_name, target_name);
+                        let _ = writeln!(output, "    - {} -> [{}]", rel_name, target_name);
                     }
                 }
             }
@@ -191,14 +202,18 @@ fn format_separated(
     interner: &StringInterner,
     config: &MarkdownFormatConfig,
 ) -> String {
-    let estimated_cap = entities.len() * 256 + edges.len() * 64 + 128;
+    let estimated_cap = entities.len() * 320 + edges.len() * 80 + 128;
     let mut output = String::with_capacity(estimated_cap);
-    let _ = writeln!(output, "# {}:\n\n## Entidades:", config.header_title);
+    let _ = writeln!(output, "# {}:\n\n## Entities:\n", config.header_title);
 
-    for entity in entities {
+    for (idx, entity) in entities.iter().enumerate() {
+        if idx > 0 {
+            let _ = writeln!(output);
+        }
+
         let (node_name, entity_type, description) = if let Some(rec) = entity.node_record {
             (
-                interner.resolve(rec.name_id).unwrap_or("Entidade"),
+                interner.resolve(rec.name_id).unwrap_or("Entity"),
                 interner.resolve(rec.type_id).filter(|s| !s.is_empty()),
                 interner
                     .resolve(rec.description_id)
@@ -208,7 +223,7 @@ fn format_separated(
             (
                 interner
                     .resolve(StringId::new(entity.node_id.as_u32()))
-                    .unwrap_or("Entidade"),
+                    .unwrap_or("Entity"),
                 None,
                 None,
             )
@@ -218,11 +233,11 @@ fn format_separated(
             if config.include_scores {
                 let _ = writeln!(
                     output,
-                    "- [{}] (Tipo: {}, Score: {:.2})",
+                    "- [{}] (Type: {}, Score: {:.2})",
                     node_name, ty, entity.final_score
                 );
             } else {
-                let _ = writeln!(output, "- [{}] (Tipo: {})", node_name, ty);
+                let _ = writeln!(output, "- [{}] (Type: {})", node_name, ty);
             }
         } else if config.include_scores {
             let _ = writeln!(
@@ -238,27 +253,27 @@ fn format_separated(
             let cleaned = clean_description_for_display(desc);
             if !cleaned.is_empty() {
                 if cleaned.contains('\n') {
-                    let _ = writeln!(output, "  Descrição:");
+                    let _ = writeln!(output, "  Description:");
                     for line in cleaned.lines() {
                         let _ = writeln!(output, "    {}", line);
                     }
                 } else {
-                    let _ = writeln!(output, "  Descrição: {}", cleaned);
+                    let _ = writeln!(output, "  Description: {}", cleaned);
                 }
             }
         }
     }
 
     if !edges.is_empty() {
-        let _ = writeln!(output, "\n## Relações Estruturais:");
+        let _ = writeln!(output, "\n## Structural Relationships:\n");
         for edge in edges {
-            let rel_name = interner.resolve(edge.relation_id).unwrap_or("RELACAO");
+            let rel_name = interner.resolve(edge.relation_id).unwrap_or("RELATION");
             let source_name = interner
                 .resolve(StringId::new(edge.source.as_u32()))
-                .unwrap_or("Origem");
+                .unwrap_or("Source");
             let target_name = interner
                 .resolve(StringId::new(edge.target.as_u32()))
-                .unwrap_or("Destino");
+                .unwrap_or("Target");
 
             if config.include_edge_weights {
                 let _ = writeln!(
@@ -286,7 +301,13 @@ fn clean_description_for_display(desc: &str) -> String {
         text = text[pos + "Content:\n".len()..].trim().to_string();
     } else if let Some(pos) = text.find(":\n") {
         let prefix = &text[..pos];
-        if prefix.contains("Documentação") || prefix.contains("Documentation in") {
+        if prefix.contains("Documentação")
+            || prefix.contains("Documentation")
+            || prefix.contains("Trecho de conhecimento")
+            || prefix.contains("Knowledge chunk")
+            || prefix.contains("Documento de conhecimento")
+            || prefix.contains("Knowledge document")
+        {
             text = text[pos + 2..].trim().to_string();
         }
     }
@@ -367,10 +388,10 @@ mod tests {
         let config = MarkdownFormatConfig::default();
         let md = format_pruned_subgraph_markdown(&pruned, &interner, &config);
 
-        assert!(md.contains("# Contexto Recuperado do Conhecimento:"));
-        assert!(md.contains("- [Projeto Titan] (Relevância: 0.95)"));
-        assert!(md.contains("  - LIDERADO_POR -> [Ana Silva] (Confiança: 0.98)"));
-        assert!(md.contains("- [Ana Silva] (Relevância: 0.85)"));
+        assert!(md.contains("# Retrieved Knowledge Context:"));
+        assert!(md.contains("- [Projeto Titan] (Relevance: 0.95)"));
+        assert!(md.contains("    - LIDERADO_POR -> [Ana Silva] (Weight: 0.98)"));
+        assert!(md.contains("- [Ana Silva] (Relevance: 0.85)"));
     }
 
     #[test]
@@ -415,9 +436,9 @@ mod tests {
         let md = format_pruned_subgraph_markdown(&pruned, &interner, &config);
 
         assert!(md.contains("# Knowledge:"));
-        assert!(md.contains("## Entidades:"));
+        assert!(md.contains("## Entities:"));
         assert!(md.contains("- [Rust]"));
-        assert!(md.contains("## Relações Estruturais:"));
+        assert!(md.contains("## Structural Relationships:"));
         assert!(md.contains("- [Rust] --USADO_EM--> [Backend]"));
     }
 }

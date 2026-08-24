@@ -63,7 +63,7 @@ pub fn prune_subgraph_by_budget(
         };
     }
 
-    let header = "# Contexto Recuperado do Conhecimento:\n";
+    let header = "# Retrieved Knowledge Context:\n";
     let header_tokens = counter.count_tokens(header);
 
     if header_tokens >= max_tokens {

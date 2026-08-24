@@ -163,7 +163,7 @@ pub fn chunk_markdown_document(
                 title: format!("{} (p.{})", sec_title, p_idx + 1),
                 chunk_type: "Chunk".to_string(),
                 content: format!(
-                    "Trecho de conhecimento em {}:{} (Seção '{}'):\n{}",
+                    "Knowledge chunk in {}:{} (Section '{}'):\n{}",
                     file_path, section_start_line, sec_title, paragraph_text
                 ),
                 file_path: file_path.to_string(),
@@ -171,7 +171,7 @@ pub fn chunk_markdown_document(
                 section_hierarchy: vec![
                     file_basename.to_string(),
                     sec_title.to_string(),
-                    format!("Parte {}", p_idx + 1),
+                    format!("Part {}", p_idx + 1),
                 ],
                 relations: chunk_relations,
             });
@@ -255,7 +255,7 @@ pub fn chunk_plain_document(
         title: file_basename.to_string(),
         chunk_type: "Document".to_string(),
         content: format!(
-            "Documento de conhecimento: {} | Hash: {}",
+            "Knowledge document: {} | Hash: {}",
             file_basename, file_hash
         ),
         file_path: file_path.to_string(),
@@ -268,7 +268,7 @@ pub fn chunk_plain_document(
     let mut prev_chunk_id: Option<String> = None;
 
     for (idx, p_text) in paragraphs.into_iter().enumerate() {
-        let chunk_node_name = format!("{}: Trecho {}", file_basename, idx + 1);
+        let chunk_node_name = format!("{}: Chunk {}", file_basename, idx + 1);
         let mut relations = vec![(doc_root_name.clone(), "CHUNK_OF".to_string(), 0.95)];
 
         if let Some(prev) = prev_chunk_id {
@@ -279,17 +279,17 @@ pub fn chunk_plain_document(
 
         chunks.push(DocumentChunk {
             chunk_id: chunk_node_name,
-            title: format!("{} (Trecho {})", file_basename, idx + 1),
+            title: format!("{} (Chunk {})", file_basename, idx + 1),
             chunk_type: "Chunk".to_string(),
             content: format!(
-                "Trecho de conhecimento em {} (Trecho {}):\n{}",
+                "Knowledge chunk in {} (Chunk {}):\n{}",
                 file_path,
                 idx + 1,
                 p_text
             ),
             file_path: file_path.to_string(),
             line_number: 1,
-            section_hierarchy: vec![file_basename.to_string(), format!("Trecho {}", idx + 1)],
+            section_hierarchy: vec![file_basename.to_string(), format!("Chunk {}", idx + 1)],
             relations,
         });
     }

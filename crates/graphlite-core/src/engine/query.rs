@@ -341,7 +341,7 @@ impl GraphLiteEngine {
 
         // 5. Format Final Markdown for LLM Prompt
         let format_config = MarkdownFormatConfig {
-            header_title: "Contexto Recuperado do Conhecimento".to_string(),
+            header_title: "Retrieved Knowledge Context".to_string(),
             include_scores: true,
             include_edge_weights: true,
             style: opts.markdown_style,
@@ -439,7 +439,7 @@ impl GraphLiteEngine {
 
         // Markdown Formatting
         let format_config = MarkdownFormatConfig {
-            header_title: "Contexto Recuperado do Conhecimento".to_string(),
+            header_title: "Retrieved Knowledge Context".to_string(),
             include_scores: true,
             include_edge_weights: true,
             style: opts.markdown_style,

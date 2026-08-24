@@ -200,7 +200,7 @@ pub fn execute_query(db_path: &Path, args: &QueryArgs, verbose: bool) -> Result<
                 );
 
                 let format_config = graphlite_core::MarkdownFormatConfig {
-                    header_title: "Contexto Recuperado do Conhecimento (Reranked)".to_string(),
+                    header_title: "Retrieved Knowledge Context (Reranked)".to_string(),
                     include_scores: true,
                     include_edge_weights: true,
                     style: MarkdownStyle::Hierarchical,

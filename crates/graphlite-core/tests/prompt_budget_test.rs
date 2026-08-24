@@ -155,16 +155,16 @@ fn test_markdown_styling_variations() {
         ..Default::default()
     };
     let hier_md = format_pruned_subgraph_markdown(&pruned, &interner, &hier_config);
-    assert!(hier_md.contains("# Contexto Recuperado do Conhecimento:"));
+    assert!(hier_md.contains("# Retrieved Knowledge Context:"));
 
     // Test Separated Sections Style
     let sep_config = MarkdownFormatConfig {
         style: MarkdownStyle::SeparatedSections,
-        header_title: "Base de Conhecimento".to_string(),
+        header_title: "Knowledge Base".to_string(),
         include_scores: false,
         include_edge_weights: false,
     };
     let sep_md = format_pruned_subgraph_markdown(&pruned, &interner, &sep_config);
-    assert!(sep_md.contains("# Base de Conhecimento:"));
-    assert!(sep_md.contains("## Entidades:"));
+    assert!(sep_md.contains("# Knowledge Base:"));
+    assert!(sep_md.contains("## Entities:"));
 }
