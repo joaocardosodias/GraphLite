@@ -2,6 +2,30 @@
 @import 'fumadocs-ui/css/neutral.css';
 @import 'fumadocs-ui/css/preset.css';
 
+:root {
+  --color-fd-primary: #10b981;
+  --color-fd-primary-foreground: #ffffff;
+}
+
+.dark, :root[class~="dark"], [data-theme="dark"], html.dark {
+  --color-fd-background: #000000 !important;
+  --color-fd-foreground: #ededed !important;
+  --color-fd-card: #080808 !important;
+  --color-fd-card-foreground: #ededed !important;
+  --color-fd-popover: #080808 !important;
+  --color-fd-popover-foreground: #ededed !important;
+  --color-fd-muted: #111111 !important;
+  --color-fd-muted-foreground: #888888 !important;
+  --color-fd-border: #1e1e1e !important;
+  --color-fd-accent: #141414 !important;
+  --color-fd-accent-foreground: #ffffff !important;
+  --color-fd-sidebar: #000000 !important;
+}
+
+body {
+  background-color: var(--color-fd-background);
+}
+
 html {
   scrollbar-gutter: stable;
 }

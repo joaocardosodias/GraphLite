@@ -1,0 +1,14 @@
+{
+  "title": "Documentation",
+  "pages": [
+    "index",
+    "quickstart",
+    "---Engine Internals---",
+    "engine-internals",
+    "---Guides & Reference---",
+    "cli",
+    "rust-sdk",
+    "agents-and-mcp",
+    "benchmarks"
+  ]
+}
