@@ -1,0 +1,165 @@
+---
+title: Hybrid Search & Reciprocal Rank Fusion
+description: Inverted BM25 lexical indexing, query expansion pipeline, Reciprocal Rank Fusion (RRF), and hybrid graph scoring formulas.
+---
+
+Dense vector search captures semantic intent but suffers from blind spots with exact terminology, code identifiers, legal citations, and domain acronyms. Graphite resolves this by unifying dense vector representations with an in-memory BM25 inverted index through **Reciprocal Rank Fusion (RRF)** and depth-decayed graph structural scoring.
+
+---
+
+## 1. Inverted BM25 Lexical Index
+
+Graphite indexes entity names, types, and descriptions into an in-memory inverted index supporting the Okapi BM25 scoring algorithm.
+
+```rust
+// crates/graphite-core/src/graph/bm25.rs
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct Bm25Params {
+    /// Term frequency saturation parameter (default: 1.2)
+    pub k1: f32,
+    /// Document length normalization parameter (default: 0.75)
+    pub b: f32,
+}
+
+#[derive(Debug, Clone, Default)]
+pub struct Bm25Index {
+    inverted_index: HashMap<String, Vec<(NodeId, u32)>>,
+    doc_lengths: HashMap<NodeId, usize>,
+    total_tokens: usize,
+    params: Bm25Params,
+}
+```
+
+### Mathematical Scoring Formulation
+
+For a search query `Q` containing terms `t_1, t_2, ..., t_m` and a candidate document node `D`, the BM25 score is computed as:
+
+```text
+Score(D, Q) = sum( IDF(t) * ( (TF(t, D) * (k1 + 1)) / (TF(t, D) + k1 * (1 - b + b * (|D| / avgdl))) ) )
+```
+
+Where:
+* `TF(t, D)` is the term frequency of token `t` in document `D`.
+* `|D|` is the token count of document `D`.
+* `avgdl` is the average document token length across the entire indexed graph.
+* `k1 = 1.2` controls term frequency saturation non-linearity.
+* `b = 0.75` regulates the penalty applied to long documents.
+
+The Inverse Document Frequency (`IDF`) utilizes the Robertson-Spärck Jones formula:
+
+```text
+IDF(t) = ln( 1.0 + (N - DF(t) + 0.5) / (DF(t) + 0.5) )
+```
+
+Where `N` is the total number of indexed nodes and `DF(t)` is the number of documents containing token `t`.
+
+---
+
+## 2. Tokenization & Query Expansion Pipeline
+
+Text inputs pass through a multi-stage tokenization and expansion engine designed for source code, structured documentation, and legal texts.
+
+```rust
+// Tokenization pipeline stages in crates/graphite-core/src/graph/bm25.rs
+pub fn tokenize(text: &str) -> Vec<String> {
+    let mut tokens = Vec::new();
+
+    // Stage 0: Normalized digit sequence extraction (e.g. "Art. 1.228" -> "1228")
+    // Stage 1: Punctuation splitting preserving underscores
+    // Stage 2: CamelCase & PascalCase sub-word segmentation (e.g. "connectWiFi" -> ["connect", "wifi"])
+    // Stage 3: Domain acronym and bilingual synonym expansion (e.g. "cdc", "lgpd", "database")
+    
+    tokens
+}
+```
+
+### Expansion Pipeline Architecture
+
+| Stage | Input Example | Extracted Tokens | Purpose |
+| :--- | :--- | :--- | :--- |
+| **0. Numeric Norm** | `Art. 1.228 do Código Civil` | `["1228"]` | Matches digit sequences regardless of punctuation |
+| **1. Split** | `sqlite3_open_v2()` | `["sqlite3", "open", "v2"]` | Breaks code identifiers and operators |
+| **2. Casing Split** | `GraphiteEngineBuilder` | `["graphite", "engine", "builder"]` | Decomposes compound camelCase / PascalCase names |
+| **3. Acronyms** | `cdc` | `["cdc", "consumidor", "consumo", "defesa"]` | Resolves domain-specific acronyms |
+| **3. Synonyms** | `banco` | `["banco", "db", "database", "dados"]` | Cross-lingual EN/PT synonym bridging |
+
+---
+
+## 3. Reciprocal Rank Fusion (RRF)
+
+Dense vector search produces continuous cosine similarity scores in `[-1.0, 1.0]`, while BM25 generates unbounded positive lexical scores in `[0.0, +inf)`. Directly adding these raw scores produces severe calibration distortion.
+
+Graphite unifies rankings using **Reciprocal Rank Fusion (RRF)**:
+
+```text
+RRF_Score(d) = sum( 1.0 / (k + rank_r(d)) )  for r in Rankings
+```
+
+Where `rank_r(d)` is the 1-based rank position of candidate `d` in ranked list `r` (Vector or BM25), and `k = 60` is the standard smoothing parameter preventing top-ranked items from dominating disproportionately.
+
+```rust
+// crates/graphite-core/src/graph/hybrid_score.rs
+pub fn compute_rrf_fused_ranks(
+    ranked_lists: &[&[(NodeId, f32)]],
+    k: usize,
+) -> HashMap<NodeId, f32> {
+    let mut rrf_scores: HashMap<NodeId, f32> = HashMap::new();
+    let k_f32 = k as f32;
+
+    for list in ranked_lists {
+        for (rank_idx, (node_id, _)) in list.iter().enumerate() {
+            let rank = (rank_idx + 1) as f32;
+            let score_increment = 1.0 / (k_f32 + rank);
+            *rrf_scores.entry(*node_id).or_insert(0.0) += score_increment;
+        }
+    }
+
+    // Normalize RRF scores to [0.0, 1.0]
+    let max_possible = ranked_lists.len() as f32 / (k_f32 + 1.0);
+    if max_possible > 0.0 {
+        for score in rrf_scores.values_mut() {
+            *score = (*score / max_possible).clamp(0.0, 1.0);
+        }
+    }
+
+    rrf_scores
+}
+```
+
+---
+
+## 4. Hybrid Graph Scoring & Depth Decay
+
+Candidates discovered via vector and lexical retrieval act as **seed nodes** for relational graph exploration. As relational breadth-first search (BFS) expands outward, graph scores decay exponentially with traversal depth.
+
+### Scoring Configuration
+
+```rust
+// crates/graphite-core/src/graph/hybrid_score.rs
+pub struct HybridScoreConfig {
+    pub alpha: f32,                // Vector vs Graph balance (default: 0.6)
+    pub depth_decay: f32,          // Per-hop decay factor (default: 0.85)
+    pub min_score_threshold: f32,  // Cutoff threshold (default: 0.05)
+    pub use_rrf: bool,             // Enable RRF fusion (default: true)
+    pub rrf_k: usize,              // Smoothing constant (default: 60)
+}
+```
+
+### Combined Scoring Formula
+
+For a node `d` reached at traversal distance `depth` via incoming edge `e`:
+
+```text
+FinalScore(d) = alpha * SeedScore(d) + (1 - alpha) * ( EdgeWeight(e) * (depth_decay ^ depth) )
+```
+
+### Depth Decay Impact Table
+
+| Traversal Depth | Decay Factor (`gamma = 0.85`) | Structural Weight Multiplier |
+| :--- | :--- | :--- |
+| **Depth 0 (Direct Seed)** | $0.85^0 = 1.0000$ | 100.0% of edge weight |
+| **Depth 1 (1-Hop Neighbor)**| $0.85^1 = 0.8500$ | 85.0% of edge weight |
+| **Depth 2 (2-Hop Neighbor)**| $0.85^2 = 0.7225$ | 72.25% of edge weight |
+| **Depth 3 (3-Hop Neighbor)**| $0.85^3 = 0.6141$ | 61.41% of edge weight |
+
+Entities scoring below `min_score_threshold` (0.05) are pruned prior to prompt assembly, ensuring zero token budget is wasted on distant or irrelevant graph noise.
