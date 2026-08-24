@@ -15,6 +15,18 @@ pub struct LocalEmbedder {
     dim: usize,
 }
 
+/// Returns the global standard user cache directory for storing ONNX model files (~/.cache/graphite/models).
+#[cfg(feature = "fastembed")]
+fn default_model_cache_dir() -> std::path::PathBuf {
+    if let Ok(home) = std::env::var("HOME") {
+        std::path::PathBuf::from(home).join(".cache").join("graphite").join("models")
+    } else if let Ok(userprofile) = std::env::var("USERPROFILE") {
+        std::path::PathBuf::from(userprofile).join(".cache").join("graphite").join("models")
+    } else {
+        std::env::temp_dir().join("graphite_models")
+    }
+}
+
 impl LocalEmbedder {
     /// Initializes a new local embedder using `all-MiniLM-L6-v2` (384 dimensions).
     #[cfg(feature = "fastembed")]
@@ -22,6 +34,7 @@ impl LocalEmbedder {
         let mut options = InitOptions::default();
         options.model_name = EmbeddingModel::AllMiniLML6V2;
         options.show_download_progress = false;
+        options.cache_dir = default_model_cache_dir();
 
         let model = TextEmbedding::try_new(options)
             .map_err(|e| GraphiteError::Io(std::io::Error::other(e.to_string())))?;
@@ -38,6 +51,7 @@ impl LocalEmbedder {
         let mut options = InitOptions::default();
         options.model_name = EmbeddingModel::BGESmallENV15;
         options.show_download_progress = false;
+        options.cache_dir = default_model_cache_dir();
 
         let model = TextEmbedding::try_new(options)
             .map_err(|e| GraphiteError::Io(std::io::Error::other(e.to_string())))?;
