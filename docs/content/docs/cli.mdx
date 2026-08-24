@@ -1,0 +1,209 @@
+---
+title: CLI Reference & Ingestion Guide
+description: Complete command-line reference for graphite-cli including initialization, document ingestion, hybrid GraphRAG queries, agent memories, and database inspection.
+---
+
+import { Step, Steps } from 'fumadocs-ui/components/steps';
+import { Tab, Tabs } from 'fumadocs-ui/components/tabs';
+
+The `graphite` CLI is a high-performance, single-binary utility for building, querying, ingesting, and inspecting embedded `.graphite` databases without external background daemons or database servers.
+
+---
+
+## 1. Installation
+
+<Tabs items={['Cargo (From Source)', 'Prebuilt Binary']}>
+<Tab value="Cargo (From Source)">
+
+```bash
+cargo install --path crates/graphite-cli
+```
+
+</Tab>
+<Tab value="Prebuilt Binary">
+
+```bash
+# Verify installation
+graphite --version
+```
+
+</Tab>
+</Tabs>
+
+---
+
+## 2. Global Options
+
+Global options apply across all `graphite` subcommands:
+
+| Flag / Option | Shorthand | Default | Description |
+| :--- | :--- | :--- | :--- |
+| `--db <PATH>` | `-d` | `graphite.graphite` | Target path to the `.graphite` database file |
+| `--verbose` | `-v` | `false` | Enable verbose diagnostic logging and timing metrics |
+| `--help` | `-h` | — | Display help information and argument list |
+| `--version` | `-V` | — | Display version information |
+
+---
+
+## 3. Subcommands Reference
+
+### `graphite init`
+
+Initializes a new, empty `.graphite` single-file database.
+
+```bash
+graphite init -d knowledge.graphite --dim 384 --metric cosine --quantization scalar-int8 -t 2048
+```
+
+| Option | Shorthand | Default | Description |
+| :--- | :--- | :--- | :--- |
+| `--dim <NUM>` | `-D` | `384` | Dimensionality of dense vector embeddings |
+| `--metric <METRIC>` | `-m` | `cosine` | Distance metric: `cosine`, `dot-product`, `l2` |
+| `--quantization <MODE>`| `-q` | `scalar-int8` | Vector compression: `scalar-int8` (SQ8), `none` |
+| `--max-tokens <NUM>` | `-t` | `2048` | Default token budget limit for prompt synthesis |
+| `--force` | `-f` | `false` | Overwrite existing database file if it already exists |
+
+---
+
+### `graphite ingest`
+
+Recursively parses documents (Markdown, PDF, Plain Text, JSON, CSV), applies hierarchical semantic chunking, computes dense embeddings, builds the BM25 index, and serializes the complete `.graphite` binary file.
+
+```bash
+graphite ingest ./documents -d knowledge.graphite --chunk-size 350 --chunk-overlap 40 --no-tmp
+```
+
+| Option | Shorthand | Default | Description |
+| :--- | :--- | :--- | :--- |
+| `<PATH>` | *(Positional)* | `.` | Directory or file path containing documents |
+| `--chunk-size <TOKENS>`| `-s` | `350` | Target token capacity per semantic text chunk |
+| `--chunk-overlap <TOKENS>`| `-o` | `40` | Overlap tokens between adjacent sliding windows |
+| `--extensions <LIST>` | `-e` | All supported | Comma-separated file extensions (e.g. `md,txt,pdf`) |
+| `--max-files <NUM>` | — | `1000` | Maximum number of files to process |
+| `--watch` | `-w` | `false` | Watch directory for changes and continuously re-index |
+| `--force` | `-f` | `false` | Force re-indexing ignoring cached file content hashes |
+| `--no-tmp` | — | `false` | Write directly to database without temporary staging files |
+
+---
+
+### `graphite query`
+
+Executes hybrid GraphRAG retrieval combining SIMD vector search, BM25 lexical matching, Reciprocal Rank Fusion, CSR graph expansion, and optional Cross-Encoder reranking.
+
+```bash
+graphite -d knowledge.graphite query -T "artigo 861 do codigo civil" --rerank -v
+```
+
+| Option | Shorthand | Default | Description |
+| :--- | :--- | :--- | :--- |
+| `--text <QUERY>` | `-T` | — | Plain text query (automatically embedded in Rust) |
+| `--vector <FLOATS>` | `-V` | — | Comma-separated query embedding vector floats |
+| `--seeds <NAMES>` | `-s` | — | Comma-separated seed entity names for graph exploration |
+| `--top-k <NUM>` | `-k` | `5` | Quantity of direct seed candidates to retrieve |
+| `--tokens <NUM>` | `-t` | Config default | Maximum prompt token budget override |
+| `--depth <HOPS>` | — | `2` | Maximum BFS relational graph traversal depth |
+| `--alpha <FLOAT>` | — | `0.6` | Hybrid weighting: `1.0` (pure vector) to `0.0` (pure graph) |
+| `--type <FILTER>` | `-y` | — | Filter entities by type (e.g. `Function,Struct,Article`) |
+| `--rerank` | — | `false` | Enable local Cross-Encoder semantic reranking |
+| `--format <MODE>` | `-f` | `markdown` | Output formatting: `markdown`, `json`, `triples` |
+
+---
+
+### `graphite remember`
+
+Records an AI agent fact, preference, task, or rule with automatic embedding generation and relational semantic linking into the knowledge graph.
+
+```bash
+graphite -d agent.graphite remember "O usuário prefere respostas em português e código com tipos estritos em Rust." -c preference
+```
+
+| Option | Shorthand | Default | Description |
+| :--- | :--- | :--- | :--- |
+| `<TEXT>` | *(Positional)* | — | Memory text content to record |
+| `--category <LABEL>` | `-c` | `AgentMemory` | Category: `preference`, `fact`, `task`, `rule` |
+| `--link-nearest` | `-l` | `true` | Automatically link memory to semantically closest nodes |
+
+---
+
+### `graphite insert-node` & `insert-edge`
+
+Low-level commands for manual entity and relational graph construction.
+
+```bash
+# Insert Entity
+graphite -d knowledge.graphite insert-node \
+  --name "GraphiteEngine" \
+  --type "Struct" \
+  --description "High-performance embedded GraphRAG engine in Rust" \
+  --auto-embed
+
+# Insert Relationship Edge
+graphite -d knowledge.graphite insert-edge \
+  --source "GraphiteEngine" \
+  --target "CsrGraph" \
+  --relation "USES" \
+  --weight 0.95
+```
+
+---
+
+### `graphite inspect`
+
+Inspects database metadata, section byte offsets, CRC32 checksum integrity, and entity counts.
+
+```bash
+graphite -d knowledge.graphite inspect
+```
+
+Output:
+```text
+=== Graphite Database Inspection ===
+Database File:   knowledge.graphite
+File Size:       142,880 bytes (139.5 KB)
+Magic Bytes:     GRAPHITE (Valid)
+Format Version:  1
+Dimensions:      384
+Distance Metric: Cosine
+Quantization:    ScalarInt8 (SQ8)
+Node Count:      492
+Edge Count:      980
+Checksum:        0x9D4A12F0 (Verified CRC32)
+```
+
+---
+
+## 4. End-to-End Workflow Tutorial
+
+<Steps>
+<Step>
+### 1. Initialize Database
+Create an empty database configured for 384-dimensional embeddings:
+```bash
+graphite init -d knowledge.graphite -D 384
+```
+</Step>
+
+<Step>
+### 2. Ingest Document Corpus
+Ingest a directory of Markdown, legal, or technical documentation:
+```bash
+graphite ingest ./documents -d knowledge.graphite --no-tmp
+```
+</Step>
+
+<Step>
+### 3. Query with Cross-Encoder Reranking
+Execute a deep semantic query and output formatted Markdown context:
+```bash
+graphite -d knowledge.graphite query -T "gestão de negócios de terceiros" --rerank
+```
+</Step>
+
+<Step>
+### 4. Verify Database Integrity
+Inspect binary memory layout and section checksums:
+```bash
+graphite -d knowledge.graphite inspect
+```
+</Step>
+</Steps>
