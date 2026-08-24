@@ -281,7 +281,8 @@ pub fn prune_subgraph_by_budget_mmr(
     let n = subgraph.entities.len();
     let mut remaining_indices: smallvec::SmallVec<[usize; 64]> = (0..n).collect();
     let mut mmr_ordered: Vec<ScoredEntity> = Vec::with_capacity(n);
-    let mut selected_indices: smallvec::SmallVec<[usize; 64]> = smallvec::SmallVec::with_capacity(n);
+    let mut selected_indices: smallvec::SmallVec<[usize; 64]> =
+        smallvec::SmallVec::with_capacity(n);
 
     while !remaining_indices.is_empty() {
         let mut best_rem_pos = 0;

@@ -1,5 +1,5 @@
-use std::collections::HashMap;
 use smallvec::SmallVec;
+use std::collections::HashMap;
 
 use crate::error::{GraphiteError, Result};
 use crate::graph::csr::CsrGraph;

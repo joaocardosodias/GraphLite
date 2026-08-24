@@ -1,0 +1,176 @@
+---
+title: Poda de Contexto por Orçamento de Tokens & MMR
+description: Contagem exata de tokens via BPE Tiktoken, otimização de diversidade com Maximal Marginal Relevance (MMR), similaridade de Jaccard zero-alocação e poda gulosa.
+---
+
+Arquiteturas de RAG convencionais dependem de mecanismos ingênuos de recuperação **Top-K**, retornando uma quantidade fixa de trechos de documentos independentemente do seu tamanho em tokens. Caso cada trecho contenha 800 tokens, uma consulta Top-5 injetará 4.000 tokens no contexto do LLM, estourando facilmente a janela de contexto ou empurrando instruções críticas do sistema para fora da atenção do modelo.
+
+O Graphite trata o **orçamento de tokens** como uma restrição matemática estrita de primeira classe. Os subgrafos são montados, ponderados para máxima diversidade informacional via **Maximal Marginal Relevance (MMR)** e podados de forma gulosa para garantir que o contexto sintetizado nunca exceda o limite estipulado.
+
+---
+
+## 1. Motor de Contagem de Tokens (`TokenCounter`)
+
+O Graphite isola a contagem de tokens em uma abstração desacoplada com suporte a tokenizadores BPE de alta precisão e contadores heurísticos de dependência zero.
+
+```rust
+// crates/graphite-core/src/prompt/token_counter.rs
+pub trait TokenCounter: Send + Sync + Debug {
+    /// Retorna o número exato ou estimado de tokens para o texto fornecido.
+    fn count_tokens(&self, text: &str) -> usize;
+}
+```
+
+### Codificações Suportadas
+
+| Tipo de Contador | Algoritmo Subjacente | Codificações Suportadas | Performance / Latência |
+| :--- | :--- | :--- | :--- |
+| **TiktokenCounter** | BPE nativo em Rust (`tiktoken-rs`) | `cl100k_base` (GPT-4), `o200k_base` (GPT-4o) | Contagem exata BPE; sub-milissegundo |
+| **HeuristicCounter** | Limites de palavras e proporção de caracteres | Heurística `max(words, ceil(chars / 4.0))` | Zero alocações, latência em sub-microssegundos |
+
+```rust
+// Contador BPE de alta precisão com cache estático OnceLock
+impl TokenCounter for TiktokenCounter {
+    fn count_tokens(&self, text: &str) -> usize {
+        if text.is_empty() {
+            return 0;
+        }
+        self.bpe.encode_with_special_tokens(text).len()
+    }
+}
+```
+
+---
+
+## 2. Otimização por Maximal Marginal Relevance (MMR)
+
+Recuperar documentos baseado exclusivamente na relevância bruta com frequência introduz trechos redundantes ou quase duplicados (como múltiplos artigos legislativos idênticos ou repetições de declarações de código).
+
+O Graphite aplica o algoritmo **Maximal Marginal Relevance (MMR)** para equilibrar a relevância com a diversidade informacional:
+
+```text
+Score_MMR(d_i) = lambda * Relevancia(d_i) - (1.0 - lambda) * max( Similaridade(d_i, d_j) )  para d_j em Selecionados
+```
+
+Onde:
+* `Relevancia(d_i)` é a pontuação híbrida combinada (Vetor + BM25 + Estrutura do Grafo).
+* `Similaridade(d_i, d_j)` mede a sobreposição lexical entre o candidato `d_i` e as entidades `d_j` já selecionadas.
+* `lambda = 0.75` (padrão) assegura alto alinhamento com a consulta enquanto penaliza redundâncias contextuais.
+
+### Calibração do Parâmetro de Diversidade (`lambda`)
+
+* `lambda = 1.0`: Ranqueamento puro por relevância. O motor ignora o cálculo MMR através de um atalho rápido (*fast path*).
+* `lambda = 0.75`: Operação padrão balanceada. Penaliza trechos repetitivos preservando máxima pertinência.
+* `lambda = 0.50`: Exploração de alta diversidade. Penaliza fortemente a sobreposição semântica, forçando a seleção de subgrafos variados.
+
+---
+
+## 3. Similaridade Lexical de Jaccard Zero-Alocação
+
+Durante o laço de seleção do MMR, a similaridade entre pares de descrições é avaliada continuamente. Alocações convencionais de conjuntos de tokens no heap gerariam sobrecarga desnecessária. O Graphite calcula a sobreposição lexical através de um algoritmo de similaridade de Jaccard de zero-alocação:
+
+```text
+Jaccard(A, B) = |A ∩ B| / |A ∪ B|
+```
+
+```rust
+// crates/graphite-core/src/prompt/pruner.rs
+pub fn prune_subgraph_by_budget_mmr(
+    subgraph: &ConnectedSubgraph,
+    interner: &StringInterner,
+    max_tokens: usize,
+    counter: &dyn TokenCounter,
+    mmr_lambda: f32,
+) -> PrunedSubgraph {
+    if subgraph.is_empty() || max_tokens == 0 {
+        return PrunedSubgraph::default();
+    }
+
+    let lambda = mmr_lambda.clamp(0.0, 1.0);
+
+    // Fast path: ignora MMR se a relevância pura for solicitada
+    if (lambda - 1.0).abs() < 1e-4 || subgraph.entities.len() <= 1 {
+        return prune_subgraph_by_budget(subgraph, interner, max_tokens, counter);
+    }
+
+    // Pré-resolve as strings de descrição do StringInterner uma única vez
+    let descriptions: Vec<&str> = subgraph
+        .entities
+        .iter()
+        .map(|e| {
+            if let Some(rec) = e.node_record {
+                interner.resolve(rec.description_id).unwrap_or("")
+            } else {
+                ""
+            }
+        })
+        .collect();
+
+    let n = subgraph.entities.len();
+    let mut remaining_indices: smallvec::SmallVec<[usize; 64]> = (0..n).collect();
+    let mut mmr_ordered: Vec<ScoredEntity> = Vec::with_capacity(n);
+    let mut selected_indices: smallvec::SmallVec<[usize; 64]> = smallvec::SmallVec::with_capacity(n);
+
+    while !remaining_indices.is_empty() {
+        let mut best_rem_pos = 0;
+        let mut best_mmr_score = f32::NEG_INFINITY;
+
+        for (rem_pos, &cand_idx) in remaining_indices.iter().enumerate() {
+            let relevance = subgraph.entities[cand_idx].final_score;
+            let cand_desc = descriptions[cand_idx];
+
+            let max_sim = if selected_indices.is_empty() {
+                0.0
+            } else {
+                selected_indices
+                    .iter()
+                    .map(|&sel_idx| text_jaccard_similarity(cand_desc, descriptions[sel_idx]))
+                    .fold(0.0f32, f32::max)
+            };
+
+            let mmr_score = (lambda * relevance) - ((1.0 - lambda) * max_sim);
+            if mmr_score > best_mmr_score {
+                best_mmr_score = mmr_score;
+                best_rem_pos = rem_pos;
+            }
+        }
+
+        let chosen_idx = remaining_indices.swap_remove(best_rem_pos);
+        selected_indices.push(chosen_idx);
+        mmr_ordered.push(subgraph.entities[chosen_idx].clone());
+    }
+
+    let mmr_subgraph = ConnectedSubgraph {
+        entities: mmr_ordered,
+        edges: subgraph.edges.clone(),
+        seed_ids: subgraph.seed_ids.clone(),
+    };
+
+    prune_subgraph_by_budget(&mmr_subgraph, interner, max_tokens, counter)
+}
+```
+
+O uso de buffers `SmallVec<[usize; 64]>` alocados na pilha mantém o rastreamento dos índices nos registradores da CPU e no cache L1 para subgrafos com até 64 entidades, contornando qualquer alocação no heap.
+
+---
+
+## 4. Poda Gulosa por Orçamento & Truncamento Gradual
+
+Após a reordenação por MMR, o algoritmo guloso de poda empacota as entidades e suas respectivas arestas de conexão no buffer de saída até atingir o limite `max_tokens`.
+
+```rust
+// Estrutura representativa do contexto final formatado
+pub struct PrunedSubgraph {
+    pub entities: Vec<ScoredEntity>,
+    pub edges: Vec<EdgeRecord>,
+    pub total_tokens: usize,
+    pub budget: usize,
+}
+```
+
+### Mecânica de Poda
+
+1. **Contabilização de Cabeçalho:** Os tokens do cabeçalho fixo (`# Retrieved Knowledge Context:\n`) são debitados antes da inclusão das entidades.
+2. **Montagem Gulosa:** Formata a entidade candidata, afere seu custo exato em tokens e a aceita caso `current_tokens + entity_tokens <= max_tokens`.
+3. **Truncamento Gradual da Melhor Entidade:** Se a entidade com maior pontuação exceder ligeiramente o orçamento total, o motor trunca gradualmente o texto da sua descrição para aproveitar toda a capacidade restante de tokens, em vez de retornar um contexto vazio.
+4. **Poda de Arestas Relacionais:** Arestas conectadas só são inseridas se ambos os nós de origem e destino estiverem presentes no conjunto podado.

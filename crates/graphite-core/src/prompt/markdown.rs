@@ -282,7 +282,11 @@ fn format_separated(
                     source_name, rel_name, edge.weight, target_name
                 );
             } else {
-                let _ = writeln!(output, "- [{}] --{}--> [{}]", source_name, rel_name, target_name);
+                let _ = writeln!(
+                    output,
+                    "- [{}] --{}--> [{}]",
+                    source_name, rel_name, target_name
+                );
             }
         }
     }
