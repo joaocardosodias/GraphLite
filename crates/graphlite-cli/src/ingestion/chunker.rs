@@ -52,7 +52,7 @@ pub fn chunk_markdown_document(
         title: file_basename.to_string(),
         chunk_type: "Document".to_string(),
         content: format!(
-            "Documento de conhecimento: {} | Hash: {}",
+            "Knowledge document: {} | Hash: {}",
             file_basename, file_hash
         ),
         file_path: file_path.to_string(),
@@ -125,7 +125,7 @@ pub fn chunk_markdown_document(
             title: sec_title.to_string(),
             chunk_type: "Section".to_string(),
             content: format!(
-                "Seção '{}' do documento '{}' em {}:{}.\nResumo:\n{}",
+                "Section '{}' of document '{}' at {}:{}.\nSummary:\n{}",
                 sec_title,
                 file_basename,
                 file_path,
@@ -144,9 +144,9 @@ pub fn chunk_markdown_document(
 
         for (p_idx, paragraph_text) in paragraphs.into_iter().enumerate() {
             let chunk_node_name = if p_idx == 0 {
-                format!("{}: {} (Parte 1)", file_basename, sec_title)
+                format!("{}: {} (Part 1)", file_basename, sec_title)
             } else {
-                format!("{}: {} (Parte {})", file_basename, sec_title, p_idx + 1)
+                format!("{}: {} (Part {})", file_basename, sec_title, p_idx + 1)
             };
 
             let mut chunk_relations =
@@ -317,8 +317,11 @@ fn split_into_semantic_paragraphs(text: &str, config: &ChunkConfig) -> Vec<Strin
         if current_chunk.len() + trimmed.len() > config.target_chars && !current_chunk.is_empty() {
             chunks.push(current_chunk.clone());
 
-            // Sliding window overlap
-            let overlap_start = current_chunk.len().saturating_sub(config.overlap_chars);
+            // Sliding window overlap with UTF-8 char boundary safety
+            let mut overlap_start = current_chunk.len().saturating_sub(config.overlap_chars);
+            while overlap_start < current_chunk.len() && !current_chunk.is_char_boundary(overlap_start) {
+                overlap_start += 1;
+            }
             current_chunk = current_chunk[overlap_start..].to_string();
             if !current_chunk.is_empty() {
                 current_chunk.push('\n');
