@@ -85,16 +85,20 @@ pub fn format_connected_subgraph_markdown(
     }
 }
 
+use std::fmt::Write;
+
 fn format_hierarchical(
     entities: &[crate::graph::hybrid_score::ScoredEntity],
     edges: &[EdgeRecord],
     interner: &StringInterner,
     config: &MarkdownFormatConfig,
 ) -> String {
-    let mut output = format!("# {}:\n", config.header_title);
+    let estimated_cap = entities.len() * 256 + edges.len() * 64 + 128;
+    let mut output = String::with_capacity(estimated_cap);
+    let _ = writeln!(output, "# {}:", config.header_title);
 
     // Map outgoing edges by source NodeId
-    let mut outgoing_map: HashMap<NodeId, Vec<&EdgeRecord>> = HashMap::new();
+    let mut outgoing_map: HashMap<NodeId, Vec<&EdgeRecord>> = HashMap::with_capacity(entities.len());
     for edge in edges {
         outgoing_map.entry(edge.source).or_default().push(edge);
     }
@@ -123,32 +127,34 @@ fn format_hierarchical(
 
         if let Some(ty) = entity_type {
             if config.include_scores {
-                output.push_str(&format!(
-                    "- [{}] (Tipo: {}, Relevância: {:.2})\n",
+                let _ = writeln!(
+                    output,
+                    "- [{}] (Tipo: {}, Relevância: {:.2})",
                     node_name, ty, entity.final_score
-                ));
+                );
             } else {
-                output.push_str(&format!("- [{}] (Tipo: {})\n", node_name, ty));
+                let _ = writeln!(output, "- [{}] (Tipo: {})", node_name, ty);
             }
         } else if config.include_scores {
-            output.push_str(&format!(
-                "- [{}] (Relevância: {:.2})\n",
+            let _ = writeln!(
+                output,
+                "- [{}] (Relevância: {:.2})",
                 node_name, entity.final_score
-            ));
+            );
         } else {
-            output.push_str(&format!("- [{}]\n", node_name));
+            let _ = writeln!(output, "- [{}]", node_name);
         }
 
         if let Some(desc) = description {
             let cleaned = clean_description_for_display(desc);
             if !cleaned.is_empty() {
                 if cleaned.contains('\n') {
-                    output.push_str("  Descrição:\n");
+                    let _ = writeln!(output, "  Descrição:");
                     for line in cleaned.lines() {
-                        output.push_str(&format!("    {}\n", line));
+                        let _ = writeln!(output, "    {}", line);
                     }
                 } else {
-                    output.push_str(&format!("  Descrição: {}\n", cleaned));
+                    let _ = writeln!(output, "  Descrição: {}", cleaned);
                 }
             }
         }
@@ -163,12 +169,13 @@ fn format_hierarchical(
                         .unwrap_or("Alvo");
 
                     if config.include_edge_weights {
-                        output.push_str(&format!(
-                            "  - {} -> [{}] (Confiança: {:.2})\n",
+                        let _ = writeln!(
+                            output,
+                            "  - {} -> [{}] (Confiança: {:.2})",
                             rel_name, target_name, edge.weight
-                        ));
+                        );
                     } else {
-                        output.push_str(&format!("  - {} -> [{}]\n", rel_name, target_name));
+                        let _ = writeln!(output, "  - {} -> [{}]", rel_name, target_name);
                     }
                 }
             }
@@ -184,7 +191,9 @@ fn format_separated(
     interner: &StringInterner,
     config: &MarkdownFormatConfig,
 ) -> String {
-    let mut output = format!("# {}:\n\n## Entidades:\n", config.header_title);
+    let estimated_cap = entities.len() * 256 + edges.len() * 64 + 128;
+    let mut output = String::with_capacity(estimated_cap);
+    let _ = writeln!(output, "# {}:\n\n## Entidades:", config.header_title);
 
     for entity in entities {
         let (node_name, entity_type, description) = if let Some(rec) = entity.node_record {
@@ -207,58 +216,58 @@ fn format_separated(
 
         if let Some(ty) = entity_type {
             if config.include_scores {
-                output.push_str(&format!(
-                    "- [{}] (Tipo: {}, Score: {:.2})\n",
+                let _ = writeln!(
+                    output,
+                    "- [{}] (Tipo: {}, Score: {:.2})",
                     node_name, ty, entity.final_score
-                ));
+                );
             } else {
-                output.push_str(&format!("- [{}] (Tipo: {})\n", node_name, ty));
+                let _ = writeln!(output, "- [{}] (Tipo: {})", node_name, ty);
             }
         } else if config.include_scores {
-            output.push_str(&format!(
-                "- [{}] (Score: {:.2})\n",
+            let _ = writeln!(
+                output,
+                "- [{}] (Score: {:.2})",
                 node_name, entity.final_score
-            ));
+            );
         } else {
-            output.push_str(&format!("- [{}]\n", node_name));
+            let _ = writeln!(output, "- [{}]", node_name);
         }
 
         if let Some(desc) = description {
             let cleaned = clean_description_for_display(desc);
             if !cleaned.is_empty() {
                 if cleaned.contains('\n') {
-                    output.push_str("  Descrição:\n");
+                    let _ = writeln!(output, "  Descrição:");
                     for line in cleaned.lines() {
-                        output.push_str(&format!("    {}\n", line));
+                        let _ = writeln!(output, "    {}", line);
                     }
                 } else {
-                    output.push_str(&format!("  Descrição: {}\n", cleaned));
+                    let _ = writeln!(output, "  Descrição: {}", cleaned);
                 }
             }
         }
     }
 
     if !edges.is_empty() {
-        output.push_str("\n## Relações Estruturais:\n");
+        let _ = writeln!(output, "\n## Relações Estruturais:");
         for edge in edges {
+            let rel_name = interner.resolve(edge.relation_id).unwrap_or("RELACAO");
             let source_name = interner
                 .resolve(StringId::new(edge.source.as_u32()))
                 .unwrap_or("Origem");
-            let rel_name = interner.resolve(edge.relation_id).unwrap_or("RELACAO");
             let target_name = interner
                 .resolve(StringId::new(edge.target.as_u32()))
                 .unwrap_or("Destino");
 
             if config.include_edge_weights {
-                output.push_str(&format!(
-                    "- [{}] --{} ({:.2})--> [{}]\n",
+                let _ = writeln!(
+                    output,
+                    "- [{}] --{} ({:.2})--> [{}]",
                     source_name, rel_name, edge.weight, target_name
-                ));
+                );
             } else {
-                output.push_str(&format!(
-                    "- [{}] --{}--> [{}]\n",
-                    source_name, rel_name, target_name
-                ));
+                let _ = writeln!(output, "- [{}] --{}--> [{}]", source_name, rel_name, target_name);
             }
         }
     }

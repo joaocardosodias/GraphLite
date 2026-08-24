@@ -1,4 +1,4 @@
-use std::collections::{HashSet, VecDeque};
+use std::collections::VecDeque;
 
 use crate::graph::adjacency::AdjacencyGraph;
 use crate::graph::csr::CsrGraph;
@@ -60,20 +60,69 @@ pub struct TraversedNode {
     pub path_weight: f32,
 }
 
+/// High-performance cache-friendly bitset for tracking visited graph nodes without heap hashing overhead.
+#[derive(Debug, Clone, Default)]
+pub struct DenseNodeBitSet {
+    words: Vec<u64>,
+}
+
+impl DenseNodeBitSet {
+    /// Creates a new `DenseNodeBitSet` pre-allocated for expected capacity.
+    #[inline]
+    pub fn with_capacity(capacity: usize) -> Self {
+        let num_words = (capacity + 63) / 64;
+        Self {
+            words: vec![0u64; num_words.max(16)],
+        }
+    }
+
+    /// Sets the bit for `node`. Returns `true` if newly inserted (was not visited), `false` if already visited.
+    #[inline]
+    pub fn test_and_set(&mut self, node: NodeId) -> bool {
+        let idx = node.as_u32() as usize;
+        let word_idx = idx / 64;
+        let bit_mask = 1u64 << (idx % 64);
+
+        if word_idx >= self.words.len() {
+            self.words.resize(word_idx + 1 + 16, 0);
+        }
+
+        let word = &mut self.words[word_idx];
+        if (*word & bit_mask) != 0 {
+            false
+        } else {
+            *word |= bit_mask;
+            true
+        }
+    }
+
+    /// Checks whether `node` is marked in the bitset.
+    #[inline]
+    pub fn contains(&self, node: NodeId) -> bool {
+        let idx = node.as_u32() as usize;
+        let word_idx = idx / 64;
+        if word_idx >= self.words.len() {
+            return false;
+        }
+        let bit_mask = 1u64 << (idx % 64);
+        (self.words[word_idx] & bit_mask) != 0
+    }
+}
+
 /// Executes a multi-hop Breadth-First Search (BFS) on an immutable `CsrGraph`.
 pub fn bfs_csr(csr: &CsrGraph, seeds: &[NodeId], config: &TraversalConfig) -> Vec<TraversedNode> {
     if seeds.is_empty() || config.max_nodes == 0 {
         return Vec::new();
     }
 
-    let mut visited: HashSet<NodeId> = HashSet::with_capacity(seeds.len() * 4);
+    let mut visited = DenseNodeBitSet::with_capacity(csr.node_count().max(seeds.len() * 8));
     let mut results: Vec<TraversedNode> = Vec::with_capacity(seeds.len() * 8);
     let mut queue: VecDeque<(NodeId, usize, Option<EdgeRecord>, f32)> =
         VecDeque::with_capacity(seeds.len() * 4);
 
     // Enqueue seed nodes at depth 0
     for &seed in seeds {
-        if visited.insert(seed) {
+        if visited.test_and_set(seed) {
             queue.push_back((seed, 0, None, 1.0));
             results.push(TraversedNode {
                 node_id: seed,
@@ -101,7 +150,7 @@ pub fn bfs_csr(csr: &CsrGraph, seeds: &[NodeId], config: &TraversalConfig) -> Ve
             }
 
             let neighbor = edge.target;
-            if visited.insert(neighbor) {
+            if visited.test_and_set(neighbor) {
                 let next_weight = current_weight * edge.weight;
                 let traversed = TraversedNode {
                     node_id: neighbor,
@@ -135,13 +184,13 @@ pub fn bfs_adjacency(
         return Vec::new();
     }
 
-    let mut visited: HashSet<NodeId> = HashSet::with_capacity(seeds.len() * 4);
+    let mut visited = DenseNodeBitSet::with_capacity(adj.node_count().max(seeds.len() * 8));
     let mut results: Vec<TraversedNode> = Vec::with_capacity(seeds.len() * 8);
     let mut queue: VecDeque<(NodeId, usize, Option<EdgeRecord>, f32)> =
         VecDeque::with_capacity(seeds.len() * 4);
 
     for &seed in seeds {
-        if visited.insert(seed) {
+        if visited.test_and_set(seed) {
             queue.push_back((seed, 0, None, 1.0));
             results.push(TraversedNode {
                 node_id: seed,
@@ -184,7 +233,7 @@ pub fn bfs_adjacency(
                     edge.source
                 };
 
-                if visited.insert(neighbor) {
+                if visited.test_and_set(neighbor) {
                     let next_weight = current_weight * edge.weight;
                     let traversed = TraversedNode {
                         node_id: neighbor,

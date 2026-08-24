@@ -34,7 +34,6 @@ pub fn simd_dot_product(a: &[f32], b: &[f32]) -> Result<f32> {
 
     let mut total = (sum0 + sum1) + (sum2 + sum3);
 
-    // Process remainder elements for vectors whose dimension is not a multiple of 8
     for (x, y) in remainder_a.iter().zip(remainder_b.iter()) {
         total += x * y;
     }

@@ -200,17 +200,40 @@ pub fn prune_subgraph_by_budget(
     }
 }
 
-/// Calculates lexical Jaccard similarity between two text descriptions to measure redundancy.
+/// Calculates lexical Jaccard similarity between two text descriptions to measure redundancy without allocations.
 fn text_jaccard_similarity(a: &str, b: &str) -> f32 {
     if a.is_empty() || b.is_empty() {
         return 0.0;
     }
-    let set_a: HashSet<&str> = a.split_whitespace().collect();
-    let set_b: HashSet<&str> = b.split_whitespace().collect();
+    if a == b {
+        return 1.0;
+    }
 
-    let intersection = set_a.intersection(&set_b).count();
-    let union = set_a.union(&set_b).count();
+    let mut words_a: smallvec::SmallVec<[&str; 32]> = a.split_whitespace().collect();
+    let mut words_b: smallvec::SmallVec<[&str; 32]> = b.split_whitespace().collect();
 
+    words_a.sort_unstable();
+    words_a.dedup();
+    words_b.sort_unstable();
+    words_b.dedup();
+
+    let mut intersection = 0usize;
+    let mut i = 0usize;
+    let mut j = 0usize;
+
+    while i < words_a.len() && j < words_b.len() {
+        match words_a[i].cmp(words_b[j]) {
+            std::cmp::Ordering::Equal => {
+                intersection += 1;
+                i += 1;
+                j += 1;
+            }
+            std::cmp::Ordering::Less => i += 1,
+            std::cmp::Ordering::Greater => j += 1,
+        }
+    }
+
+    let union = words_a.len() + words_b.len() - intersection;
     if union == 0 {
         0.0
     } else {
@@ -237,48 +260,56 @@ pub fn prune_subgraph_by_budget_mmr(
 
     let lambda = mmr_lambda.clamp(0.0, 1.0);
 
-    // Reorder candidate entities using MMR diversity selection
-    let mut remaining: Vec<ScoredEntity> = subgraph.entities.clone();
-    let mut mmr_ordered: Vec<ScoredEntity> = Vec::with_capacity(remaining.len());
+    // Fast path: if lambda is 1.0 (pure relevance) or single entity, bypass MMR overhead
+    if (lambda - 1.0).abs() < 1e-4 || subgraph.entities.len() <= 1 {
+        return prune_subgraph_by_budget(subgraph, interner, max_tokens, counter);
+    }
 
-    let get_desc = |entity: &ScoredEntity| -> String {
-        if let Some(rec) = entity.node_record {
-            interner
-                .resolve(rec.description_id)
-                .unwrap_or("")
-                .to_string()
-        } else {
-            "".to_string()
-        }
-    };
+    // Pre-resolve all string descriptions once to avoid repeated interner lookups and string clones
+    let descriptions: Vec<&str> = subgraph
+        .entities
+        .iter()
+        .map(|e| {
+            if let Some(rec) = e.node_record {
+                interner.resolve(rec.description_id).unwrap_or("")
+            } else {
+                ""
+            }
+        })
+        .collect();
 
-    while !remaining.is_empty() {
-        let mut best_idx = 0;
+    let n = subgraph.entities.len();
+    let mut remaining_indices: smallvec::SmallVec<[usize; 64]> = (0..n).collect();
+    let mut mmr_ordered: Vec<ScoredEntity> = Vec::with_capacity(n);
+    let mut selected_indices: smallvec::SmallVec<[usize; 64]> = smallvec::SmallVec::with_capacity(n);
+
+    while !remaining_indices.is_empty() {
+        let mut best_rem_pos = 0;
         let mut best_mmr_score = f32::NEG_INFINITY;
 
-        for (idx, candidate) in remaining.iter().enumerate() {
-            let relevance = candidate.final_score;
-            let cand_desc = get_desc(candidate);
+        for (rem_pos, &cand_idx) in remaining_indices.iter().enumerate() {
+            let relevance = subgraph.entities[cand_idx].final_score;
+            let cand_desc = descriptions[cand_idx];
 
-            // Compute maximum similarity to already selected entities
-            let max_sim = if mmr_ordered.is_empty() {
+            let max_sim = if selected_indices.is_empty() {
                 0.0
             } else {
-                mmr_ordered
+                selected_indices
                     .iter()
-                    .map(|sel| text_jaccard_similarity(&cand_desc, &get_desc(sel)))
+                    .map(|&sel_idx| text_jaccard_similarity(cand_desc, descriptions[sel_idx]))
                     .fold(0.0f32, f32::max)
             };
 
             let mmr_score = (lambda * relevance) - ((1.0 - lambda) * max_sim);
             if mmr_score > best_mmr_score {
                 best_mmr_score = mmr_score;
-                best_idx = idx;
+                best_rem_pos = rem_pos;
             }
         }
 
-        let selected = remaining.remove(best_idx);
-        mmr_ordered.push(selected);
+        let chosen_idx = remaining_indices.swap_remove(best_rem_pos);
+        selected_indices.push(chosen_idx);
+        mmr_ordered.push(subgraph.entities[chosen_idx].clone());
     }
 
     let mmr_subgraph = ConnectedSubgraph {

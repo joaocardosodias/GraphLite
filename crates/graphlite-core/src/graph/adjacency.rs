@@ -1,4 +1,5 @@
 use std::collections::HashMap;
+use smallvec::SmallVec;
 
 use crate::error::{GraphLiteError, Result};
 use crate::graph::csr::CsrGraph;
@@ -15,9 +16,9 @@ pub struct AdjacencyGraph {
     /// Mapping of `EdgeId` to its full `EdgeRecord`.
     edges: HashMap<EdgeId, EdgeRecord>,
     /// Outgoing adjacency list: `source_node -> [edge_id_1, edge_id_2, ...]`.
-    out_edges: HashMap<NodeId, Vec<EdgeId>>,
+    out_edges: HashMap<NodeId, SmallVec<[EdgeId; 4]>>,
     /// Incoming adjacency list: `target_node -> [edge_id_1, edge_id_2, ...]`.
-    in_edges: HashMap<NodeId, Vec<EdgeId>>,
+    in_edges: HashMap<NodeId, SmallVec<[EdgeId; 4]>>,
 }
 
 impl AdjacencyGraph {
@@ -186,7 +187,7 @@ impl AdjacencyGraph {
             for edge_id in out_e {
                 if let Some(edge) = self.edges.remove(&edge_id) {
                     if let Some(in_list) = self.in_edges.get_mut(&edge.target) {
-                        in_list.retain(|&e| e != edge_id);
+                        in_list.retain(|e| *e != edge_id);
                     }
                 }
             }
@@ -197,7 +198,7 @@ impl AdjacencyGraph {
             for edge_id in in_e {
                 if let Some(edge) = self.edges.remove(&edge_id) {
                     if let Some(out_list) = self.out_edges.get_mut(&edge.source) {
-                        out_list.retain(|&e| e != edge_id);
+                        out_list.retain(|e| *e != edge_id);
                     }
                 }
             }
@@ -211,10 +212,10 @@ impl AdjacencyGraph {
         let edge = self.edges.remove(&edge_id)?;
 
         if let Some(out_list) = self.out_edges.get_mut(&edge.source) {
-            out_list.retain(|&e| e != edge_id);
+            out_list.retain(|e| *e != edge_id);
         }
         if let Some(in_list) = self.in_edges.get_mut(&edge.target) {
-            in_list.retain(|&e| e != edge_id);
+            in_list.retain(|e| *e != edge_id);
         }
 
         Some(edge)

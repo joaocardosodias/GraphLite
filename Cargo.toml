@@ -31,6 +31,7 @@ memmap2 = "0.9"
 # Concurrency & Performance
 parking_lot = "0.12"
 rayon = "1.10"
+smallvec = { version = "1.14", features = ["serde"] }
 
 # Tokenization
 tiktoken-rs = "0.6"
