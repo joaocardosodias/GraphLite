@@ -1,0 +1,3 @@
+# Exclude docs directory from GitHub language statistics (keeps repository 100% Rust)
+docs/** linguist-documentation
+docs/**/* linguist-documentation

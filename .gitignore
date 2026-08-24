@@ -26,3 +26,10 @@ examples/documents/
 examples/graphite.graphite
 example/documents/
 example/
+
+# Docs / Next.js
+docs/node_modules/
+docs/.next/
+docs/out/
+docs/.source/
+docs/.turbo/
