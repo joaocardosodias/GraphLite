@@ -70,7 +70,7 @@ impl DenseNodeBitSet {
     /// Creates a new `DenseNodeBitSet` pre-allocated for expected capacity.
     #[inline]
     pub fn with_capacity(capacity: usize) -> Self {
-        let num_words = (capacity + 63) / 64;
+        let num_words = (capacity + 63).div_ceil(64);
         Self {
             words: vec![0u64; num_words.max(16)],
         }
