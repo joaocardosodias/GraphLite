@@ -5,6 +5,7 @@
     "quickstart",
     "cli",
     "rust-sdk",
+    "agents-and-mcp",
     "engine-internals"
   ]
 }

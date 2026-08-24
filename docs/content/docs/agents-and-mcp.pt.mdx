@@ -1,0 +1,170 @@
+---
+title: Agentes de IA & Model Context Protocol (MCP)
+description: Conecte os Grafos de Conhecimento do Graphite diretamente ao Claude Desktop, Cursor e agentes de IA autônomos via Model Context Protocol (MCP).
+---
+
+import { Step, Steps } from 'fumadocs-ui/components/steps';
+import { Tab, Tabs } from 'fumadocs-ui/components/tabs';
+
+Agentes autônomos de IA e assistentes de programação LLM exigem memória persistente de longo prazo para reter contexto arquitetural, preferências de usuário e restrições técnicas entre diferentes sessões de trabalho.
+
+O Graphite disponibiliza um servidor nativo **Model Context Protocol (MCP)** (`graphite-mcp`) comunicando-se via JSON-RPC 2.0 stdio, permitindo que modelos frontier (Claude, GPT-4, Cursor) recuperem subgrafos fundamentados, registrem memórias e vinculem entidades em tempo real.
+
+---
+
+## 1. Ferramentas MCP Nativas
+
+O servidor `graphite-mcp` expõe três ferramentas principais diretamente para os modelos de IA:
+
+| Nome da Ferramenta MCP | Finalidade | Argumentos Principais |
+| :--- | :--- | :--- |
+| `graphite_retrieve` | Recuperação de contexto para prompts e perguntas | `query` *(string)*, `max_tokens` *(int)*, `top_k` *(int)* |
+| `graphite_remember` | Registro de entidades, regras e preferências em tempo real | `name` *(string)*, `type` *(string)*, `description` *(string)* |
+| `graphite_connect` | Criação de arestas relacionais entre entidades | `source` *(string)*, `target` *(string)*, `relation` *(string)*, `weight` *(float)* |
+
+---
+
+## 2. Integração com Desktop & IDEs
+
+<Tabs items={['Claude Desktop', 'Cursor IDE', 'Windsurf / CLI Customizada']}>
+<Tab value="Claude Desktop">
+
+Adicione o Graphite ao seu arquivo `claude_desktop_config.json`:
+
+* **macOS:** `~/Library/Application Support/Claude/claude_desktop_config.json`
+* **Linux:** `~/.config/Claude/claude_desktop_config.json`
+* **Windows:** `%APPDATA%\Claude\claude_desktop_config.json`
+
+```json
+{
+  "mcpServers": {
+    "graphite": {
+      "command": "graphite-mcp",
+      "args": ["-d", "/caminho/absoluto/para/knowledge.graphite"]
+    }
+  }
+}
+```
+
+</Tab>
+<Tab value="Cursor IDE">
+
+Adicione ao arquivo `.cursor/mcp.json` na raiz do seu projeto ou nas configurações globais do Cursor:
+
+```json
+{
+  "mcpServers": {
+    "graphite": {
+      "command": "graphite-mcp",
+      "args": ["-d", "knowledge.graphite"]
+    }
+  }
+}
+```
+
+</Tab>
+<Tab value="Windsurf / CLI Customizada">
+
+```json
+{
+  "mcpServers": {
+    "graphite": {
+      "command": "graphite-mcp",
+      "args": ["-d", "knowledge.graphite", "-D", "384"]
+    }
+  }
+}
+```
+
+</Tab>
+</Tabs>
+
+---
+
+## 3. Referência das Ferramentas
+
+### `graphite_retrieve`
+
+Executa a busca semântica híbrida sobre vetores, BM25 e topologia CSR do grafo, retornando o contexto formatado em Markdown dentro do limite de tokens especificado.
+
+```json
+// Exemplo de Chamada de Ferramenta pelo LLM
+{
+  "name": "graphite_retrieve",
+  "arguments": {
+    "query": "Quais são as regras para escrita atômica no banco?",
+    "max_tokens": 400,
+    "top_k": 3
+  }
+}
+```
+
+**Contexto Retornado:**
+```markdown
+# Retrieved Knowledge Context:
+- [GarantiasEscritaAtomica] (Tipo: RegraArquitetural, Relevância: 0.94)
+  Descrição: Todas as mutações compilam em memória e gravam em arquivo temporário antes do fsync e rename atômico.
+- [CsrGraph] (Tipo: Struct, Relevância: 0.88)
+  Descrição: Topologia de grafo imutável em Compressed Sparse Row com zero-copy mmap.
+
+# Structural Relationships:
+- GarantiasEscritaAtomica --[PROTEGE]--> CsrGraph
+```
+
+---
+
+### `graphite_remember`
+
+Armazena decisões arquiteturais, preferências do usuário ou regras de projeto com desduplicação semântica em tempo real.
+
+```json
+// Exemplo de Chamada de Ferramenta pelo LLM
+{
+  "name": "graphite_remember",
+  "arguments": {
+    "name": "TemaEstritamenteMonocromatico",
+    "type": "RegraDesign",
+    "description": "O usuário exige estilo estritamente preto e branco puro em todas as páginas da documentação."
+  }
+}
+```
+
+---
+
+### `graphite_connect`
+
+Conecta duas entidades existentes com uma aresta relacional direcionada e ponderada.
+
+```json
+// Exemplo de Chamada de Ferramenta pelo LLM
+{
+  "name": "graphite_connect",
+  "arguments": {
+    "source": "TemaEstritamenteMonocromatico",
+    "target": "DocumentacaoFrontend",
+    "relation": "DEVE_APLICAR_A",
+    "weight": 0.98
+  }
+}
+```
+
+---
+
+## 4. Ciclo de Memória de Agentes Autônomos
+
+<Steps>
+<Step>
+### 1. Recuperação de Contexto Pré-Ação
+Antes de responder a perguntas complexas ou modificar arquivos da base de código, o agente de IA invoca `graphite_retrieve` para fundamentar suas ações nas convenções vigentes do projeto.
+</Step>
+
+<Step>
+### 2. Execução da Tarefa
+O agente realiza as alterações (refatoração de código, síntese de respostas, modelagem de dados) em total conformidade com as restrições recuperadas.
+</Step>
+
+<Step>
+### 3. Inscrição Automática na Memória de Longo Prazo
+Ao estabelecer uma nova preferência de usuário ou decisão arquitetural, o agente executa `graphite_remember` e `graphite_connect`, garantindo que sessões futuras mantenham a continuidade da memória.
+</Step>
+</Steps>
