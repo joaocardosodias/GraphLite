@@ -51,6 +51,16 @@ impl Bm25Index {
     pub fn tokenize(text: &str) -> Vec<String> {
         let mut tokens = Vec::new();
 
+        // 0. Extract normalized digit sequences (e.g. Art. 1.228 -> 1228, Lei 10.406 -> 10406)
+        for word in text.split_whitespace() {
+            let digits_only: String = word.chars().filter(|c| c.is_ascii_digit()).collect();
+            if digits_only.len() >= 3 && digits_only.len() <= 6 {
+                if !tokens.contains(&digits_only) {
+                    tokens.push(digits_only);
+                }
+            }
+        }
+
         // 1. Initial split on whitespace and punctuation (preserving underscore for compound identifiers)
         let raw_parts = text.split(|c: char| !c.is_alphanumeric() && c != '_');
 

@@ -91,10 +91,6 @@ pub struct InitArgs {
     /// Overwrite existing database file if it already exists.
     #[arg(short = 'f', long, help = "Overwrite existing database file")]
     pub force: bool,
-
-    /// Skip creating or updating AI agent rules files (AGENTS.md, CLAUDE.md, GEMINI.md).
-    #[arg(long, help = "Skip generating AI assistant rules files")]
-    pub no_rules: bool,
 }
 
 #[derive(Args, Debug)]

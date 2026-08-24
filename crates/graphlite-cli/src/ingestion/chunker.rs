@@ -304,40 +304,40 @@ fn split_into_semantic_paragraphs(text: &str, config: &ChunkConfig) -> Vec<Strin
     }
 
     let mut raw_blocks = Vec::new();
-    for p in text.split("\n\n") {
-        let trimmed = p.trim();
+    let mut current_block = String::new();
+
+    for line in text.lines() {
+        let trimmed = line.trim();
         if trimmed.is_empty() {
+            if !current_block.trim().is_empty() {
+                raw_blocks.push(current_block.trim().to_string());
+                current_block = String::new();
+            }
             continue;
         }
 
-        // Split on distinct legal article or chapter boundaries within a section
-        let lines: Vec<&str> = trimmed.lines().collect();
-        let mut current_sub_block = String::new();
+        let is_article_start = trimmed.starts_with("Art.")
+            || trimmed.starts_with("Artigo ")
+            || trimmed.starts_with("Article ")
+            || trimmed.starts_with("Section ")
+            || trimmed.starts_with("CAPÍTULO")
+            || trimmed.starts_with("TÍTULO")
+            || trimmed.starts_with("LIVRO")
+            || trimmed.starts_with("CHAPTER ");
 
-        for line in lines {
-            let l_trim = line.trim();
-            let is_article_start = l_trim.starts_with("Art.")
-                || l_trim.starts_with("Artigo ")
-                || l_trim.starts_with("Article ")
-                || l_trim.starts_with("Section ")
-                || l_trim.starts_with("CAPÍTULO")
-                || l_trim.starts_with("TÍTULO")
-                || l_trim.starts_with("CHAPTER ");
-
-            if is_article_start && !current_sub_block.is_empty() {
-                raw_blocks.push(current_sub_block.trim().to_string());
-                current_sub_block = String::new();
-            }
-
-            if !current_sub_block.is_empty() {
-                current_sub_block.push('\n');
-            }
-            current_sub_block.push_str(line);
+        if is_article_start && !current_block.trim().is_empty() {
+            raw_blocks.push(current_block.trim().to_string());
+            current_block = String::new();
         }
 
-        if !current_sub_block.trim().is_empty() {
-            raw_blocks.push(current_sub_block.trim().to_string());
+        if !current_block.is_empty() {
+            current_block.push('\n');
         }
+        current_block.push_str(trimmed);
+    }
+
+    if !current_block.trim().is_empty() {
+        raw_blocks.push(current_block.trim().to_string());
     }
 
     let mut chunks = Vec::new();
