@@ -3,6 +3,8 @@ title: Formato Binário & Zero-Copy Mmap
 description: Especificação de baixo nível em bytes, alinhamento de memória, serialização CSR e arquitetura de mapeamento em memória do formato de arquivo .graphite.
 ---
 
+import { Step, Steps } from 'fumadocs-ui/components/steps';
+
 O formato de arquivo `.graphite` é um banco de dados binário contíguo de arquivo único projetado para leituras zero-copy de altíssimo rendimento via mapeamento de memória (`mmap`). Todos os registros de grafo, embeddings vetoriais, topologias de adjacência e tabelas de strings são organizados sequencialmente com alinhamento estrito de 64 bits e 32 bytes para prevenir penalidades de acesso à memória desalinhada em processadores x86_64 e ARM64.
 
 ---
@@ -208,26 +210,24 @@ impl MmapGraphReader {
 
 Para garantir a consistência do banco contra falhas de energia ou travamentos durante a gravação:
 
-```text
-Estado do Grafo em Memória
-       │
-       ▼
-Cálculo de CRC32 & Offsets das Seções
-       │
-       ▼
-Gravação em Arquivo Temporário (.tmp.uuid)
-       │
-       ▼
-Sincronização de Disco (fsync / flush)
-       │
-       ▼
-Substituição Atômica no SO (syscall rename)
-       │
-       ▼
-Arquivo .graphite Consistente e Íntegro
-```
+<Steps>
+<Step>
+### 1. Compilação em Memória
+Todas as mutações são compiladas em buffers contíguos na memória, calculando offsets exatos e somas de verificação CRC32 polinomiais.
+</Step>
 
-1. Todas as mutações são compiladas em buffers contíguos na memória.
-2. O conteúdo completo é gravado em um arquivo temporário irmão (`<target>.tmp.<uuid>`).
-3. Uma chamada explícita `fsync` descarrega as páginas do kernel para a mídia física.
-4. O arquivo temporário substitui o destino por meio de uma syscall atômica (`rename(2)` em Linux/POSIX, `MoveFileEx` no Windows).
+<Step>
+### 2. Gravação em Arquivo Temporário Irmão
+O conteúdo binário completo é gravado sequencialmente em um arquivo temporário (`<target>.tmp.<uuid>`).
+</Step>
+
+<Step>
+### 3. Sincronização de Páginas do Kernel (`fsync`)
+Uma chamada explícita de sistema `fsync` força o despejo das páginas sujas do cache do kernel para o armazenamento não-volátil.
+</Step>
+
+<Step>
+### 4. Substituição Atômica no Sistema de Arquivos
+O arquivo temporário substitui o arquivo de destino atomicamente através da syscall do sistema operacional (`rename(2)` em Linux/POSIX, `MoveFileEx` no Windows).
+</Step>
+</Steps>

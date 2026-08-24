@@ -3,6 +3,8 @@ title: Binary Format & Zero-Copy Mmap
 description: Low-level byte specification, memory alignment, CSR serialization, and zero-copy memory mapping architecture of the .graphite file format.
 ---
 
+import { Step, Steps } from 'fumadocs-ui/components/steps';
+
 The `.graphite` file format is a contiguous, single-file binary database designed for high-throughput zero-copy reads via memory mapping (`mmap`). All graph records, vector embeddings, adjacency topologies, and string tables are laid out sequentially with strict 64-bit and 32-byte alignment to prevent unaligned memory access penalties on x86_64 and ARM64 processors.
 
 ---
@@ -214,26 +216,24 @@ impl MmapGraphReader {
 
 To ensure crash consistency and prevent database corruption during writes:
 
-```text
-In-Memory Graph State
-       │
-       ▼
-Compute CRC32 & Section Offsets
-       │
-       ▼
-Write Payload to Temporary File (.tmp.uuid)
-       │
-       ▼
-Kernel Sync (fsync / flush)
-       │
-       ▼
-Atomic OS Rename (rename syscall)
-       │
-       ▼
-Consistent .graphite Database File
-```
+<Steps>
+<Step>
+### 1. In-Memory Compilation
+All mutations compile in-memory into contiguous buffers, computing section offsets and polynomial CRC32 checksums.
+</Step>
 
-1. All mutations compile in-memory into contiguous buffers.
-2. The entire payload is written to a temporary sibling file (`<target>.tmp.<uuid>`).
-3. An explicit `fsync` commits dirty kernel pages to non-volatile storage.
-4. The temporary file replaces the target via an atomic kernel syscall (`rename(2)` on Linux/POSIX, `MoveFileEx` on Windows).
+<Step>
+### 2. Sibling Temporary File Write
+The entire payload is written sequentially to a temporary sibling file (`<target>.tmp.<uuid>`).
+</Step>
+
+<Step>
+### 3. Kernel Page Sync (`fsync`)
+An explicit `fsync` syscall commits dirty kernel pages to non-volatile storage.
+</Step>
+
+<Step>
+### 4. Atomic System Rename
+The temporary file replaces the destination atomically via the kernel filesystem syscall (`rename(2)` on Linux/POSIX, `MoveFileEx` on Windows).
+</Step>
+</Steps>

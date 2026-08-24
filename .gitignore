@@ -34,3 +34,5 @@ docs/out/
 docs/.source/
 docs/.turbo/
 .agents/skills/
+.claude/skills/
+skills-lock.json
