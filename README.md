@@ -1,11 +1,11 @@
-# GraphLite
+# Graphite
 
 [![License: MIT OR Apache-2.0](https://img.shields.io/badge/License-MIT%20OR%20Apache--2.0-blue.svg)](LICENSE)
 [![Rust](https://img.shields.io/badge/Rust-1.80%2B-orange.svg?logo=rust)](https://www.rust-lang.org)
 [![Build Status](https://img.shields.io/badge/build-passing-brightgreen.svg)]()
 [![Tests](https://img.shields.io/badge/tests-99%20passed-success.svg)]()
 
-> **GraphLite** is an embedded, single-file Graph + Vector database engine written in pure Rust. 
+> **Graphite** is an embedded, single-file Graph + Vector database engine written in pure Rust. 
 > Designed as the **"SQLite of GraphRAG"** for autonomous AI agents, chatbots, and local-first document knowledge bases.
 
 ---
@@ -13,8 +13,8 @@
 ## ⚡ Key Highlights
 
 - **Single-File Embedded Database (`.graph`):** Fully self-contained single file with crash-resilient atomic writes, CRC32 checksums, and zero external daemon or database dependencies.
-- **Universal Document Ingestion (`graphlite ingest`):** Ingests Markdown, PDF, Plain Text, JSON, YAML, and CSV with structure-aware semantic chunking and automated cross-document relational linking.
-- **Agent Long-Term Memory (`graphlite remember`):** Real-time recording of facts, preferences, business rules, and tasks with automatic local embeddings.
+- **Universal Document Ingestion (`graphite ingest`):** Ingests Markdown, PDF, Plain Text, JSON, YAML, and CSV with structure-aware semantic chunking and automated cross-document relational linking.
+- **Agent Long-Term Memory (`graphite remember`):** Real-time recording of facts, preferences, business rules, and tasks with automatic local embeddings.
 - **Hybrid Retrieval (Vector + BM25 + Graph):** Fuses SIMD vector similarity with BM25 lexical ranking via Reciprocal Rank Fusion (RRF) and multi-hop BFS graph traversal.
 - **MMR Semantic Deduplication & Diversity:** Built-in Maximal Marginal Relevance (MMR) and Jaccard token overlap pruning to suppress redundant text chunks and maximize information density.
 - **Token-Budgeted Retrieval:** Built-in semantic prompt pruner (Tiktoken `cl100k_base` / `o200k_base` + heuristic) enforcing strict LLM context token limits.
@@ -78,29 +78,29 @@
 ### 1. Installation
 
 ```bash
-cargo install --path crates/graphlite-cli
+cargo install --path crates/graphite-cli
 ```
 
 ### 2. Ingest Documents into Knowledge Graph
 
 ```bash
 # Ingest an entire folder of documentation, manuals, or policies
-graphlite -d knowledge.graph ingest ./docs/
+graphite -d knowledge.graph ingest ./docs/
 
 # Custom chunk size and overlap
-graphlite -d knowledge.graph ingest ./docs/ --chunk-size 400 --chunk-overlap 50
+graphite -d knowledge.graph ingest ./docs/ --chunk-size 400 --chunk-overlap 50
 ```
 
 ### 3. Record Agent Memories & Preferences
 
 ```bash
 # Store user preference
-graphlite -d knowledge.graph remember \
+graphite -d knowledge.graph remember \
   "User prefers concise answers in Portuguese and is an Enterprise customer" \
   --category "UserPreference"
 
 # Store business fact or rule
-graphlite -d knowledge.graph remember \
+graphite -d knowledge.graph remember \
   "Refund requests are fully refundable within 7 days of subscription" \
   --category "BusinessRule"
 ```
@@ -109,17 +109,17 @@ graphlite -d knowledge.graph remember \
 
 ```bash
 # General query
-graphlite -d knowledge.graph query -T "qual o prazo para reembolso?"
+graphite -d knowledge.graph query -T "qual o prazo para reembolso?"
 
 # Query filtered by entity type
-graphlite -d knowledge.graph query -T "preferências do usuário" --type UserPreference
+graphite -d knowledge.graph query -T "preferências do usuário" --type UserPreference
 ```
 
 ### 5. Launch REST API Server (Python / TypeScript / Web Clients)
 
 ```bash
 # Start embedded HTTP server on port 8000
-graphlite -d knowledge.graph serve --port 8000
+graphite -d knowledge.graph serve --port 8000
 ```
 
 ```bash
@@ -133,25 +133,25 @@ curl -s -X POST http://127.0.0.1:8000/v1/query \
 
 ## 🦀 Rust API Example
 
-Add GraphLite to your `Cargo.toml`:
+Add Graphite to your `Cargo.toml`:
 
 ```toml
 [dependencies]
-graphlite-core = { git = "https://github.com/joaocardosodias/GraphLite" }
+graphite-core = { git = "https://github.com/joaocardosodias/Graphite" }
 ```
 
 ### Basic GraphRAG Retrieval
 
 ```rust
-use graphlite_core::engine::{GraphLiteConfig, GraphLiteEngine, QueryOptions};
+use graphite_core::engine::{GraphiteConfig, GraphiteEngine, QueryOptions};
 
 fn main() -> anyhow::Result<()> {
     // 1. Initialize or open an existing database
-    let config = GraphLiteConfig::new()
+    let config = GraphiteConfig::new()
         .with_dim(384)
         .with_max_tokens(500);
 
-    let db = GraphLiteEngine::open_or_create("knowledge.graph", config)?;
+    let db = GraphiteEngine::open_or_create("knowledge.graph", config)?;
 
     // 2. Ingest knowledge nodes with vectors
     let embedding_policy = vec![0.1f32; 384];
@@ -193,12 +193,12 @@ fn main() -> anyhow::Result<()> {
 
 ## 🤖 Model Context Protocol (MCP) Server
 
-GraphLite includes a native stdio MCP server (`graphlite-mcp`) allowing AI assistants (Claude Desktop, Cursor, Antigravity) to retrieve and store knowledge autonomously.
+Graphite includes a native stdio MCP server (`graphite-mcp`) allowing AI assistants (Claude Desktop, Cursor, Antigravity) to retrieve and store knowledge autonomously.
 
 ### Install MCP Server:
 
 ```bash
-cargo install --path crates/graphlite-mcp
+cargo install --path crates/graphite-mcp
 ```
 
 ### Configuration (`~/.claude.json` or `~/.gemini/antigravity-cli/mcp/`):
@@ -206,8 +206,8 @@ cargo install --path crates/graphlite-mcp
 ```json
 {
   "mcpServers": {
-    "graphlite": {
-      "command": "graphlite-mcp",
+    "graphite": {
+      "command": "graphite-mcp",
       "args": [
         "--db",
         "/path/to/your/knowledge.graph"
@@ -219,9 +219,9 @@ cargo install --path crates/graphlite-mcp
 
 ### Available MCP Tools:
 
-- `graphlite_retrieve(query: string, max_tokens?: number, entity_type?: string)`: Retrieves structured context from the knowledge graph.
-- `graphlite_remember(name: string, type: string, description: string)`: Stores a fact or note with automatic semantic deduplication.
-- `graphlite_connect(source: string, target: string, relation: string, weight?: number)`: Connects relational dependencies between entities.
+- `graphite_retrieve(query: string, max_tokens?: number, entity_type?: string)`: Retrieves structured context from the knowledge graph.
+- `graphite_remember(name: string, type: string, description: string)`: Stores a fact or note with automatic semantic deduplication.
+- `graphite_connect(source: string, target: string, relation: string, weight?: number)`: Connects relational dependencies between entities.
 
 ---
 
@@ -245,9 +245,9 @@ cargo bench
 
 ## 📦 Workspace Structure
 
-- [`crates/graphlite-core`](crates/graphlite-core/): Core embedded storage engine, SIMD vector store, CSR graph traversal, BM25, MMR, and prompt pruner.
-- [`crates/graphlite-cli`](crates/graphlite-cli/): Document ingestion engine (`ingest`), agent memory (`remember`), and CLI interface (`graphlite`).
-- [`crates/graphlite-mcp`](crates/graphlite-mcp/): Model Context Protocol server for AI assistants and chatbots.
+- [`crates/graphite-core`](crates/graphite-core/): Core embedded storage engine, SIMD vector store, CSR graph traversal, BM25, MMR, and prompt pruner.
+- [`crates/graphite-cli`](crates/graphite-cli/): Document ingestion engine (`ingest`), agent memory (`remember`), and CLI interface (`graphite`).
+- [`crates/graphite-mcp`](crates/graphite-mcp/): Model Context Protocol server for AI assistants and chatbots.
 
 ---
 

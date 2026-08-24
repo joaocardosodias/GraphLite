@@ -1028,12 +1028,12 @@ dependencies = [
 ]
 
 [[package]]
-name = "graphlite-cli"
+name = "graphite-cli"
 version = "0.1.0"
 dependencies = [
  "anyhow",
  "clap",
- "graphlite-core",
+ "graphite-core",
  "indicatif 0.17.11",
  "parking_lot",
  "serde",
@@ -1043,7 +1043,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "graphlite-core"
+name = "graphite-core"
 version = "0.1.0"
 dependencies = [
  "anyhow",
@@ -1061,12 +1061,12 @@ dependencies = [
 ]
 
 [[package]]
-name = "graphlite-mcp"
+name = "graphite-mcp"
 version = "0.1.0"
 dependencies = [
  "anyhow",
  "clap",
- "graphlite-core",
+ "graphite-core",
  "serde",
  "serde_json",
 ]

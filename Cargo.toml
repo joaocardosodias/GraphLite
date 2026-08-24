@@ -1,8 +1,8 @@
 [workspace]
 members = [
-    "crates/graphlite-core",
-    "crates/graphlite-cli",
-    "crates/graphlite-mcp",
+    "crates/graphite-core",
+    "crates/graphite-cli",
+    "crates/graphite-mcp",
 ]
 resolver = "2"
 
@@ -11,7 +11,7 @@ version = "0.1.0"
 edition = "2021"
 authors = ["João Cardoso <joaocardosodias>"]
 license = "MIT OR Apache-2.0"
-repository = "https://github.com/joaocardosodias/GraphLite"
+repository = "https://github.com/joaocardosodias/Graphite"
 description = "Embedded, single-file Graph + Vector / GraphRAG engine in pure Rust"
 readme = "README.md"
 keywords = ["graphrag", "vector-search", "knowledge-graph", "embedded-database", "llm"]
@@ -44,4 +44,4 @@ clap = { version = "4.5", features = ["derive", "cargo"] }
 indicatif = "0.17"
 
 # Internal workspace crates
-graphlite-core = { path = "crates/graphlite-core" }
+graphite-core = { path = "crates/graphite-core" }

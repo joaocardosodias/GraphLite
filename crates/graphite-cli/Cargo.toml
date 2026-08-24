@@ -1,0 +1,24 @@
+[package]
+name = "graphite-cli"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+repository.workspace = true
+description = "Command-line interface for Graphite embedded database"
+readme = "../../README.md"
+
+[[bin]]
+name = "graphite"
+path = "src/main.rs"
+
+[dependencies]
+graphite-core = { workspace = true }
+clap = { workspace = true }
+indicatif = { workspace = true }
+anyhow = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+serde_yaml = { workspace = true }
+parking_lot = { workspace = true }
+tiny_http = "0.12"

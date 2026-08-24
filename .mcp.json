@@ -1,10 +1,10 @@
 {
   "mcpServers": {
-    "graphlite": {
-      "command": "/home/cardoso/GitHub/GraphLite/target/release/graphlite-mcp",
+    "graphite": {
+      "command": "/home/cardoso/GitHub/Graphite/target/release/graphite-mcp",
       "args": [
         "--db",
-        "/home/cardoso/GitHub/GraphLite/demo_project/backend.graph"
+        "/home/cardoso/GitHub/Graphite/demo_project/backend.graph"
       ]
     }
   }
