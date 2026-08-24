@@ -3,18 +3,43 @@ title: Quickstart Guide
 description: Installation, database initialization, document ingestion, and hybrid query execution.
 ---
 
-import { Callout } from 'fumadocs-ui/components/callout';
 import { Step, Steps } from 'fumadocs-ui/components/steps';
+import { Tab, Tabs } from 'fumadocs-ui/components/tabs';
 
 <Steps>
 <Step>
 ### Binary Installation
 
-Compile and install the `graphite` CLI binary locally via Cargo:
+Install the pre-compiled `graphite` and `graphite-mcp` binaries:
+
+<Tabs items={['Linux / macOS (One-line)', 'Windows (PowerShell)', 'Cargo (Rust)', 'GitHub Releases']}>
+<Tab value="Linux / macOS (One-line)">
 
 ```bash
-cargo install --path crates/graphite-cli --force
+curl -fsSL https://raw.githubusercontent.com/joaocardosodias/Graphite/main/install.sh | bash
 ```
+
+</Tab>
+<Tab value="Windows (PowerShell)">
+
+```powershell
+irm https://raw.githubusercontent.com/joaocardosodias/Graphite/main/install.ps1 | iex
+```
+
+</Tab>
+<Tab value="Cargo (Rust)">
+
+```bash
+cargo install graphite-cli
+```
+
+</Tab>
+<Tab value="GitHub Releases">
+
+Download standalone archives for your OS and architecture from [GitHub Releases](https://github.com/joaocardosodias/Graphite/releases).
+
+</Tab>
+</Tabs>
 
 Confirm binary registration in your system path:
 

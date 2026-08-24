@@ -107,9 +107,9 @@ export default function HomePage() {
         {/* Medium Card (Span 1) */}
         <div className="p-6 rounded-xl border border-neutral-200 dark:border-neutral-800 bg-neutral-50/50 dark:bg-[#070707] hover:border-neutral-300 dark:hover:border-neutral-700 transition-colors">
           <ShieldCheck className="w-5 h-5 text-neutral-950 dark:text-white mb-3" />
-          <h3 className="text-sm font-semibold text-neutral-950 dark:text-white mb-1.5">Model Context Protocol</h3>
+          <h3 className="text-sm font-semibold text-neutral-950 dark:text-white mb-1.5">Embedded REST API & SDKs</h3>
           <p className="text-xs text-neutral-600 dark:text-neutral-400 leading-relaxed">
-            Native MCP server integration providing long-term memory tools for Claude Desktop, Cursor, and agentic LLM workflows.
+            Zero-dependency embedded HTTP server with CORS, sub-millisecond retrieval, and native integration for Rust, Python, and TypeScript.
           </p>
         </div>
 

@@ -1061,17 +1061,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "graphite-mcp"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "clap",
- "graphite-core",
- "serde",
- "serde_json",
-]
-
-[[package]]
 name = "h2"
 version = "0.4.18"
 source = "registry+https://github.com/rust-lang/crates.io-index"

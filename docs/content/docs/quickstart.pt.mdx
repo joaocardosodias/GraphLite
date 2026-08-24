@@ -3,18 +3,43 @@ title: Guia de Início Rápido
 description: Instalação, inicialização do banco de dados, ingestão de documentos e execução de consultas híbridas.
 ---
 
-import { Callout } from 'fumadocs-ui/components/callout';
 import { Step, Steps } from 'fumadocs-ui/components/steps';
+import { Tab, Tabs } from 'fumadocs-ui/components/tabs';
 
 <Steps>
 <Step>
 ### Instalação do Binário
 
-Compile e instale o binário do CLI `graphite` localmente através do Cargo:
+Instale os binários pré-compilados do `graphite` e `graphite-mcp`:
+
+<Tabs items={['Linux / macOS (Linha única)', 'Windows (PowerShell)', 'Cargo (Rust)', 'GitHub Releases']}>
+<Tab value="Linux / macOS (Linha única)">
 
 ```bash
-cargo install --path crates/graphite-cli --force
+curl -fsSL https://raw.githubusercontent.com/joaocardosodias/Graphite/main/install.sh | bash
 ```
+
+</Tab>
+<Tab value="Windows (PowerShell)">
+
+```powershell
+irm https://raw.githubusercontent.com/joaocardosodias/Graphite/main/install.ps1 | iex
+```
+
+</Tab>
+<Tab value="Cargo (Rust)">
+
+```bash
+cargo install graphite-cli
+```
+
+</Tab>
+<Tab value="GitHub Releases">
+
+Baixe os pacotes binários standalone para seu sistema operacional e arquitetura no [GitHub Releases](https://github.com/joaocardosodias/Graphite/releases).
+
+</Tab>
+</Tabs>
 
 Confirme o registro do binário no seu PATH:
 

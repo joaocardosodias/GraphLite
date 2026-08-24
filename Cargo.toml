@@ -2,7 +2,6 @@
 members = [
     "crates/graphite-core",
     "crates/graphite-cli",
-    "crates/graphite-mcp",
 ]
 resolver = "2"
 
@@ -44,4 +43,4 @@ clap = { version = "4.5", features = ["derive", "cargo"] }
 indicatif = "0.17"
 
 # Internal workspace crates
-graphite-core = { path = "crates/graphite-core" }
+graphite-core = { version = "0.1.0", path = "crates/graphite-core" }
