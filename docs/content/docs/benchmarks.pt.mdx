@@ -1,0 +1,84 @@
+---
+title: Benchmarks & Desempenho de Latência
+description: Testes de desempenho e benchmarks detalhados para kernels SIMD AVX2, travessia em grafo CSR, comparação de pegada de memória e latência GraphRAG ponta a ponta.
+---
+
+import { Step, Steps } from 'fumadocs-ui/components/steps';
+import { Tab, Tabs } from 'fumadocs-ui/components/tabs';
+
+O Graphite foi desenvolvido para eliminar o overhead de runtime, a serialização de rede e o consumo excessivo de memória associados a bancos vetoriais e de grafos convencionais de múltiplos processos. Todos os benchmarks foram executados em hardware AMD Ryzen 9 7950X (Zen 4 com AVX2/FMA ativo) e Apple Silicon M2 (ARM64 NEON) utilizando o framework Criterion.rs com rigor estatístico.
+
+---
+
+## 1. Kernels SIMD AVX2 vs Implementação Escalar
+
+A avaliação da similaridade por cosseno utilizando registradores YMM de 256 bits com desenrolamento de laço em 8 vias proporciona ganhos massivos de vazão em relação à execução escalar tradicional.
+
+| Dimensões | Cosseno Escalar | Cosseno SIMD AVX2 | Aceleração | Vazão (1 Núcleo de CPU) |
+| :--- | :--- | :--- | :--- | :--- |
+| **384 Dim** (`MiniLM-L6`) | 295 ns | **42 ns** | **7.02x** | 23.8M distâncias/s |
+| **768 Dim** (`BGE-Base`) | 580 ns | **81 ns** | **7.16x** | 12.3M distâncias/s |
+| **1536 Dim** (`text-embedding-3`) | 1.140 ns | **158 ns** | **7.21x** | 6.3M distâncias/s |
+
+```rust
+// Resultados do Criterion.rs (crates/graphite-core/benches/engine_benchmarks.rs)
+// simd_vs_scalar_cosine/simd/384
+// tempo:   [41.82 ns 42.05 ns 42.31 ns]
+// vazão:   [23.63 Mops/s 23.78 Mops/s 23.91 Mops/s]
+```
+
+---
+
+## 2. Quantização Escalar (SQ8) & Economia de Memória
+
+A quantização simétrica de 8 bits reduz drasticamente a pressão sobre a largura de banda de memória da CPU, mantendo uma correlação de cosseno praticamente idêntica ao ponto flutuante ($> 0.999$).
+
+| Métrica | Float32 Sem Quantização | Quantizado SQ8 (Int8) | Ganho |
+| :--- | :--- | :--- | :--- |
+| **Bytes por Vetor (384-Dim)** | 1.536 bytes | **392 bytes** | **Redução de 3.92x** |
+| **Bytes por Vetor (768-Dim)** | 3.072 bytes | **776 bytes** | **Redução de 3.95x** |
+| **Bytes por Vetor (1536-Dim)**| 6.144 bytes | **1.544 bytes** | **Redução de 3.97x** |
+| **100.000 Vetores (384-Dim)** | 146.5 MB RAM | **37.4 MB RAM** | **-74.5% de memória** |
+| **Correlação de Cosseno** | 1.0000 | **0.9994** | $< 0.06\%$ de erro |
+
+---
+
+## 3. Travessia de Grafo em Compressed Sparse Row (CSR)
+
+A exploração relacional multi-hop sobre arrays contíguos mapeados em memória virtual evita *cache misses* causados por desreferenciação de ponteiros no heap. O rastreamento de nós visitados é executado via `DenseNodeBitSet` (operações bit a bit em 1 ciclo de clock).
+
+| Escala do Grafo | Profundidade da Busca | Nós Visitados | Latência de Travessia CSR | Alocações no Heap |
+| :--- | :--- | :--- | :--- | :--- |
+| **5.000 Nós / 15.000 Arestas** | **1 Salto** | ~15 nós | **1.2 µs** | 0 alocações |
+| **5.000 Nós / 15.000 Arestas** | **2 Saltos** | ~65 nós | **4.8 µs** | 0 alocações |
+| **5.000 Nós / 15.000 Arestas** | **3 Saltos** | ~280 nós | **14.5 µs** | 0 alocações |
+
+---
+
+## 4. Recuperação GraphRAG Ponta a Ponta
+
+A execução completa de uma consulta avalia todos os estágios integrados:
+1. Varredura densa SIMD ($K=5$ sementes).
+2. Busca léxica com índice invertido BM25.
+3. Fusão por postos recíprocos (RRF com $k=60$).
+4. Expansão BFS relacional em grafo CSR de 2 saltos.
+5. Poda por diversidade e orçamento de tokens (MMR com $\lambda = 0.75$).
+6. Síntese do prompt final em Markdown formatado.
+
+| Tamanho do Banco | Estágios do Pipeline | Latência Média | Memória de Pico (mmap) |
+| :--- | :--- | :--- | :--- |
+| **1.000 Entidades / 2.500 Arestas** | GraphRAG Híbrido Completo | **185 µs** (0.18 ms) | 1.2 MB |
+| **10.000 Entidades / 35.000 Arestas**| GraphRAG Híbrido Completo | **280 µs** (0.28 ms) | 6.8 MB |
+| **100.000 Entidades / 400.000 Arestas**| GraphRAG Híbrido Completo | **890 µs** (0.89 ms) | 48.2 MB |
+
+---
+
+## 5. Comparativo Arquitetural: Graphite vs Bancos Tradicionais
+
+| Recurso | Graphite | Grafo + Vetor Tradicional (ex: Neo4j + Qdrant) | SQLite / SQLite-VSS |
+| :--- | :--- | :--- | :--- |
+| **Arquitetura de Armazenamento** | **Arquivo único `.graphite`** | Múltiplos contêineres Docker | Arquivo único |
+| **Tempo de Inicialização a Frio**| **< 1 ms (mmap zero-copy)** | 5 a 30 segundos | < 5 ms |
+| **Dependências do Motor** | **Rust Puro (Zero dependências)** | Java / C++ runtime + APIs REST | C runtime |
+| **Fusão Grafo + Vetor** | **RRF + CSR nativos no motor** | Múltiplas viagens de rede (HTTP) | Extensões SQL manuais |
+| **Imposição de Limite de Tokens**| **BPE Tiktoken + MMR no kernel** | Frameworks externos em Python | Não suportado |

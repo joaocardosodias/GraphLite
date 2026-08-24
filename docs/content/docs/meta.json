@@ -6,6 +6,7 @@
     "cli",
     "rust-sdk",
     "agents-and-mcp",
+    "benchmarks",
     "engine-internals"
   ]
 }
