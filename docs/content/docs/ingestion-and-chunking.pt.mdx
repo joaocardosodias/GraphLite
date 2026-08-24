@@ -1,0 +1,108 @@
+---
+title: Ingestão & Segmentação Semântica
+description: Análise hierárquica de documentos, segmentação consciente de títulos Markdown, síntese automática de relacionamentos e cache de hash de conteúdo.
+---
+
+import { Step, Steps } from 'fumadocs-ui/components/steps';
+import { Tab, Tabs } from 'fumadocs-ui/components/tabs';
+
+Pipelines de RAG convencionais costumam cortar documentos em blocos arbitrários de caracteres fixos, dividindo parágrafos no meio de frases e descartando o contexto dos títulos. O Graphite possui um **Segmentador Semântico Hierárquico** (*Hierarchical Semantic Chunker*) que analisa a estrutura do documento e conecta os trechos em um Grafo de Conhecimento relacional durante a ingestão.
+
+---
+
+## 1. Arquitetura da Segmentação Semântica Hierárquica
+
+Em vez de tratar o texto como uma lista plana de vetores isolados, o Graphite constrói um grafo relacional em múltiplos níveis:
+
+```text
+[Nó de Documento: codigo_civil.md]
+        │
+        ├─── [SECTION_OF] ───► [Nó de Seção: Livro III - Do Direito das Coisas]
+        │                             │
+        │                             └─── [PART_OF] ───► [Nó de Trecho: Art. 1.228]
+        │                                                        │
+        │                                                        └─── [NEXT_CHUNK] ───► [Nó de Trecho: Art. 1.229]
+        │
+        └─── [SECTION_OF] ───► [Nó de Seção: Livro IV - Do Direito de Família]
+```
+
+### Topologia do Grafo Gerado
+
+| Tipo de Nó | Papel no Grafo | Descrição |
+| :--- | :--- | :--- |
+| **`Document`** | Nó Raiz | Representa o arquivo fonte, caminho, metadados e hash de conteúdo |
+| **`Section`** | Hub Intermediário | Representa títulos principais (`#`, `##`, `###`), agrupando tópicos |
+| **`Chunk`** | Folha / Trecho | Bloco de texto delimitado (~350 tokens) contendo o embedding denso |
+| **`Entity`** | Nó Nomeado | Entidade de domínio extraída (ex: `Art. 861`, `Struct AuthService`) |
+
+---
+
+## 2. Analisadores Multiformato
+
+O Graphite inclui analisadores nativos para formatos comuns de documentação:
+
+| Formato | Extensão | Comportamento do Analisador |
+| :--- | :--- | :--- |
+| **Markdown** | `.md`, `.mdx` | Varredura AST por cabeçalhos; preserva blocos de código e tabelas íntegros |
+| **Documentos PDF**| `.pdf` | Extração de texto multi-página com normalização de quebras e cabeçalhos |
+| **Texto Puro** | `.txt` | Detecção de limites de parágrafo com janelas deslizantes |
+| **Dados JSON** | `.json` | Aplanamento chave-valor e mapeamento de propriedades em entidades |
+| **Tabelas CSV** | `.csv` | Criação de entidades mapeando linhas da tabela em nós do grafo |
+
+---
+
+## 3. Opções de Configuração do Segmentador
+
+```rust
+// Configuração do segmentador semântico
+pub struct ChunkConfig {
+    pub target_chars: usize,   // Tamanho alvo em caracteres (~1.200 caracteres / ~350 tokens)
+    pub overlap_chars: usize,  // Sobreposição entre trechos (~150 caracteres / ~40 tokens)
+}
+```
+
+Ao ingerir documentos via CLI ou API REST:
+
+```bash
+graphite ingest ./documentos \
+  -d knowledge.graphite \
+  --chunk-size 350 \
+  --chunk-overlap 40 \
+  --extensions md,txt,pdf \
+  --no-tmp
+```
+
+---
+
+## 4. Cache por Hash de Conteúdo & Modo Watch
+
+Para prevenir a re-geração redundante de embeddings em acervos extensos:
+
+<Steps>
+<Step>
+### 1. Assinatura Digital do Arquivo
+Durante a ingestão, o Graphite calcula um hash criptográfico do conteúdo de cada documento.
+</Step>
+
+<Step>
+### 2. Validação do Cache
+Ao executar `graphite ingest` ou o modo contínuo `--watch`, arquivos inalterados são ignorados instantaneamente (&lt; 1 ms).
+</Step>
+
+<Step>
+### 3. Atualização Diferencial do Grafo
+Quando um arquivo é modificado, seus trechos e relacionamentos antigos são removidos do índice em memória antes da inserção dos novos nós atualizados.
+</Step>
+</Steps>
+
+---
+
+## 5. Resolução Semântica de Entidades em Tempo Real
+
+Durante a ingestão, entidades recém-extraídas são comparadas com entidades existentes no grafo utilizando similaridade por cosseno:
+
+```text
+similaridade_cosseno(v_novo, v_existente) >= 0.92
+```
+
+Ao detectar correspondência, o Graphite vincula as novas arestas diretamente ao nó canônico, prevenindo a duplicação desordenada de entidades no grafo.

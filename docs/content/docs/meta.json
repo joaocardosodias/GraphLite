@@ -4,7 +4,9 @@
     "index",
     "quickstart",
     "cli",
+    "ingestion-and-chunking",
     "rust-sdk",
+    "rest-api",
     "agents-and-mcp",
     "benchmarks",
     "engine-internals"
