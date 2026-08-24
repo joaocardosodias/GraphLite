@@ -124,6 +124,9 @@ impl Bm25Index {
                 "tabela" | "tabelas" => &["table", "tables"],
                 "table" | "tables" => &["tabela", "tabelas"],
                 "rota" | "rotas" | "endpoint" | "endpoints" => &["route", "endpoint", "api"],
+                "cdc" => &["consumidor", "consumo", "defesa"],
+                "lgpd" => &["lgpd", "privacidade", "dados", "pessoais"],
+                "cf" | "cf88" => &["constituicao", "constituição", "federal"],
                 _ => &[],
             };
 

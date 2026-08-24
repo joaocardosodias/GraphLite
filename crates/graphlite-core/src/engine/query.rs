@@ -120,7 +120,7 @@ impl GraphLiteEngine {
         let candidate_pool_size = if opts.type_filter.is_some() {
             state.graph.node_count().min(500).max(opts.top_k_seeds * 20)
         } else {
-            (opts.top_k_seeds * 4).max(20)
+            (opts.top_k_seeds * 20).clamp(50, 250)
         };
 
         let matches_type_filter = |node_id: NodeId| -> bool {
@@ -153,14 +153,16 @@ impl GraphLiteEngine {
             let vec_ids: Vec<NodeId> = vector_matches.iter().map(|(id, _)| *id).collect();
             let bm25_ids: Vec<NodeId> = bm25_matches.iter().map(|(id, _)| *id).collect();
 
+            let max_rrf = 2.0 / 61.0;
             let fused = crate::graph::bm25::reciprocal_rank_fusion(&vec_ids, &bm25_ids, 60);
             let mut top_fused = Vec::new();
-            for (id, rrf_score) in fused.into_iter().take(opts.top_k_seeds) {
+            for (id, rrf_raw) in fused.into_iter().take(opts.top_k_seeds) {
+                let rrf_normalized = (rrf_raw / max_rrf).clamp(0.20, 1.0);
                 let score = vector_matches
                     .iter()
                     .find(|(nid, _)| *nid == id)
                     .map(|(_, s)| *s)
-                    .unwrap_or(rrf_score.min(1.0));
+                    .unwrap_or(rrf_normalized);
                 top_fused.push((id, score));
             }
             top_fused

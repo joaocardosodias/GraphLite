@@ -217,7 +217,9 @@ pub fn run_ingest_pass(
         return Ok(false);
     }
 
-    let config = load_or_default_config(db_path).with_direct_write(args.no_tmp);
+    let config = load_or_default_config(db_path)
+        .with_direct_write(args.no_tmp)
+        .with_auto_flush(false);
     let engine = GraphLiteEngine::open_or_create(db_path, config)?;
 
     let chunk_config = ChunkConfig {
@@ -298,32 +300,41 @@ pub fn run_ingest_pass(
     let mut merged_entities_count = 0;
     let mut edges_created_count = 0;
 
-    for chunk in &all_chunks {
-        pb.set_message(format!("{}: {}", chunk.chunk_type, chunk.title));
+    // Process nodes in vectorized batches of 32 for massive ONNX SIMD throughput
+    let batch_size = 32;
+    for chunk_batch in all_chunks.chunks(batch_size) {
+        let texts: Vec<String> = chunk_batch
+            .iter()
+            .map(|c| format!("{} {}: {}", c.chunk_type, c.title, c.content))
+            .collect();
 
-        let embedding_text = format!("{} {}: {}", chunk.chunk_type, chunk.title, chunk.content);
-        let vector = embedder.embed_one(&embedding_text)?;
+        let vectors = embedder.embed_batch(&texts)?;
 
-        let initial_node_count = engine.node_count();
-        let node_id = engine.upsert_node(
-            &chunk.chunk_id,
-            &chunk.chunk_type,
-            &chunk.content,
-            Some(&vector),
-        )?;
-        let final_node_count = engine.node_count();
+        for (chunk, vector) in chunk_batch.iter().zip(vectors) {
+            pb.set_message(format!("{}: {}", chunk.chunk_type, chunk.title));
 
-        if final_node_count > initial_node_count {
-            new_entities_count += 1;
-        } else {
-            merged_entities_count += 1;
+            let initial_node_count = engine.node_count();
+            let node_id = engine.upsert_node(
+                &chunk.chunk_id,
+                &chunk.chunk_type,
+                &chunk.content,
+                Some(&vector),
+            )?;
+            let final_node_count = engine.node_count();
+
+            if final_node_count > initial_node_count {
+                new_entities_count += 1;
+            } else {
+                merged_entities_count += 1;
+            }
+
+            name_to_id.insert(chunk.chunk_id.clone(), node_id);
+            pb.inc(1);
         }
-
-        name_to_id.insert(chunk.chunk_id.clone(), node_id);
-        pb.inc(1);
     }
 
     // Insert relational edges connecting the knowledge graph
+    pb.set_message("Linking knowledge graph relations...");
     for chunk in &all_chunks {
         if let Some(&src_id) = name_to_id.get(&chunk.chunk_id) {
             for (tgt_name, rel_label, weight) in &chunk.relations {
@@ -339,8 +350,9 @@ pub fn run_ingest_pass(
         }
     }
 
-    pb.finish_with_message("Sync complete");
+    pb.set_message("Syncing binary storage to disk...");
     engine.flush()?;
+    pb.finish_with_message("Sync complete");
 
     let elapsed = start_time.elapsed();
     println!(

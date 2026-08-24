@@ -163,8 +163,13 @@ pub fn execute_query(db_path: &Path, args: &QueryArgs, verbose: bool) -> Result<
 
             if !candidate_docs.is_empty() {
                 let rerank_res = reranker.rerank(q_text, &candidate_docs)?;
+                let top_score = rerank_res.first().map(|r| r.score).unwrap_or(0.0);
                 let mut reranked_entities = Vec::new();
                 for r in rerank_res {
+                    // Filter out noise: discard low-probability and low-relative-confidence items
+                    if r.score < 0.15 || (top_score >= 0.25 && r.score < top_score * 0.35) {
+                        continue;
+                    }
                     if r.index < result.scored_entities.len() {
                         let mut entity = result.scored_entities[r.index].clone();
                         entity.final_score = r.score;

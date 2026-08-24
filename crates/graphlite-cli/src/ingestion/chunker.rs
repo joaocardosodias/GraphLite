@@ -297,35 +297,61 @@ pub fn chunk_plain_document(
     chunks
 }
 
-/// Splits long text into paragraphs respecting target character count and sliding window overlap.
+/// Splits long text into cohesive paragraphs and articles without arbitrary word slicing.
 fn split_into_semantic_paragraphs(text: &str, config: &ChunkConfig) -> Vec<String> {
     if text.len() <= config.target_chars {
         return vec![text.to_string()];
     }
 
-    let mut chunks = Vec::new();
-    let raw_paragraphs: Vec<&str> = text.split("\n\n").collect();
-
-    let mut current_chunk = String::new();
-
-    for p in raw_paragraphs {
+    let mut raw_blocks = Vec::new();
+    for p in text.split("\n\n") {
         let trimmed = p.trim();
         if trimmed.is_empty() {
             continue;
         }
 
-        if current_chunk.len() + trimmed.len() > config.target_chars && !current_chunk.is_empty() {
-            chunks.push(current_chunk.clone());
+        // Split on distinct legal article or chapter boundaries within a section
+        let lines: Vec<&str> = trimmed.lines().collect();
+        let mut current_sub_block = String::new();
 
-            // Sliding window overlap with UTF-8 char boundary safety
-            let mut overlap_start = current_chunk.len().saturating_sub(config.overlap_chars);
-            while overlap_start < current_chunk.len() && !current_chunk.is_char_boundary(overlap_start) {
-                overlap_start += 1;
+        for line in lines {
+            let l_trim = line.trim();
+            let is_article_start = l_trim.starts_with("Art.")
+                || l_trim.starts_with("Artigo ")
+                || l_trim.starts_with("Article ")
+                || l_trim.starts_with("Section ")
+                || l_trim.starts_with("CAPÍTULO")
+                || l_trim.starts_with("TÍTULO")
+                || l_trim.starts_with("CHAPTER ");
+
+            if is_article_start && !current_sub_block.is_empty() {
+                raw_blocks.push(current_sub_block.trim().to_string());
+                current_sub_block = String::new();
             }
-            current_chunk = current_chunk[overlap_start..].to_string();
-            if !current_chunk.is_empty() {
-                current_chunk.push('\n');
+
+            if !current_sub_block.is_empty() {
+                current_sub_block.push('\n');
             }
+            current_sub_block.push_str(line);
+        }
+
+        if !current_sub_block.trim().is_empty() {
+            raw_blocks.push(current_sub_block.trim().to_string());
+        }
+    }
+
+    let mut chunks = Vec::new();
+    let mut current_chunk = String::new();
+
+    for block in raw_blocks {
+        let trimmed = block.trim();
+        if trimmed.is_empty() {
+            continue;
+        }
+
+        if current_chunk.len() + trimmed.len() > config.target_chars && !current_chunk.is_empty() {
+            chunks.push(current_chunk.trim().to_string());
+            current_chunk = String::new();
         }
 
         if !current_chunk.is_empty() {
