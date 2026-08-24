@@ -4,6 +4,7 @@
     "index",
     "quickstart",
     "cli",
+    "rust-sdk",
     "engine-internals"
   ]
 }
