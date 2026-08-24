@@ -2,6 +2,7 @@ import { loader } from 'fumadocs-core/source';
 import { docsContentRoute, docsImageRoute, docsRoute } from './shared';
 import { defineDocs } from 'fumadocs-mdx/macro';
 import { metaSchema, pageSchema } from 'fumadocs-core/source/schema';
+import { i18nConfig } from './i18n';
 
 const docs = defineDocs({
   dir: 'content/docs',
@@ -20,6 +21,7 @@ const docs = defineDocs({
 export const source = loader({
   baseUrl: docsRoute,
   source: docs.toFumadocsSource(),
+  i18n: i18nConfig,
   plugins: [],
 });
 

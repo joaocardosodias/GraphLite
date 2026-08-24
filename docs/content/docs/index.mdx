@@ -5,7 +5,6 @@ description: High-performance embedded binary database unifying Knowledge Graphs
 
 import { Callout } from 'fumadocs-ui/components/callout';
 import { Card, Cards } from 'fumadocs-ui/components/card';
-import { Tab, Tabs } from 'fumadocs-ui/components/tabs';
 
 Graphite compiles graph topology, quantized vector matrices, and lexical structures into a zero-copy memory-mapped (`.graphite`) binary file, providing sub-microsecond retrieval and prompt synthesis.
 
@@ -44,64 +43,6 @@ Graphite compiles graph topology, quantized vector matrices, and lexical structu
 | **Token Budgeting** | Fixed Top-K (token-unaware) | Manual graph trimming | **Exact Token Budget Pruning (MMR)** |
 | **Reranking** | External Python service / API | Not supported | **Local SIMD Cross-Encoder Transformer** |
 | **Read Latency** | 10ms – 50ms (Network overhead) | 15ms – 80ms | **1.6µs – 4.0ms (In-Memory / Mmap)** |
-
----
-
-## Interface Reference
-
-<Tabs items={['CLI', 'Rust SDK', 'MCP Server']}>
-  <Tab value="CLI">
-```bash
-# 1. Initialize database with 384 dimensions and Scalar Int8 quantization
-graphite init -d knowledge.graphite
-
-# 2. Ingest structured or legal documents with semantic article chunking
-graphite ingest ./documents -d knowledge.graphite --no-tmp
-
-# 3. Execute hybrid query with Cross-Encoder reranking
-graphite -d knowledge.graphite query -T "quais sao as hipoteses de anulacao do negocio juridico" --rerank -v
-```
-  </Tab>
-
-  <Tab value="Rust SDK">
-```rust
-use graphite_core::engine::{GraphiteConfig, GraphiteEngine, QueryOptions};
-
-fn main() -> anyhow::Result<()> {
-    let config = GraphiteConfig::new()
-        .with_dim(384)
-        .with_max_tokens(2048);
-
-    let engine = GraphiteEngine::open_or_create("knowledge.graphite", config)?;
-
-    let query_embedding = vec![0.042f32; 384];
-    let query_options = QueryOptions {
-        max_tokens: Some(1500),
-        expand_hops: 2,
-        ..Default::default()
-    };
-
-    let result = engine.retrieve_context(&query_embedding, Some(query_options))?;
-    println!("Formatted LLM Context ({} tokens):\n{}", result.token_count, result.markdown);
-
-    Ok(())
-}
-```
-  </Tab>
-
-  <Tab value="MCP Server">
-```json
-{
-  "mcpServers": {
-    "graphite": {
-      "command": "graphite-mcp",
-      "args": ["-d", "knowledge.graphite"]
-    }
-  }
-}
-```
-  </Tab>
-</Tabs>
 
 <Callout type="info" title="Next Steps">
 To examine the low-level implementation details of the engine, proceed to [Binary Format & Zero-Copy Mmap](/docs/engine-internals/binary-format-and-mmap) or review the [Quickstart Guide](/docs/quickstart).

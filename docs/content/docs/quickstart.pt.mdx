@@ -1,0 +1,84 @@
+---
+title: Guia de Início Rápido
+description: Instalação, inicialização do banco de dados, ingestão de documentos e execução de consultas híbridas.
+---
+
+import { Callout } from 'fumadocs-ui/components/callout';
+import { Step, Steps } from 'fumadocs-ui/components/steps';
+
+<Steps>
+<Step>
+### Instalação do Binário
+
+Compile e instale o binário do CLI `graphite` localmente através do Cargo:
+
+```bash
+cargo install --path crates/graphite-cli --force
+```
+
+Confirme o registro do binário no seu PATH:
+
+```bash
+graphite --help
+```
+</Step>
+
+<Step>
+### Inicializar um Banco de Dados
+
+Crie um arquivo de banco de dados `.graphite` novo com o esquema de quantização e dimensões padrão (384 dimensões, compatível com embeddings `all-MiniLM-L6-v2`):
+
+```bash
+graphite init -d knowledge.graphite
+```
+
+Para inspecionar o cabeçalho binário de 64 bytes e a integridade de integridade do arquivo recém-criado:
+
+```bash
+graphite info -d knowledge.graphite
+```
+</Step>
+
+<Step>
+### Ingestão de Documentos com Chunking Semântico
+
+Ingira arquivos Markdown, PDF, texto plano ou arquivos estruturados. O analisador decompõe o texto respeitando os limites semânticos (por exemplo, artigos jurídicos como `Art. 1.228`) e compila nós e arestas de relacionamento de forma atômica:
+
+```bash
+# Ingerir documentos sem criar arquivo de banco temporário
+graphite ingest ./documents -d knowledge.graphite --no-tmp
+```
+
+O comando exibe o número de nós criados, as arestas conectadas e o tempo total de processamento.
+</Step>
+
+<Step>
+### Gravação de Fatos e Preferências em Tempo Real
+
+Insira nós individuais de conhecimento, preferências de usuário ou regras de negócio no grafo:
+
+```bash
+graphite -d knowledge.graphite remember \
+  "Artigo 1.228 do Código Civil: O proprietário tem a faculdade de usar, gozar e dispor da coisa." \
+  --category "Artigo"
+```
+</Step>
+
+<Step>
+### Executar Consulta Híbrida com Reranking
+
+Execute uma consulta combinando busca vetorial SIMD, pontuação lexical BM25, expansão em grafo CSR e reranking com Cross-Encoder:
+
+```bash
+graphite -d knowledge.graphite query -T "quais sao os direitos do proprietario" --rerank -v
+```
+
+A flag `-v` exibe a decomposição passo a passo da recuperação:
+1. Sementes densas por cosseno via SIMD.
+2. Sementes léxicas via BM25.
+3. Fusão dos candidatos via RRF.
+4. Travessia relacional BFS em grafo CSR.
+5. Reordenação e pontuação via Cross-Encoder ONNX.
+6. Síntese do contexto final em Markdown formatado respeitando o orçamento de tokens.
+</Step>
+</Steps>

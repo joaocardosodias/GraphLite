@@ -3,8 +3,8 @@
 @import 'fumadocs-ui/css/preset.css';
 
 :root {
-  --color-fd-primary: #10b981;
-  --color-fd-primary-foreground: #ffffff;
+  --color-fd-primary: #ffffff;
+  --color-fd-primary-foreground: #000000;
 }
 
 .dark, :root[class~="dark"], [data-theme="dark"], html.dark {
@@ -26,11 +26,14 @@ body {
   background-color: var(--color-fd-background);
 }
 
-html {
-  scrollbar-gutter: stable;
-}
-
 html > body[data-scroll-locked] {
   margin-right: 0px !important;
   --removed-body-scroll-bar-size: 0px !important;
+}
+
+.bg-grid-white {
+  background-image: 
+    linear-gradient(to right, rgba(255, 255, 255, 0.04) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(255, 255, 255, 0.04) 1px, transparent 1px);
+  background-size: 32px 32px;
 }

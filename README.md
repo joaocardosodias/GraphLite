@@ -1,9 +1,19 @@
-# Graphite
+<p align="center">
+  <img src="assets/logo.png" alt="Graphite Logo" width="120" />
+</p>
 
-[![License: MIT OR Apache-2.0](https://img.shields.io/badge/License-MIT%20OR%20Apache--2.0-blue.svg)](LICENSE)
-[![Rust](https://img.shields.io/badge/Rust-1.80%2B-orange.svg?logo=rust)](https://www.rust-lang.org)
-[![Build Status](https://img.shields.io/badge/build-passing-brightgreen.svg)]()
-[![Tests](https://img.shields.io/badge/tests-99%20passed-success.svg)]()
+<h1 align="center">Graphite</h1>
+
+<p align="center">
+  <strong>Embedded Single-File GraphRAG & AI Agent Memory Database in Pure Rust</strong>
+</p>
+
+<p align="center">
+  <a href="LICENSE"><img src="https://img.shields.io/badge/License-MIT%20OR%20Apache--2.0-blue.svg" alt="License" /></a>
+  <a href="https://www.rust-lang.org"><img src="https://img.shields.io/badge/Rust-1.80%2B-orange.svg?logo=rust" alt="Rust" /></a>
+  <img src="https://img.shields.io/badge/build-passing-brightgreen.svg" alt="Build Status" />
+  <img src="https://img.shields.io/badge/tests-99%20passed-success.svg" alt="Tests" />
+</p>
 
 > **Graphite** is an embedded, single-file Graph + Vector database engine written in pure Rust. 
 > Designed as the **"SQLite of GraphRAG"** for autonomous AI agents, chatbots, and local-first document knowledge bases.
@@ -12,7 +22,7 @@
 
 ## ⚡ Key Highlights
 
-- **Single-File Embedded Database (`.graph`):** Fully self-contained single file with crash-resilient atomic writes, CRC32 checksums, and zero external daemon or database dependencies.
+- **Single-File Embedded Database (`.graphite`):** Fully self-contained single file with crash-resilient atomic writes, CRC32 checksums, and zero external daemon or database dependencies.
 - **Universal Document Ingestion (`graphite ingest`):** Ingests Markdown, PDF, Plain Text, JSON, YAML, and CSV with structure-aware semantic chunking and automated cross-document relational linking.
 - **Agent Long-Term Memory (`graphite remember`):** Real-time recording of facts, preferences, business rules, and tasks with automatic local embeddings.
 - **Hybrid Retrieval (Vector + BM25 + Graph):** Fuses SIMD vector similarity with BM25 lexical ranking via Reciprocal Rank Fusion (RRF) and multi-hop BFS graph traversal.
@@ -49,7 +59,7 @@
 
 ---
 
-## 📂 Binary File Layout (`.graph`)
+## 📂 Binary File Layout (`.graphite`)
 
 ```text
 ┌────────────────────────────────────────────────────────┐
@@ -85,22 +95,22 @@ cargo install --path crates/graphite-cli
 
 ```bash
 # Ingest an entire folder of documentation, manuals, or policies
-graphite -d knowledge.graph ingest ./docs/
+graphite -d knowledge.graphite ingest ./docs/
 
 # Custom chunk size and overlap
-graphite -d knowledge.graph ingest ./docs/ --chunk-size 400 --chunk-overlap 50
+graphite -d knowledge.graphite ingest ./docs/ --chunk-size 400 --chunk-overlap 50
 ```
 
 ### 3. Record Agent Memories & Preferences
 
 ```bash
 # Store user preference
-graphite -d knowledge.graph remember \
+graphite -d knowledge.graphite remember \
   "User prefers concise answers in Portuguese and is an Enterprise customer" \
   --category "UserPreference"
 
 # Store business fact or rule
-graphite -d knowledge.graph remember \
+graphite -d knowledge.graphite remember \
   "Refund requests are fully refundable within 7 days of subscription" \
   --category "BusinessRule"
 ```
@@ -109,17 +119,17 @@ graphite -d knowledge.graph remember \
 
 ```bash
 # General query
-graphite -d knowledge.graph query -T "qual o prazo para reembolso?"
+graphite -d knowledge.graphite query -T "qual o prazo para reembolso?"
 
 # Query filtered by entity type
-graphite -d knowledge.graph query -T "preferências do usuário" --type UserPreference
+graphite -d knowledge.graphite query -T "preferências do usuário" --type UserPreference
 ```
 
 ### 5. Launch REST API Server (Python / TypeScript / Web Clients)
 
 ```bash
 # Start embedded HTTP server on port 8000
-graphite -d knowledge.graph serve --port 8000
+graphite -d knowledge.graphite serve --port 8000
 ```
 
 ```bash
@@ -151,7 +161,7 @@ fn main() -> anyhow::Result<()> {
         .with_dim(384)
         .with_max_tokens(500);
 
-    let db = GraphiteEngine::open_or_create("knowledge.graph", config)?;
+    let db = GraphiteEngine::open_or_create("knowledge.graphite", config)?;
 
     // 2. Ingest knowledge nodes with vectors
     let embedding_policy = vec![0.1f32; 384];
@@ -210,7 +220,7 @@ cargo install --path crates/graphite-mcp
       "command": "graphite-mcp",
       "args": [
         "--db",
-        "/path/to/your/knowledge.graph"
+        "/path/to/your/knowledge.graphite"
       ]
     }
   }

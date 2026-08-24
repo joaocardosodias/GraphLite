@@ -22,6 +22,14 @@ export default function DefaultSearchDialog(props: SharedProps) {
     }),
   });
 
+  const items =
+    query.data !== 'empty' && Array.isArray(query.data)
+      ? query.data.filter((item) => {
+          if (!locale) return true;
+          return item.url?.startsWith(`/${locale}/`) || item.id?.startsWith(`/${locale}/`);
+        })
+      : null;
+
   return (
     <SearchDialog search={search} onSearchChange={setSearch} isLoading={query.isLoading} {...props}>
       <SearchDialogOverlay />
@@ -31,7 +39,7 @@ export default function DefaultSearchDialog(props: SharedProps) {
           <SearchDialogInput />
           <SearchDialogClose />
         </SearchDialogHeader>
-        <SearchDialogList items={query.data !== 'empty' ? query.data : null} />
+        <SearchDialogList items={items} />
       </SearchDialogContent>
     </SearchDialog>
   );

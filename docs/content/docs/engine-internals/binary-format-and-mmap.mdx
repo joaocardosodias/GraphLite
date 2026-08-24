@@ -1,0 +1,239 @@
+---
+title: Binary Format & Zero-Copy Mmap
+description: Low-level byte specification, memory alignment, CSR serialization, and zero-copy memory mapping architecture of the .graphite file format.
+---
+
+The `.graphite` file format is a contiguous, single-file binary database designed for high-throughput zero-copy reads via memory mapping (`mmap`). All graph records, vector embeddings, adjacency topologies, and string tables are laid out sequentially with strict 64-bit and 32-byte alignment to prevent unaligned memory access penalties on x86_64 and ARM64 processors.
+
+---
+
+## File Layout Overview
+
+A `.graphite` binary file consists of a fixed 64-byte header followed by four contiguous, independently offset sections:
+
+| Byte Range | Section Name | Contents |
+| :--- | :--- | :--- |
+| `0x0000 .. 0x0040` | **Database Header** | Magic bytes, version, vector dimensions, section offsets, CRC32 checksum |
+| `0x0040 .. OffsetE` | **Node Block** | Contiguous array of fixed 32-byte `NodeRecord` structs |
+| `OffsetE .. OffsetV` | **Edge / CSR Block** | CSR row offset pointers and contiguous 32-byte `EdgeRecord` array |
+| `OffsetV .. OffsetS` | **Vector Block** | Dense Float32 or Scalar-Quantized Int8 (SQ8) vector matrix |
+| `OffsetS .. EOF` | **String Interner Pool** | Length-prefixed UTF-8 string slices with O(1) index |
+
+---
+
+## 1. Fixed 64-Byte Header (`GraphHeader`)
+
+Every `.graphite` file begins with a 64-byte header (`#[repr(C)]`), guaranteeing that the subsequent `NodeBlock` starts at exact byte offset `0x00000040` (64 decimal), which matches standard CPU L1 cache-line boundaries.
+
+### Binary Layout Table
+
+| Byte Offset | Field Name | Type | Description |
+| :--- | :--- | :--- | :--- |
+| `0x00 .. 0x04` | `magic` | `[u8; 4]` | Magic bytes: ASCII `b"GRPH"` (`0x47, 0x52, 0x50, 0x48`). |
+| `0x04 .. 0x06` | `version` | `u16` | Binary specification version (`1`). |
+| `0x06 .. 0x08` | `flags` | `u16` | Feature bitflags (`0x01`: SQ8 Quantized, `0x02`: Compressed, `0x04`: Directed). |
+| `0x08 .. 0x0A` | `vector_dim` | `u16` | Dense embedding vector dimensionality (e.g. `384`, `768`, `1536`). |
+| `0x0A .. 0x0B` | `metric_type` | `u8` | Distance metric (`0`: Cosine, `1`: DotProduct, `2`: Euclidean, `3`: Manhattan). |
+| `0x0B .. 0x0C` | `quant_type` | `u8` | Vector storage format (`0`: Float32, `1`: Scalar Quantization Int8). |
+| `0x0C .. 0x10` | `node_count` | `u32` | Total count of active node records. |
+| `0x10 .. 0x14` | `edge_count` | `u32` | Total count of active edge records. |
+| `0x14 .. 0x18` | `string_bytes_len`| `u32` | Total length of the serialized string interning pool in bytes. |
+| `0x18 .. 0x20` | `node_section_offset` | `u64` | Byte offset where the `NodeBlock` begins. |
+| `0x20 .. 0x28` | `edge_section_offset` | `u64` | Byte offset where the `CSRBlock` begins. |
+| `0x28 .. 0x30` | `vector_section_offset`| `u64` | Byte offset where the `VectorBlock` begins. |
+| `0x30 .. 0x38` | `string_section_offset`| `u64` | Byte offset where the `StringTable` begins. |
+| `0x38 .. 0x3C` | `checksum` | `u32` | IEEE 802.3 CRC32 polynomial checksum over the file body. |
+| `0x3C .. 0x40` | `_reserved` | `[u8; 4]` | Padding to guarantee 64-byte structural alignment. |
+
+### Header Rust Struct
+
+```rust
+#[repr(C)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct GraphHeader {
+    pub magic: [u8; 4],
+    pub version: u16,
+    pub flags: u16,
+    pub vector_dim: u16,
+    pub metric_type: u8,
+    pub quant_type: u8,
+    pub node_count: u32,
+    pub edge_count: u32,
+    pub string_bytes_len: u32,
+    pub node_section_offset: u64,
+    pub edge_section_offset: u64,
+    pub vector_section_offset: u64,
+    pub string_section_offset: u64,
+    pub checksum: u32,
+    pub _reserved: [u8; 4],
+}
+```
+
+---
+
+## 2. Node Block & Record Structure
+
+The `NodeBlock` stores an array of fixed-size 32-byte records. Because variable-length textual data (names, descriptions, types) are interned as 32-bit `StringId` handles, each `NodeRecord` has a deterministic size:
+
+```rust
+#[repr(C)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct NodeRecord {
+    pub id: NodeId,               // 4 bytes (u32)
+    pub name_id: StringId,         // 4 bytes (u32)
+    pub type_id: StringId,         // 4 bytes (u32)
+    pub description_id: StringId,  // 4 bytes (u32)
+    pub vector_offset: u64,        // 8 bytes (u64)
+    pub flags: u32,                // 4 bytes (u32, bit 0 = FLAG_ACTIVE)
+    pub _reserved: u32,            // 4 bytes (padding for 8-byte alignment)
+}
+```
+
+### Memory Alignment & Lookup Cost
+
+* **Record Size:** Exactly 32 bytes (`std::mem::size_of::<NodeRecord>() == 32`).
+* **Random Lookup:** Accessing node index `i` requires computing offset:
+  `Offset(i) = node_section_offset + 8 + (i * 32)`
+* **Time Complexity:** O(1) direct pointer arithmetic over the memory-mapped slice without deserialization.
+
+---
+
+## 3. Compressed Sparse Row (CSR) Topology Block
+
+Graphite serializes graph connectivity using the **Compressed Sparse Row (CSR)** format. This eliminates pointer chasing, pointer indirection overhead, and fragmented allocations.
+
+### Binary Representation
+
+| Field Name | Type / Size | Description |
+| :--- | :--- | :--- |
+| `node_count` | `u32` (4 bytes) | Total active nodes in graph ($N$) |
+| `edge_count` | `u32` (4 bytes) | Total active edges in graph ($E$) |
+| `row_offsets` | `[u64; N + 1]` ($(N + 1) \times 8$ bytes) | Start/end index pointers for each node's outbound edges |
+| `edges` | `[EdgeRecord; E]` ($E \times 32$ bytes) | Contiguous array of fixed 32-byte edge descriptors |
+
+### `EdgeRecord` Struct (32 Bytes)
+
+```rust
+#[repr(C)]
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct EdgeRecord {
+    pub id: EdgeId,                // 4 bytes (u32)
+    pub source: NodeId,            // 4 bytes (u32)
+    pub target: NodeId,            // 4 bytes (u32)
+    pub relation_id: StringId,     // 4 bytes (u32)
+    pub weight: f32,               // 4 bytes (f32)
+    pub flags: u32,                // 4 bytes (u32, bit 0 = ACTIVE, bit 1 = DIRECTED)
+    pub _reserved: u64,            // 8 bytes (padding for 64-bit alignment)
+}
+```
+
+### Neighbor Traversal Mechanics
+
+To traverse all outbound edges from `node_id`:
+
+```rust
+let start = row_offsets[node_id as usize] as usize;
+let end = row_offsets[(node_id + 1) as usize] as usize;
+let outbound_edges: &[EdgeRecord] = &edges[start..end];
+```
+
+This operation requires zero heap allocations and executes in O(1) time, providing a contiguous memory slice ideal for CPU hardware prefetching.
+
+---
+
+## 4. Vector Block Architecture
+
+The `VectorBlock` stores dense numerical representations for semantic similarity computations. Graphite supports two storage modes:
+
+### Unquantized Float32 Mode
+* Vectors are stored as contiguous arrays of little-endian single-precision IEEE 754 floating-point values.
+* **Bytes per Vector:** `dim * 4 bytes` (e.g. `384 * 4 = 1,536 bytes`).
+
+### Scalar Quantization (SQ8 Int8) Mode
+* Floats in `[-1.0, 1.0]` are mapped linearly into signed 8-bit integers `[-128, 127]` with per-vector `scale` (f32) and `min_val` (f32) parameters.
+* **Bytes per Vector:** `dim + 8 bytes` (e.g. `384 + 8 = 392 bytes`).
+* **Memory Reduction:** Achieves **3.92x storage compression** while retaining `>= 0.999` cosine similarity correlation.
+
+---
+
+## 5. String Interner Table
+
+Textual descriptions, node labels, and relationship names are deduplicated using a string interning pool:
+
+1. **Table Header:** 4 bytes storing total interned string count `S`.
+2. **Offset Index:** `S * 8 bytes`, where each entry contains:
+   * `offset: u32` (Byte offset into string data pool)
+   * `length: u32` (Length of the UTF-8 byte slice)
+3. **Data Pool:** Contiguous raw UTF-8 bytes without null terminators.
+
+Resolving a `StringId(k)` returns a zero-copy string slice `&str` directly borrowing from the mapped memory page.
+
+---
+
+## 6. Zero-Copy Memory Mapping (`memmap2`)
+
+Graphite uses kernel-level memory mapping via the `memmap2` crate:
+
+```rust
+use memmap2::Mmap;
+use std::fs::File;
+
+pub struct MmapGraphReader {
+    mmap: Mmap,
+    header: GraphHeader,
+}
+
+impl MmapGraphReader {
+    pub fn open(file: &File) -> Result<Self> {
+        let mmap = unsafe { Mmap::map(file)? };
+        let header = GraphHeader::from_bytes(&mmap[0..HEADER_SIZE])?;
+        
+        // Verify CRC32 integrity
+        let computed_crc = compute_crc32(&mmap[HEADER_SIZE..]);
+        if computed_crc != header.checksum {
+            return Err(GraphiteError::CorruptedChecksum {
+                expected: header.checksum,
+                found: computed_crc,
+            });
+        }
+
+        Ok(Self { mmap, header })
+    }
+}
+```
+
+### Performance Guarantees
+
+* **Zero Heap Deserialization:** The database file is mapped into the process virtual address space. Node records and CSR arrays are viewed as native Rust slices (`&[NodeRecord]`, `&[EdgeRecord]`) via pointer casting.
+* **Demand Paging:** The operating system kernel pages in 4KB memory blocks on demand, leaving inactive database regions out of physical RAM.
+* **L1/L2 Cache Pre-fetching:** Contiguous arrays ensure maximum hardware pre-fetcher efficiency during linear vector scans and BFS graph hops.
+
+---
+
+## 7. Atomic Write Guarantees
+
+To ensure crash consistency and prevent database corruption during writes:
+
+```text
+In-Memory Graph State
+       │
+       ▼
+Compute CRC32 & Section Offsets
+       │
+       ▼
+Write Payload to Temporary File (.tmp.uuid)
+       │
+       ▼
+Kernel Sync (fsync / flush)
+       │
+       ▼
+Atomic OS Rename (rename syscall)
+       │
+       ▼
+Consistent .graphite Database File
+```
+
+1. All mutations compile in-memory into contiguous buffers.
+2. The entire payload is written to a temporary sibling file (`<target>.tmp.<uuid>`).
+3. An explicit `fsync` commits dirty kernel pages to non-volatile storage.
+4. The temporary file replaces the target via an atomic kernel syscall (`rename(2)` on Linux/POSIX, `MoveFileEx` on Windows).

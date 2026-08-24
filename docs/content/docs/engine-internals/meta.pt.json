@@ -1,0 +1,11 @@
+{
+  "title": "Mecanismos Internos",
+  "pages": [
+    "binary-format-and-mmap",
+    "simd-avx2-and-quantization",
+    "hybrid-search-and-rrf",
+    "graph-csr-and-traversal",
+    "mmr-and-token-pruning",
+    "cross-encoder-reranking"
+  ]
+}
