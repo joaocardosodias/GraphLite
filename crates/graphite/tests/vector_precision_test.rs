@@ -1,5 +1,5 @@
-use graphite_core::id::NodeId;
-use graphite_core::vector::{
+use graphite::id::NodeId;
+use graphite::vector::{
     cosine_similarity, dot_product, euclidean_distance, norm, normalized, simd_cosine_similarity,
     simd_dot_product, simd_euclidean_distance, Metric, Quantization, QuantizedVector, VectorStore,
 };

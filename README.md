@@ -10,7 +10,7 @@
 
 <p align="center">
   <a href="LICENSE"><img src="https://img.shields.io/badge/License-MIT%20OR%20Apache--2.0-black.svg" alt="License" /></a>
-  <a href="https://crates.io/crates/graphite-core"><img src="https://img.shields.io/crates/v/graphite-core.svg?color=black" alt="Crates.io" /></a>
+  <a href="https://crates.io/crates/graphite"><img src="https://img.shields.io/crates/v/graphite.svg?color=black" alt="Crates.io" /></a>
   <a href="https://github.com/joaocardosodias/Graphite/actions"><img src="https://img.shields.io/badge/CI-passing-black.svg" alt="CI Status" /></a>
   <a href="https://joaocardosodias.github.io/Graphite"><img src="https://img.shields.io/badge/docs-fumadocs-black.svg" alt="Documentation" /></a>
 </p>
@@ -31,7 +31,7 @@ curl -fsSL https://raw.githubusercontent.com/joaocardosodias/Graphite/main/insta
 irm https://raw.githubusercontent.com/joaocardosodias/Graphite/main/install.ps1 | iex
 ```
 
-### Via Cargo (Rust):
+### Via Cargo (Rust CLI):
 ```bash
 cargo install graphite-cli
 ```
@@ -78,27 +78,22 @@ cargo install graphite-cli
 
 ## Quickstart CLI Guide
 
-### 1. Initialize a Database
+### 1. Ingest Document Acquis
 ```bash
-graphite init -d knowledge.graphite
+graphite ingest ./docs -d knowledge.graphite
 ```
 
-### 2. Ingest Document Acquis
-```bash
-graphite ingest ./docs -d knowledge.graphite --chunk-size 350 --chunk-overlap 40
-```
-
-### 3. Query GraphRAG Context
+### 2. Query GraphRAG Context
 ```bash
 graphite query "How does authentication work?" -d knowledge.graphite --max-tokens 400 --top-k 5
 ```
 
-### 4. Record Agent Facts & Rules
+### 3. Record Facts & Rules
 ```bash
-graphite remember "User prefers concise answers in Portuguese." -d knowledge.graphite --category "UserPreference"
+graphite remember "User prefers concise answers in Portuguese." -d knowledge.graphite
 ```
 
-### 5. Launch Embedded REST API
+### 4. Launch Embedded REST API
 ```bash
 graphite serve -d knowledge.graphite --port 8080 --host 0.0.0.0
 ```
@@ -107,15 +102,15 @@ graphite serve -d knowledge.graphite --port 8080 --host 0.0.0.0
 
 ## Rust SDK Example
 
-Add `graphite-core` to your `Cargo.toml`:
+Add `graphite` to your `Cargo.toml`:
 
 ```toml
 [dependencies]
-graphite-core = "0.1"
+graphite = "0.1"
 ```
 
 ```rust
-use graphite_core::engine::{GraphiteConfig, GraphiteEngine, QueryOptions};
+use graphite::prelude::*;
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     // 1. Initialize engine
@@ -123,7 +118,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         .with_dim(384)
         .with_max_tokens(500);
 
-    let db = GraphiteEngine::open_or_create("knowledge.graphite", config)?;
+    let db = Graphite::open_or_create("knowledge.graphite", config)?;
 
     // 2. Ingest nodes with dense embeddings
     let v_titan = vec![0.05f32; 384];
@@ -160,7 +155,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
 ## Workspace Layout
 
-- [`crates/graphite-core`](crates/graphite-core/): Pure Rust embedded storage engine, zero-copy mmap reader, SIMD AVX2 kernels, SQ8 quantization, CSR graph topology, BM25, and MMR token budgeting.
+- [`crates/graphite`](crates/graphite/): Pure Rust embedded storage engine, zero-copy mmap reader, SIMD AVX2 kernels, SQ8 quantization, CSR graph topology, BM25, and MMR token budgeting.
 - [`crates/graphite-cli`](crates/graphite-cli/): The `graphite` command-line executable, multi-format document chunker, and embedded REST API server.
 
 ---

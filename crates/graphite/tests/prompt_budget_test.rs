@@ -1,12 +1,12 @@
-use graphite_core::graph::hybrid_score::ScoredEntity;
-use graphite_core::graph::subgraph::ConnectedSubgraph;
-use graphite_core::id::{EdgeId, NodeId};
-use graphite_core::interner::StringInterner;
-use graphite_core::prompt::{
+use graphite::graph::hybrid_score::ScoredEntity;
+use graphite::graph::subgraph::ConnectedSubgraph;
+use graphite::id::{EdgeId, NodeId};
+use graphite::interner::StringInterner;
+use graphite::prompt::{
     format_pruned_subgraph_markdown, format_subgraph_json, format_subgraph_triples,
     prune_subgraph_by_budget, MarkdownFormatConfig, MarkdownStyle, TiktokenCounter, TokenCounter,
 };
-use graphite_core::record::EdgeRecord;
+use graphite::record::EdgeRecord;
 
 /// Helper to generate a realistic test graph with $N$ ranked entities and interconnected edges.
 fn create_mock_subgraph(n_entities: usize) -> (ConnectedSubgraph, StringInterner) {

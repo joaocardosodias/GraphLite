@@ -5,23 +5,31 @@ edition.workspace = true
 authors.workspace = true
 license.workspace = true
 repository.workspace = true
-description = "Embedded single-file GraphRAG engine and client for knowledge graphs and AI agent memory"
+description = "Embedded single-file GraphRAG engine in pure Rust: Knowledge Graphs, SIMD vector search, and token-budgeted prompt synthesis"
 readme = "../../README.md"
-keywords.workspace = true
-categories.workspace = true
 
 [dependencies]
-graphite-core = { workspace = true, optional = true }
-serde = { workspace = true }
-serde_json = { workspace = true }
-thiserror = { workspace = true }
-anyhow = { workspace = true }
+thiserror.workspace = true
+anyhow.workspace = true
+parking_lot.workspace = true
+rayon.workspace = true
+memmap2.workspace = true
+smallvec.workspace = true
+serde = { workspace = true, optional = true }
+serde_json = { workspace = true, optional = true }
+tiktoken-rs = { workspace = true, optional = true }
+fastembed = { version = "6.0.0", optional = true }
 
 [features]
-default = ["embedded", "fastembed", "tiktoken"]
-embedded = ["dep:graphite-core"]
-fastembed = ["graphite-core/fastembed"]
-tiktoken = ["graphite-core/tiktoken"]
+default = ["serde", "tiktoken", "fastembed"]
+serde = ["dep:serde", "dep:serde_json"]
+tiktoken = ["dep:tiktoken-rs"]
+fastembed = ["dep:fastembed"]
 
 [dev-dependencies]
 tempfile = "3.17"
+criterion = { workspace = true }
+
+[[bench]]
+name = "engine_benchmarks"
+harness = false

@@ -2,12 +2,12 @@ use std::sync::Arc;
 use std::thread;
 use tempfile::tempdir;
 
-use graphite_core::engine::config::GraphiteConfig;
-use graphite_core::engine::entity_resolution::ResolutionConfig;
-use graphite_core::engine::instance::GraphiteEngine;
-use graphite_core::engine::query::QueryOptions;
-use graphite_core::prompt::markdown::MarkdownStyle;
-use graphite_core::vector::distance::Metric;
+use graphite::engine::config::GraphiteConfig;
+use graphite::engine::entity_resolution::ResolutionConfig;
+use graphite::engine::instance::GraphiteEngine;
+use graphite::engine::query::QueryOptions;
+use graphite::prompt::markdown::MarkdownStyle;
+use graphite::vector::distance::Metric;
 
 #[test]
 fn test_full_ai_assistant_knowledge_graph_workflow() {

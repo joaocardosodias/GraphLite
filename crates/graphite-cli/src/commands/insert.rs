@@ -2,12 +2,12 @@ use anyhow::{bail, Context, Result};
 use std::fs;
 use std::path::Path;
 
-use graphite_core::engine::config::GraphiteConfig;
-use graphite_core::engine::entity_resolution::ResolutionConfig;
-use graphite_core::engine::instance::GraphiteEngine;
-use graphite_core::storage::mmap_reader::MmapGraphReader;
-use graphite_core::vector::distance::Metric;
-use graphite_core::vector::quantization::Quantization;
+use graphite::engine::config::GraphiteConfig;
+use graphite::engine::entity_resolution::ResolutionConfig;
+use graphite::engine::instance::GraphiteEngine;
+use graphite::storage::mmap_reader::MmapGraphReader;
+use graphite::vector::distance::Metric;
+use graphite::vector::quantization::Quantization;
 
 use crate::args::{InsertEdgeArgs, InsertNodeArgs};
 
@@ -77,7 +77,7 @@ pub fn execute_insert_node(db_path: &Path, args: &InsertNodeArgs) -> Result<()> 
         parse_vector_arg(Some(raw))?
     } else if args.auto_embed {
         let text_to_embed = format!("{} {}: {}", args.name, args.entity_type, args.description);
-        let embedder = graphite_core::LocalEmbedder::new_minilm()
+        let embedder = graphite::LocalEmbedder::new_minilm()
             .with_context(|| "Failed to initialize local ONNX embedding model")?;
         Some(embedder.embed_one(&text_to_embed)?)
     } else {
@@ -111,7 +111,7 @@ pub fn execute_insert_node(db_path: &Path, args: &InsertNodeArgs) -> Result<()> 
             )?
         } else {
             let id = engine.upsert_node(&args.name, &args.entity_type, &args.description, None)?;
-            graphite_core::engine::ResolutionResult {
+            graphite::engine::ResolutionResult {
                 node_id: id,
                 is_merged: false,
                 matched_existing_id: None,

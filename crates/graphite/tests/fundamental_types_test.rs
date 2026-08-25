@@ -1,7 +1,7 @@
-use graphite_core::error::GraphiteError;
-use graphite_core::id::{EdgeId, NodeId, StringId};
-use graphite_core::interner::StringInterner;
-use graphite_core::record::{EdgeRecord, NodeRecord, FLAG_ACTIVE, FLAG_DIRECTED, NO_VECTOR_OFFSET};
+use graphite::error::GraphiteError;
+use graphite::id::{EdgeId, NodeId, StringId};
+use graphite::interner::StringInterner;
+use graphite::record::{EdgeRecord, NodeRecord, FLAG_ACTIVE, FLAG_DIRECTED, NO_VECTOR_OFFSET};
 use std::collections::{BTreeSet, HashSet};
 
 #[test]

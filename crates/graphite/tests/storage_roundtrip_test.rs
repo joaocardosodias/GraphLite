@@ -2,13 +2,13 @@ use std::fs::OpenOptions;
 use std::io::Write;
 use tempfile::tempdir;
 
-use graphite_core::error::GraphiteError;
-use graphite_core::graph::csr::CsrGraph;
-use graphite_core::id::{EdgeId, NodeId, StringId};
-use graphite_core::interner::StringInterner;
-use graphite_core::record::{EdgeRecord, NodeRecord, NO_VECTOR_OFFSET};
-use graphite_core::storage::{write_database_atomic, MmapGraphReader, GRAPH_MAGIC};
-use graphite_core::vector::quantization::QuantizedVector;
+use graphite::error::GraphiteError;
+use graphite::graph::csr::CsrGraph;
+use graphite::id::{EdgeId, NodeId, StringId};
+use graphite::interner::StringInterner;
+use graphite::record::{EdgeRecord, NodeRecord, NO_VECTOR_OFFSET};
+use graphite::storage::{write_database_atomic, MmapGraphReader, GRAPH_MAGIC};
+use graphite::vector::quantization::QuantizedVector;
 
 #[test]
 fn test_large_scale_storage_roundtrip_fidelity() {

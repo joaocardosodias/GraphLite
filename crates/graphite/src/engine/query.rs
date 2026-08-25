@@ -52,6 +52,67 @@ impl Default for QueryOptions {
     }
 }
 
+impl QueryOptions {
+    /// Creates a new `QueryOptions` with default values.
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    /// Sets the number of entry seed nodes retrieved via vector search.
+    pub fn with_top_k(mut self, top_k: usize) -> Self {
+        self.top_k_seeds = top_k;
+        self
+    }
+
+    /// Sets the number of entry seed nodes retrieved via vector search (alias).
+    pub fn with_top_k_seeds(mut self, top_k: usize) -> Self {
+        self.top_k_seeds = top_k;
+        self
+    }
+
+    /// Sets the maximum token budget for the returned prompt context.
+    pub fn with_max_tokens(mut self, max_tokens: usize) -> Self {
+        self.max_tokens = Some(max_tokens);
+        self
+    }
+
+    /// Sets the query text for lexical BM25 matching and Reciprocal Rank Fusion.
+    pub fn with_query_text<S: Into<String>>(mut self, text: S) -> Self {
+        self.query_text = Some(text.into());
+        self
+    }
+
+    /// Sets the Markdown rendering style.
+    pub fn with_markdown_style(mut self, style: MarkdownStyle) -> Self {
+        self.markdown_style = style;
+        self
+    }
+
+    /// Sets the maximum BFS exploration depth in hops.
+    pub fn with_max_depth(mut self, depth: usize) -> Self {
+        self.max_depth = Some(depth);
+        self
+    }
+
+    /// Sets the vector vs graph alpha balance parameter ($0.0 \le \alpha \le 1.0$).
+    pub fn with_alpha(mut self, alpha: f32) -> Self {
+        self.alpha = Some(alpha);
+        self
+    }
+
+    /// Sets the minimum hybrid score threshold for entities to be included.
+    pub fn with_min_score(mut self, threshold: f32) -> Self {
+        self.min_score_threshold = Some(threshold);
+        self
+    }
+
+    /// Sets an entity type filter list.
+    pub fn with_type_filter<S: ToString>(mut self, types: &[S]) -> Self {
+        self.type_filter = Some(types.iter().map(|t| t.to_string()).collect());
+        self
+    }
+}
+
 /// The structured result of an end-to-end Graphite retrieval query.
 #[derive(Debug, Clone, PartialEq)]
 pub struct QueryResult {

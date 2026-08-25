@@ -1,9 +1,9 @@
-use graphite_core::graph::{
+use graphite::graph::{
     bfs_adjacency, bfs_csr, extract_subgraph_adjacency, extract_subgraph_csr, AdjacencyGraph,
     CsrGraph, HybridScoreConfig, TraversalConfig, TraversalDirection,
 };
-use graphite_core::id::{EdgeId, NodeId, StringId};
-use graphite_core::record::{EdgeRecord, NodeRecord, NO_VECTOR_OFFSET};
+use graphite::id::{EdgeId, NodeId, StringId};
+use graphite::record::{EdgeRecord, NodeRecord, NO_VECTOR_OFFSET};
 
 /// Helper to create a NodeRecord with minimal boilerplate.
 fn make_node(id: u32, name_id: u32) -> NodeRecord {

@@ -13,7 +13,7 @@ name = "graphite"
 path = "src/main.rs"
 
 [dependencies]
-graphite-core = { workspace = true }
+graphite = { workspace = true }
 clap = { workspace = true }
 indicatif = { workspace = true }
 anyhow = { workspace = true }

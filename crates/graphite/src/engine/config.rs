@@ -12,9 +12,9 @@ use serde::{Deserialize, Serialize};
 /// # Example
 ///
 /// ```rust
-/// use graphite_core::engine::GraphiteConfig;
-/// use graphite_core::vector::Metric;
-/// use graphite_core::vector::Quantization;
+/// use graphite::engine::GraphiteConfig;
+/// use graphite::vector::Metric;
+/// use graphite::vector::Quantization;
 ///
 /// let config = GraphiteConfig::new()
 ///     .with_dim(384)
@@ -88,7 +88,7 @@ impl GraphiteConfig {
     /// Creates a new `GraphiteConfig` with standard recommended defaults.
     ///
     /// ```rust
-    /// use graphite_core::engine::GraphiteConfig;
+    /// use graphite::engine::GraphiteConfig;
     ///
     /// let config = GraphiteConfig::new();
     /// assert_eq!(config.vector_dim, 384);

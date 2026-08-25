@@ -4,12 +4,12 @@ use std::path::Path;
 use std::time::Instant;
 
 use anyhow::{Context, Result};
-use graphite_core::engine::config::GraphiteConfig;
-use graphite_core::engine::instance::GraphiteEngine;
-use graphite_core::storage::mmap_reader::MmapGraphReader;
-use graphite_core::vector::distance::Metric;
-use graphite_core::vector::quantization::Quantization;
-use graphite_core::LocalEmbedder;
+use graphite::engine::config::GraphiteConfig;
+use graphite::engine::instance::GraphiteEngine;
+use graphite::storage::mmap_reader::MmapGraphReader;
+use graphite::vector::distance::Metric;
+use graphite::vector::quantization::Quantization;
+use graphite::LocalEmbedder;
 
 use crate::args::RememberArgs;
 

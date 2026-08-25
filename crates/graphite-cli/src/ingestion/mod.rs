@@ -13,12 +13,12 @@ use std::time::{Duration, Instant};
 use anyhow::{bail, Context, Result};
 use indicatif::{ProgressBar, ProgressStyle};
 
-use graphite_core::engine::config::GraphiteConfig;
-use graphite_core::engine::instance::GraphiteEngine;
-use graphite_core::storage::mmap_reader::MmapGraphReader;
-use graphite_core::vector::distance::Metric;
-use graphite_core::vector::quantization::Quantization;
-use graphite_core::LocalEmbedder;
+use graphite::engine::config::GraphiteConfig;
+use graphite::engine::instance::GraphiteEngine;
+use graphite::storage::mmap_reader::MmapGraphReader;
+use graphite::vector::distance::Metric;
+use graphite::vector::quantization::Quantization;
+use graphite::LocalEmbedder;
 
 use self::chunker::{chunk_markdown_document, chunk_plain_document, ChunkConfig, DocumentChunk};
 use crate::args::IngestArgs;
@@ -108,7 +108,7 @@ pub fn link_related_chunks(chunks: &mut [DocumentChunk]) {
     let mut concept_to_chunks: HashMap<String, Vec<usize>> = HashMap::new();
 
     for (idx, chunk) in chunks.iter().enumerate() {
-        let tokens = graphite_core::graph::bm25::Bm25Index::tokenize(&chunk.content);
+        let tokens = graphite::graph::bm25::Bm25Index::tokenize(&chunk.content);
         let mut unique_concepts: HashSet<String> = HashSet::new();
 
         for token in tokens {

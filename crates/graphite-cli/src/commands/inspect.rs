@@ -3,8 +3,8 @@ use serde::Serialize;
 use std::fs;
 use std::path::Path;
 
-use graphite_core::storage::checksum::verify_file_integrity;
-use graphite_core::storage::mmap_reader::MmapGraphReader;
+use graphite::storage::checksum::verify_file_integrity;
+use graphite::storage::mmap_reader::MmapGraphReader;
 
 use crate::args::InspectArgs;
 

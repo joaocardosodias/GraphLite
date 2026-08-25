@@ -3,15 +3,15 @@ use std::fs;
 use std::path::Path;
 use std::time::Instant;
 
-use graphite_core::engine::config::GraphiteConfig;
-use graphite_core::engine::instance::GraphiteEngine;
-use graphite_core::engine::query::QueryOptions;
-use graphite_core::prompt::format_subgraph_triples;
-use graphite_core::prompt::json::to_json_payload;
-use graphite_core::prompt::markdown::MarkdownStyle;
-use graphite_core::storage::mmap_reader::MmapGraphReader;
-use graphite_core::vector::distance::Metric;
-use graphite_core::vector::quantization::Quantization;
+use graphite::engine::config::GraphiteConfig;
+use graphite::engine::instance::GraphiteEngine;
+use graphite::engine::query::QueryOptions;
+use graphite::prompt::format_subgraph_triples;
+use graphite::prompt::json::to_json_payload;
+use graphite::prompt::markdown::MarkdownStyle;
+use graphite::storage::mmap_reader::MmapGraphReader;
+use graphite::vector::distance::Metric;
+use graphite::vector::quantization::Quantization;
 
 use crate::args::{CliOutputFormat, QueryArgs};
 
@@ -88,7 +88,7 @@ pub fn execute_query(db_path: &Path, args: &QueryArgs, verbose: bool) -> Result<
     let query_vector = if let Some(raw) = args.vector.as_deref() {
         parse_vector_arg(Some(raw))?
     } else if let Some(ref text) = args.query_text {
-        let embedder = graphite_core::LocalEmbedder::new_minilm()
+        let embedder = graphite::LocalEmbedder::new_minilm()
             .with_context(|| "Failed to initialize local ONNX embedding model")?;
         Some(embedder.embed_one(text)?)
     } else {
@@ -142,7 +142,7 @@ pub fn execute_query(db_path: &Path, args: &QueryArgs, verbose: bool) -> Result<
 
     if args.rerank {
         if let Some(ref q_text) = args.query_text {
-            let reranker = graphite_core::LocalReranker::new_bge_base()
+            let reranker = graphite::LocalReranker::new_bge_base()
                 .with_context(|| "Failed to initialize local ONNX Cross-Encoder reranker")?;
 
             let candidate_docs: Vec<String> = result
@@ -184,19 +184,19 @@ pub fn execute_query(db_path: &Path, args: &QueryArgs, verbose: bool) -> Result<
                             .map(|st| st.to_interner())
                             .unwrap_or_default()
                     } else {
-                        graphite_core::interner::StringInterner::new()
+                        graphite::interner::StringInterner::new()
                     }
                 };
 
-                let connected_subgraph = graphite_core::ConnectedSubgraph {
+                let connected_subgraph = graphite::ConnectedSubgraph {
                     entities: reranked_entities,
                     edges: result.pruned_subgraph.edges.clone(),
                     seed_ids: Vec::new(),
                 };
 
                 let token_budget = args.tokens.unwrap_or(engine.config().default_max_tokens);
-                let token_counter = graphite_core::TiktokenCounter::cl100k();
-                let pruned = graphite_core::prune_subgraph_by_budget_mmr(
+                let token_counter = graphite::TiktokenCounter::cl100k();
+                let pruned = graphite::prune_subgraph_by_budget_mmr(
                     &connected_subgraph,
                     &interner,
                     token_budget,
@@ -204,19 +204,19 @@ pub fn execute_query(db_path: &Path, args: &QueryArgs, verbose: bool) -> Result<
                     engine.config().mmr_lambda,
                 );
 
-                let format_config = graphite_core::MarkdownFormatConfig {
+                let format_config = graphite::MarkdownFormatConfig {
                     header_title: "Retrieved Knowledge Context (Reranked)".to_string(),
                     include_scores: true,
                     include_edge_weights: true,
                     style: MarkdownStyle::Hierarchical,
                 };
-                let markdown = graphite_core::format_pruned_subgraph_markdown(
+                let markdown = graphite::format_pruned_subgraph_markdown(
                     &pruned,
                     &interner,
                     &format_config,
                 );
 
-                result = graphite_core::QueryResult {
+                result = graphite::QueryResult {
                     markdown,
                     token_count: pruned.total_tokens,
                     entities_count: pruned.entities.len(),
@@ -242,7 +242,7 @@ pub fn execute_query(db_path: &Path, args: &QueryArgs, verbose: bool) -> Result<
                         .map(|st| st.to_interner())
                         .unwrap_or_default()
                 } else {
-                    graphite_core::interner::StringInterner::new()
+                    graphite::interner::StringInterner::new()
                 }
             };
             let payload = to_json_payload(&result.pruned_subgraph, &interner);
@@ -256,7 +256,7 @@ pub fn execute_query(db_path: &Path, args: &QueryArgs, verbose: bool) -> Result<
                         .map(|st| st.to_interner())
                         .unwrap_or_default()
                 } else {
-                    graphite_core::interner::StringInterner::new()
+                    graphite::interner::StringInterner::new()
                 }
             };
             let triples = format_subgraph_triples(&result.pruned_subgraph, &interner);

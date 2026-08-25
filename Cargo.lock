@@ -1032,33 +1032,6 @@ name = "graphite"
 version = "0.1.0"
 dependencies = [
  "anyhow",
- "graphite-core",
- "serde",
- "serde_json",
- "tempfile",
- "thiserror",
-]
-
-[[package]]
-name = "graphite-cli"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "clap",
- "graphite-core",
- "indicatif 0.17.11",
- "parking_lot",
- "serde",
- "serde_json",
- "serde_yaml",
- "tiny_http",
-]
-
-[[package]]
-name = "graphite-core"
-version = "0.1.0"
-dependencies = [
- "anyhow",
  "criterion",
  "fastembed",
  "memmap2",
@@ -1070,6 +1043,21 @@ dependencies = [
  "tempfile",
  "thiserror",
  "tiktoken-rs",
+]
+
+[[package]]
+name = "graphite-cli"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "clap",
+ "graphite",
+ "indicatif 0.17.11",
+ "parking_lot",
+ "serde",
+ "serde_json",
+ "serde_yaml",
+ "tiny_http",
 ]
 
 [[package]]

@@ -2,10 +2,10 @@ use anyhow::{bail, Result};
 use std::fs;
 use std::path::Path;
 
-use graphite_core::engine::config::GraphiteConfig;
-use graphite_core::engine::instance::GraphiteEngine;
-use graphite_core::vector::distance::Metric;
-use graphite_core::vector::quantization::Quantization;
+use graphite::engine::config::GraphiteConfig;
+use graphite::engine::instance::GraphiteEngine;
+use graphite::vector::distance::Metric;
+use graphite::vector::quantization::Quantization;
 
 use crate::args::{CliMetric, CliQuantization, InitArgs};
 

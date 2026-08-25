@@ -42,7 +42,7 @@ impl GraphiteEngine {
     /// # Example
     ///
     /// ```rust
-    /// use graphite_core::engine::{GraphiteConfig, GraphiteEngine};
+    /// use graphite::engine::{GraphiteConfig, GraphiteEngine};
     /// use tempfile::tempdir;
     ///
     /// let dir = tempdir().unwrap();
@@ -156,7 +156,7 @@ impl GraphiteEngine {
     /// # Example
     ///
     /// ```rust
-    /// use graphite_core::engine::{GraphiteConfig, GraphiteEngine};
+    /// use graphite::engine::{GraphiteConfig, GraphiteEngine};
     ///
     /// let config = GraphiteConfig::new().with_dim(4);
     /// let db = GraphiteEngine::in_memory(config).unwrap();

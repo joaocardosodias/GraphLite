@@ -1,22 +1,22 @@
 ---
 title: Guia do Rust SDK & Integração de Embeddings
-description: Guia completo para integração programática do graphite-core em aplicações Rust, abrangendo concorrência multi-thread, resolução de entidades e síntese de prompts GraphRAG.
+description: Guia completo para integração programática do graphite em aplicações Rust, abrangendo concorrência multi-thread, resolução de entidades e síntese de prompts GraphRAG.
 ---
 
 import { Step, Steps } from 'fumadocs-ui/components/steps';
 import { Tab, Tabs } from 'fumadocs-ui/components/tabs';
 
-O crate `graphite-core` expõe uma API fortemente tipada e segura para concorrência multi-thread. Ele permite que aplicações Rust, microsserviços e frameworks de agentes de IA incorporem Grafos de Conhecimento e busca vetorial SIMD diretamente no seu espaço de endereçamento, com zero dependências C/C++ ou servidores externos.
+O crate `graphite` expõe uma API fortemente tipada e segura para concorrência multi-thread. Ele permite que aplicações Rust, microsserviços e frameworks de agentes de IA incorporem Grafos de Conhecimento e busca vetorial SIMD diretamente no seu espaço de endereçamento, com zero dependências C/C++ ou servidores externos.
 
 ---
 
 ## 1. Configuração de Dependências no Cargo
 
-Adicione o `graphite-core` ao seu arquivo `Cargo.toml`:
+Adicione o `graphite` ao seu arquivo `Cargo.toml`:
 
 ```toml
 [dependencies]
-graphite-core = { version = "0.1", features = ["fastembed", "tiktoken", "serde"] }
+graphite = { version = "0.1", features = ["fastembed", "tiktoken", "serde"] }
 ```
 
 ### Feature Flags Disponíveis
@@ -34,8 +34,8 @@ graphite-core = { version = "0.1", features = ["fastembed", "tiktoken", "serde"]
 A estrutura `GraphiteConfig` utiliza o padrão Builder para configurar dimensões vetoriais, métricas de distância, quantização e políticas de travessia.
 
 ```rust
-use graphite_core::engine::{GraphiteConfig, GraphiteEngine};
-use graphite_core::vector::{Metric, Quantization};
+use graphite::engine::{GraphiteConfig, GraphiteEngine};
+use graphite::vector::{Metric, Quantization};
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     // 1. Configurar parâmetros do motor
@@ -93,7 +93,7 @@ db.flush()?;
 Recupere o contexto sintetizado em Markdown com orçamento estrito de tokens para injeção em prompts de LLMs.
 
 ```rust
-use graphite_core::engine::QueryOptions;
+use graphite::engine::QueryOptions;
 
 fn recuperar_contexto_rag(
     db: &GraphiteEngine,

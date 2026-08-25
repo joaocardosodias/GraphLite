@@ -2,15 +2,15 @@ use criterion::{criterion_group, criterion_main, BenchmarkId, Criterion};
 use std::hint::black_box;
 use tempfile::tempdir;
 
-use graphite_core::engine::config::GraphiteConfig;
-use graphite_core::engine::instance::GraphiteEngine;
-use graphite_core::graph::adjacency::AdjacencyGraph;
-use graphite_core::graph::traversal::{bfs_csr, TraversalConfig};
-use graphite_core::id::{EdgeId, NodeId, StringId};
-use graphite_core::record::{EdgeRecord, NodeRecord};
-use graphite_core::vector::distance::{cosine_similarity, Metric};
-use graphite_core::vector::quantization::{Quantization, QuantizedVector};
-use graphite_core::vector::simd::simd_cosine_similarity;
+use graphite::engine::config::GraphiteConfig;
+use graphite::engine::instance::GraphiteEngine;
+use graphite::graph::adjacency::AdjacencyGraph;
+use graphite::graph::traversal::{bfs_csr, TraversalConfig};
+use graphite::id::{EdgeId, NodeId, StringId};
+use graphite::record::{EdgeRecord, NodeRecord};
+use graphite::vector::distance::{cosine_similarity, Metric};
+use graphite::vector::quantization::{Quantization, QuantizedVector};
+use graphite::vector::simd::simd_cosine_similarity;
 
 fn bench_simd_cosine_similarity(c: &mut Criterion) {
     let mut group = c.benchmark_group("simd_vs_scalar_cosine");
