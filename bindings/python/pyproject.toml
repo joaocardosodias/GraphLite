@@ -3,7 +3,7 @@ requires = ["maturin>=1.5,<2.0"]
 build-backend = "maturin"
 
 [project]
-name = "graphite-db"
+name = "graphite-database"
 version = "0.1.0"
 description = "Official Python bindings for Graphite: embedded GraphRAG and knowledge graph engine"
 readme = "README.md"

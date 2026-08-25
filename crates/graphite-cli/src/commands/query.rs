@@ -210,11 +210,8 @@ pub fn execute_query(db_path: &Path, args: &QueryArgs, verbose: bool) -> Result<
                     include_edge_weights: true,
                     style: MarkdownStyle::Hierarchical,
                 };
-                let markdown = graphite::format_pruned_subgraph_markdown(
-                    &pruned,
-                    &interner,
-                    &format_config,
-                );
+                let markdown =
+                    graphite::format_pruned_subgraph_markdown(&pruned, &interner, &format_config);
 
                 result = graphite::QueryResult {
                     markdown,

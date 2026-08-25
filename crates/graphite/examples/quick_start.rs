@@ -13,9 +13,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("============================================================\n");
 
     // 1. Initialize an in-memory database with 4-dimensional vectors
-    let config = GraphiteConfig::new()
-        .with_dim(4)
-        .with_max_tokens(400);
+    let config = GraphiteConfig::new().with_dim(4).with_max_tokens(400);
 
     let db = Graphite::in_memory(config)?;
 
@@ -24,9 +22,24 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let v_jwt = [0.95, 0.05, 0.0, 0.0];
     let v_db = [0.1, 0.9, 0.0, 0.0];
 
-    let id_auth = db.upsert_node("AuthService", "Module", "Handles user authentication and JWT sessions", Some(&v_auth))?;
-    let id_jwt = db.upsert_node("JwtValidator", "Component", "Validates RS256 JWT tokens and claims", Some(&v_jwt))?;
-    let id_db = db.upsert_node("UsersDB", "Database", "PostgreSQL database storing user profiles", Some(&v_db))?;
+    let id_auth = db.upsert_node(
+        "AuthService",
+        "Module",
+        "Handles user authentication and JWT sessions",
+        Some(&v_auth),
+    )?;
+    let id_jwt = db.upsert_node(
+        "JwtValidator",
+        "Component",
+        "Validates RS256 JWT tokens and claims",
+        Some(&v_jwt),
+    )?;
+    let id_db = db.upsert_node(
+        "UsersDB",
+        "Database",
+        "PostgreSQL database storing user profiles",
+        Some(&v_db),
+    )?;
 
     // 3. Connect entities with relationships
     db.add_edge(id_auth, id_jwt, "USES", 0.95, true)?;

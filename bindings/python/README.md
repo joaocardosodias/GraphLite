@@ -12,7 +12,7 @@
 </p>
 
 <p align="center">
-  <a href="https://pypi.org/project/graphite-db"><img src="https://img.shields.io/pypi/v/graphite-db.svg?color=black" alt="PyPI" /></a>
+  <a href="https://pypi.org/project/graphite-database"><img src="https://img.shields.io/pypi/v/graphite-db.svg?color=black" alt="PyPI" /></a>
   <a href="https://github.com/joaocardosodias/Graphite/blob/main/LICENSE"><img src="https://img.shields.io/badge/License-MIT%20OR%20Apache--2.0-black.svg" alt="License" /></a>
   <a href="https://joaocardosodias.github.io/Graphite"><img src="https://img.shields.io/badge/docs-fumadocs-black.svg" alt="Documentation" /></a>
 </p>
@@ -24,7 +24,7 @@
 ## Installation
 
 ```bash
-pip install graphite-db
+pip install graphite-database
 ```
 
 ---

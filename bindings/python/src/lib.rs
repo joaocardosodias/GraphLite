@@ -85,7 +85,12 @@ impl PyGraphite {
             "euclidean" | "l2" => Metric::Euclidean,
             "dot" | "dot_product" => Metric::DotProduct,
             "manhattan" | "l1" => Metric::Manhattan,
-            other => return Err(PyValueError::new_err(format!("Unsupported metric: {}", other))),
+            other => {
+                return Err(PyValueError::new_err(format!(
+                    "Unsupported metric: {}",
+                    other
+                )))
+            }
         };
 
         let quant_enum = match quantization.to_lowercase().as_str() {
@@ -108,9 +113,8 @@ impl PyGraphite {
         let engine = match path {
             Some(p) => GraphiteEngine::open_or_create(Path::new(&p), config)
                 .map_err(|e| PyIOError::new_err(e.to_string()))?,
-            None => {
-                GraphiteEngine::in_memory(config).map_err(|e| PyRuntimeError::new_err(e.to_string()))?
-            }
+            None => GraphiteEngine::in_memory(config)
+                .map_err(|e| PyRuntimeError::new_err(e.to_string()))?,
         };
 
         let embedder = LocalEmbedder::new_minilm().ok().map(Arc::new);
@@ -137,7 +141,12 @@ impl PyGraphite {
     /// Creates an in-memory ephemeral Graphite instance.
     #[staticmethod]
     #[pyo3(signature = (dim = 384, max_tokens = 400, metric = "cosine", quantization = "sq8"))]
-    fn in_memory(dim: usize, max_tokens: usize, metric: &str, quantization: &str) -> PyResult<Self> {
+    fn in_memory(
+        dim: usize,
+        max_tokens: usize,
+        metric: &str,
+        quantization: &str,
+    ) -> PyResult<Self> {
         Self::new(None, dim, max_tokens, metric, quantization)
     }
 
@@ -362,7 +371,8 @@ impl PyGraphite {
 /// Generates a 384-dimensional embedding vector locally on CPU using FastEmbed (MiniLM-L6-v2).
 #[pyfunction]
 fn embed(text: &str) -> PyResult<Vec<f32>> {
-    let embedder = LocalEmbedder::new_minilm().map_err(|e| PyRuntimeError::new_err(e.to_string()))?;
+    let embedder =
+        LocalEmbedder::new_minilm().map_err(|e| PyRuntimeError::new_err(e.to_string()))?;
     embedder
         .embed_one(text)
         .map_err(|e| PyRuntimeError::new_err(e.to_string()))
@@ -371,7 +381,8 @@ fn embed(text: &str) -> PyResult<Vec<f32>> {
 /// Generates embedding vectors for a batch of text strings.
 #[pyfunction]
 fn embed_batch(texts: Vec<String>) -> PyResult<Vec<Vec<f32>>> {
-    let embedder = LocalEmbedder::new_minilm().map_err(|e| PyRuntimeError::new_err(e.to_string()))?;
+    let embedder =
+        LocalEmbedder::new_minilm().map_err(|e| PyRuntimeError::new_err(e.to_string()))?;
     embedder
         .embed_batch(&texts)
         .map_err(|e| PyRuntimeError::new_err(e.to_string()))
