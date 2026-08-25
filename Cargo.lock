@@ -1028,6 +1028,18 @@ dependencies = [
 ]
 
 [[package]]
+name = "graphite"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "graphite-core",
+ "serde",
+ "serde_json",
+ "tempfile",
+ "thiserror",
+]
+
+[[package]]
 name = "graphite-cli"
 version = "0.1.0"
 dependencies = [

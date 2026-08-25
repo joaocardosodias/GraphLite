@@ -1,5 +1,6 @@
 [workspace]
 members = [
+    "crates/graphite",
     "crates/graphite-core",
     "crates/graphite-cli",
 ]
