@@ -32,8 +32,11 @@ pub struct Cli {
 
 #[derive(Subcommand, Debug)]
 pub enum Commands {
-    /// Initialize a new empty `.graph` database file with the given configuration.
+    /// Initialize a new empty `.graph` database file with custom or interactive configuration.
     Init(InitArgs),
+
+    /// Create a new `.graph` database file (alias for init, interactive by default when run in a terminal).
+    Create(InitArgs),
 
     /// Insert or update an entity node with optional embedding vector.
     InsertNode(InsertNodeArgs),
@@ -60,16 +63,46 @@ pub enum Commands {
     Serve(ServeArgs),
 }
 
-#[derive(Args, Debug)]
+#[derive(Args, Debug, Clone)]
 pub struct InitArgs {
-    /// Vector embedding dimensionality (e.g. 384, 768, 1536).
+    /// Local embedding model to use (e.g. all-minilm-l6-v2, multilingual-minilm-l12-v2, multilingual-e5-base, bge-m3, nomic-embed-text-v1.5, custom).
+    #[arg(
+        short = 'e',
+        long = "embedding-model",
+        help = "Embedding model (dimension is inferred automatically)"
+    )]
+    pub embedding_model: Option<String>,
+
+    /// Local reranker model to use (e.g. bge-reranker-base, bge-reranker-v2-m3, jina-reranker-v1-turbo-en, jina-reranker-v2-base-multilingual, none).
+    #[arg(
+        short = 'r',
+        long = "reranker-model",
+        help = "Reranker model (cross-encoder for deep accuracy, or 'none')"
+    )]
+    pub reranker_model: Option<String>,
+
+    /// Launch interactive terminal wizard to configure the database.
+    #[arg(
+        short = 'i',
+        long = "interactive",
+        help = "Launch interactive terminal setup wizard"
+    )]
+    pub interactive: bool,
+
+    /// Immediately pre-download and verify ONNX model weights with progress bar.
+    #[arg(
+        long = "download",
+        help = "Pre-download and cache model weights immediately"
+    )]
+    pub download: bool,
+
+    /// Vector embedding dimensionality (inferred automatically from the chosen embedding model).
     #[arg(
         short = 'D',
         long,
-        default_value_t = 384,
-        help = "Vector embedding dimension"
+        help = "Vector dimension (only needed for custom models without local embedder)"
     )]
-    pub dim: usize,
+    pub dim: Option<usize>,
 
     /// Vector distance metric.
     #[arg(short = 'm', long, value_enum, default_value_t = CliMetric::Cosine, help = "Distance metric")]
@@ -223,12 +256,19 @@ pub struct QueryArgs {
     #[arg(short = 'f', long, value_enum, default_value_t = CliOutputFormat::Markdown, help = "Output format")]
     pub format: CliOutputFormat,
 
-    /// Enable local Cross-Encoder semantic re-ranking on candidate entities.
+    /// Enable local Cross-Encoder semantic re-ranking on candidate entities (active by default if database has reranker).
     #[arg(
         long,
-        help = "Enable local Cross-Encoder semantic reranking on candidates"
+        help = "Force enable local Cross-Encoder semantic reranking"
     )]
     pub rerank: bool,
+
+    /// Disable Cross-Encoder reranking and use pure fast hybrid retrieval (< 10ms).
+    #[arg(
+        long = "no-rerank",
+        help = "Disable Cross-Encoder reranking for ultra-low latency (< 10ms)"
+    )]
+    pub no_rerank: bool,
 }
 
 #[derive(Args, Debug)]

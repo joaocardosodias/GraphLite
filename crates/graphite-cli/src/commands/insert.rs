@@ -63,7 +63,8 @@ fn load_or_default_config(db_path: &Path) -> GraphiteConfig {
             return GraphiteConfig::new()
                 .with_dim(dim)
                 .with_metric(metric)
-                .with_quantization(quant);
+                .with_quantization(quant)
+                .with_models(reader.header().embedding_model_id(), reader.header().reranker_model_id());
         }
     }
     GraphiteConfig::default()
@@ -77,8 +78,12 @@ pub fn execute_insert_node(db_path: &Path, args: &InsertNodeArgs) -> Result<()> 
         parse_vector_arg(Some(raw))?
     } else if args.auto_embed {
         let text_to_embed = format!("{} {}: {}", args.name, args.entity_type, args.description);
-        let embedder = graphite::LocalEmbedder::new_minilm()
-            .with_context(|| "Failed to initialize local ONNX embedding model")?;
+        let emb_type = graphite::vector::embedding::EmbeddingModelType::from_id(
+            engine.config().embedding_model_id,
+            engine.config().vector_dim,
+        );
+        let embedder = graphite::LocalEmbedder::from_model_type(emb_type)
+            .with_context(|| format!("Failed to initialize local ONNX embedding model ({})", emb_type.name()))?;
         Some(embedder.embed_one(&text_to_embed)?)
     } else {
         None

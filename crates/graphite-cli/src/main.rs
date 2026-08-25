@@ -22,6 +22,13 @@ fn main() -> Result<()> {
         Commands::Init(args) => {
             execute_init(&cli.db_path, args)?;
         }
+        Commands::Create(args) => {
+            let mut create_args = args.clone();
+            if create_args.embedding_model.is_none() && create_args.dim.is_none() {
+                create_args.interactive = true;
+            }
+            execute_init(&cli.db_path, &create_args)?;
+        }
         Commands::InsertNode(args) => {
             execute_insert_node(&cli.db_path, args)?;
         }

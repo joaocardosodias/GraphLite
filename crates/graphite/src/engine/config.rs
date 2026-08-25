@@ -52,6 +52,10 @@ pub struct GraphiteConfig {
     /// - 1.0: 100% Relevance, no diversity penalty.
     /// - 0.75: Balanced relevance with duplicate suppression (default).
     pub mmr_lambda: f32,
+    /// Configured local Embedding Model identifier (0: all-MiniLM-L6-v2, 1: bge-small, etc.).
+    pub embedding_model_id: u8,
+    /// Configured local Reranker Model identifier (0: none, 1: bge-reranker-base, etc.).
+    pub reranker_model_id: u8,
 }
 
 impl Default for GraphiteConfig {
@@ -80,6 +84,8 @@ impl Default for GraphiteConfig {
             cache_capacity: 1000,
             direct_write: false,
             mmr_lambda: 0.75,
+            embedding_model_id: 0, // all-MiniLM-L6-v2
+            reranker_model_id: 1,  // bge-reranker-base
         }
     }
 }
@@ -95,6 +101,25 @@ impl GraphiteConfig {
     /// ```
     pub fn new() -> Self {
         Self::default()
+    }
+
+    /// Sets the configured embedding and reranker model identifiers.
+    pub fn with_models(mut self, embedding_model_id: u8, reranker_model_id: u8) -> Self {
+        self.embedding_model_id = embedding_model_id;
+        self.reranker_model_id = reranker_model_id;
+        self
+    }
+
+    /// Sets the embedding model identifier.
+    pub fn with_embedding_model_id(mut self, id: u8) -> Self {
+        self.embedding_model_id = id;
+        self
+    }
+
+    /// Sets the reranker model identifier.
+    pub fn with_reranker_model_id(mut self, id: u8) -> Self {
+        self.reranker_model_id = id;
+        self
     }
 
     /// Sets the vector embedding dimension.

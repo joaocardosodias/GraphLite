@@ -378,8 +378,21 @@ pub fn execute_ingest(db_path: &Path, args: &IngestArgs) -> Result<()> {
 
     println!("Scanning documents in '{}'...", target_path.display());
 
-    let embedder = LocalEmbedder::new_minilm()
-        .with_context(|| "Failed to initialize local ONNX embedding model")?;
+    let emb_type = if db_path.exists() {
+        if let Ok(reader) = graphite::storage::mmap_reader::MmapGraphReader::open(db_path) {
+            graphite::vector::embedding::EmbeddingModelType::from_id(
+                reader.header().embedding_model_id(),
+                reader.header().vector_dim as usize,
+            )
+        } else {
+            graphite::vector::embedding::EmbeddingModelType::AllMiniLML6V2
+        }
+    } else {
+        graphite::vector::embedding::EmbeddingModelType::AllMiniLML6V2
+    };
+
+    let embedder = LocalEmbedder::from_model_type(emb_type)
+        .with_context(|| format!("Failed to initialize local ONNX embedding model ({})", emb_type.name()))?;
 
     // 1. Initial ingestion pass
     run_ingest_pass(db_path, args, &embedder, false)?;
@@ -387,7 +400,7 @@ pub fn execute_ingest(db_path: &Path, args: &IngestArgs) -> Result<()> {
     // 2. Continuous Watch mode if requested
     if args.watch {
         println!(
-            "\n[Watch] 👁️  Watching '{}' for changes every 1s... (Press Ctrl+C to exit)",
+            "\n[Watch] Watching '{}' for changes every 1s... (Press Ctrl+C to exit)",
             target_path.display()
         );
 

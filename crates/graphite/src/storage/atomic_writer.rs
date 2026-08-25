@@ -22,6 +22,8 @@ pub fn serialize_database(
     interner: &StringInterner,
     vector_dim: usize,
     metric_type: u8,
+    embedding_model_id: u8,
+    reranker_model_id: u8,
 ) -> Vec<u8> {
     let node_bytes = serialize_node_block(nodes);
     let edge_bytes = serialize_csr_block(csr);
@@ -33,7 +35,8 @@ pub fn serialize_database(
     let vector_offset = edge_offset + edge_bytes.len() as u64;
     let string_offset = vector_offset + vector_bytes.len() as u64;
 
-    let mut header = GraphHeader::new(vector_dim as u16, metric_type, 1);
+    let mut header = GraphHeader::new(vector_dim as u16, metric_type, 1)
+        .with_models(embedding_model_id, reranker_model_id);
     header.flags = FLAG_QUANTIZED_SQ8;
     header.node_count = nodes.len() as u32;
     header.edge_count = csr.edge_count() as u32;
@@ -75,6 +78,8 @@ pub fn write_database_atomic<P: AsRef<Path>>(
     interner: &StringInterner,
     vector_dim: usize,
     metric_type: u8,
+    embedding_model_id: u8,
+    reranker_model_id: u8,
 ) -> Result<()> {
     let target = target_path.as_ref();
     let parent_dir = target.parent().unwrap_or_else(|| Path::new("."));
@@ -84,7 +89,16 @@ pub fn write_database_atomic<P: AsRef<Path>>(
         fs::create_dir_all(parent_dir)?;
     }
 
-    let file_payload = serialize_database(nodes, csr, vectors, interner, vector_dim, metric_type);
+    let file_payload = serialize_database(
+        nodes,
+        csr,
+        vectors,
+        interner,
+        vector_dim,
+        metric_type,
+        embedding_model_id,
+        reranker_model_id,
+    );
 
     // Unique temporary filename to prevent race conditions
     let pid = std::process::id();
@@ -120,6 +134,8 @@ pub fn write_database_direct<P: AsRef<Path>>(
     interner: &StringInterner,
     vector_dim: usize,
     metric_type: u8,
+    embedding_model_id: u8,
+    reranker_model_id: u8,
 ) -> Result<()> {
     let target = target_path.as_ref();
     let parent_dir = target.parent().unwrap_or_else(|| Path::new("."));
@@ -128,7 +144,16 @@ pub fn write_database_direct<P: AsRef<Path>>(
         fs::create_dir_all(parent_dir)?;
     }
 
-    let file_payload = serialize_database(nodes, csr, vectors, interner, vector_dim, metric_type);
+    let file_payload = serialize_database(
+        nodes,
+        csr,
+        vectors,
+        interner,
+        vector_dim,
+        metric_type,
+        embedding_model_id,
+        reranker_model_id,
+    );
 
     let mut file = File::create(target)?;
     file.write_all(&file_payload)?;
@@ -196,6 +221,8 @@ mod tests {
             &interner,
             16,
             0, // Cosine metric
+            0, // Embedding model ID
+            1, // Reranker model ID
         )
         .unwrap();
 
@@ -206,6 +233,8 @@ mod tests {
         assert_eq!(reader.header().node_count, 2);
         assert_eq!(reader.header().edge_count, 1);
         assert_eq!(reader.header().vector_dim, 16);
+        assert_eq!(reader.header().embedding_model_id(), 0);
+        assert_eq!(reader.header().reranker_model_id(), 1);
 
         assert_eq!(reader.resolve_string(s0), Some("Graphite Engine"));
         assert_eq!(reader.resolve_string(s1), Some("Fast RAG"));
@@ -248,6 +277,8 @@ mod tests {
             &interner,
             16,
             0,
+            0,
+            1,
         )
         .unwrap();
 

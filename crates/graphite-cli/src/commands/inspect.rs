@@ -99,12 +99,21 @@ pub fn execute_inspect(db_path: &Path, args: &InspectArgs) -> Result<()> {
             if is_valid { "VALID" } else { "CORRUPTED" },
             header.checksum
         );
+        let emb_type = graphite::vector::embedding::EmbeddingModelType::from_id(
+            header.embedding_model_id(),
+            header.vector_dim as usize,
+        );
+        let rerank_type = graphite::vector::reranker::RerankerModelType::from_id(
+            header.reranker_model_id(),
+        );
+
         println!("------------------------------------------------------------");
         println!(
             "Binary Format:         {} (Version: {})",
             magic_str, header.version
         );
-        println!("Vector Dimension:      {} dimensions", header.vector_dim);
+        println!("Embedding Model:       {} ({}d)", emb_type.name(), header.vector_dim);
+        println!("Reranker Model:        {}", rerank_type.name());
         println!("Distance Metric:       {}", metric_str);
         println!("Quantization Mode:     {}", quant_str);
         println!("------------------------------------------------------------");

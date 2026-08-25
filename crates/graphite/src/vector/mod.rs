@@ -13,8 +13,8 @@ pub use distance::{
     normalize_in_place, normalized, Metric,
 };
 
-pub use embedding::LocalEmbedder;
-pub use reranker::{LocalReranker, RerankResult};
+pub use embedding::{EmbeddingModelType, LocalEmbedder};
+pub use reranker::{LocalReranker, RerankResult, RerankerModelType};
 
 pub use quantization::{Quantization, QuantizedVector};
 

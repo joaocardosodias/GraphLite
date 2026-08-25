@@ -31,10 +31,11 @@ fn load_or_default_config(db_path: &Path) -> GraphiteConfig {
             return GraphiteConfig::new()
                 .with_dim(dim)
                 .with_metric(metric)
-                .with_quantization(quant);
+                .with_quantization(quant)
+                .with_models(reader.header().embedding_model_id(), reader.header().reranker_model_id());
         }
     }
-    GraphiteConfig::new().with_dim(384)
+    GraphiteConfig::default()
 }
 
 pub fn execute_remember(db_path: &Path, args: &RememberArgs) -> Result<()> {
@@ -47,9 +48,13 @@ pub fn execute_remember(db_path: &Path, args: &RememberArgs) -> Result<()> {
     let config = load_or_default_config(db_path);
     let engine = GraphiteEngine::open_or_create(db_path, config)?;
 
-    // Embed memory text
-    let embedder = LocalEmbedder::new_minilm()
-        .with_context(|| "Failed to initialize local ONNX embedding model")?;
+    // Embed memory text using configured model
+    let emb_type = graphite::vector::embedding::EmbeddingModelType::from_id(
+        engine.config().embedding_model_id,
+        engine.config().vector_dim,
+    );
+    let embedder = LocalEmbedder::from_model_type(emb_type)
+        .with_context(|| format!("Failed to initialize local ONNX embedding model ({})", emb_type.name()))?;
     let vector = embedder.embed_one(memory_text)?;
 
     // Format memory node label

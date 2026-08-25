@@ -72,10 +72,11 @@ fn load_or_default_config(db_path: &Path) -> GraphiteConfig {
             return GraphiteConfig::new()
                 .with_dim(dim)
                 .with_metric(metric)
-                .with_quantization(quant);
+                .with_quantization(quant)
+                .with_models(reader.header().embedding_model_id(), reader.header().reranker_model_id());
         }
     }
-    GraphiteConfig::new().with_dim(384)
+    GraphiteConfig::default()
 }
 
 fn json_response<T: Serialize>(data: &T, status: u16) -> Response<std::io::Cursor<Vec<u8>>> {
@@ -131,19 +132,25 @@ pub fn execute_serve(db_path: &Path, args: &ServeArgs) -> Result<()> {
     let engine = Arc::new(RwLock::new(GraphiteEngine::open_or_create(
         db_path, config,
     )?));
+
+    let emb_type = graphite::vector::embedding::EmbeddingModelType::from_id(
+        engine.read().config().embedding_model_id,
+        engine.read().config().vector_dim,
+    );
     let embedder = Arc::new(
-        LocalEmbedder::new_minilm()
-            .with_context(|| "Failed to initialize local ONNX embedding model")?,
+        LocalEmbedder::from_model_type(emb_type)
+            .with_context(|| format!("Failed to initialize local ONNX embedding model ({})", emb_type.name()))?,
     );
 
     println!("========================================================");
-    println!("  🚀 Graphite Embedded REST API Server Running");
+    println!("  Graphite Embedded REST API Server Running");
     println!("========================================================");
-    println!("  • Base URL:     http://{}", bind_addr);
-    println!("  • Database:     {}", db_path.display());
-    println!("  • Total Nodes:  {}", engine.read().node_count());
-    println!("  • Total Edges:  {}", engine.read().edge_count());
-    println!("  • Endpoints:");
+    println!("  * Base URL:     http://{}", bind_addr);
+    println!("  * Database:     {}", db_path.display());
+    println!("  * Embedding:    {} ({}d)", emb_type.name(), engine.read().config().vector_dim);
+    println!("  * Total Nodes:  {}", engine.read().node_count());
+    println!("  * Total Edges:  {}", engine.read().edge_count());
+    println!("  * Endpoints:");
     println!("    - GET  /v1/health   -> Check server & database stats");
     println!("    - POST /v1/query    -> GraphRAG context retrieval");
     println!("    - POST /v1/remember -> Store agent memory / facts");

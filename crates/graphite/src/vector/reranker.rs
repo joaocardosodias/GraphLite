@@ -25,10 +25,90 @@ pub struct RerankResult {
     pub raw_score: f32,
 }
 
+/// Supported local Cross-Encoder reranker model types.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum RerankerModelType {
+    /// Reranking disabled (pure vector + graph + BM25 RRF fusion)
+    None,
+    /// `BAAI/bge-reranker-base` (~1.11 GB) - Default / High accuracy multilingual
+    BGERerankerBase,
+    /// `BAAI/bge-reranker-v2-m3` (~2.2 GB) - Multilingual SOTA / 8192 context length
+    BGERerankerV2M3,
+    /// `jinaai/jina-reranker-v1-turbo-en` (~130 MB) - Ultralight CPU reranker
+    JinaRerankerV1TurboEn,
+    /// `jinaai/jina-reranker-v2-base-multilingual` (~1.1 GB) - Multilingual SOTA / Portuguese
+    JinaRerankerV2BaseMultilingual,
+    /// Custom external reranker
+    Custom,
+}
+
+impl RerankerModelType {
+    /// Returns the unique numeric ID stored in `.graph` binary header (0..255).
+    pub fn id(&self) -> u8 {
+        match self {
+            Self::None => crate::storage::header::RERANKER_MODEL_NONE,
+            Self::BGERerankerBase => crate::storage::header::RERANKER_MODEL_BGE_RERANKER_BASE,
+            Self::BGERerankerV2M3 => crate::storage::header::RERANKER_MODEL_BGE_RERANKER_LARGE,
+            Self::JinaRerankerV1TurboEn => crate::storage::header::RERANKER_MODEL_JINA_RERANKER_V1_TINY_EN,
+            Self::JinaRerankerV2BaseMultilingual => crate::storage::header::RERANKER_MODEL_JINA_RERANKER_V2_BASE_MULTILINGUAL,
+            Self::Custom => crate::storage::header::RERANKER_MODEL_CUSTOM,
+        }
+    }
+
+    /// Resolves a reranker model type from its header ID.
+    pub fn from_id(id: u8) -> Self {
+        match id {
+            crate::storage::header::RERANKER_MODEL_NONE => Self::None,
+            crate::storage::header::RERANKER_MODEL_BGE_RERANKER_BASE => Self::BGERerankerBase,
+            crate::storage::header::RERANKER_MODEL_BGE_RERANKER_LARGE => Self::BGERerankerV2M3,
+            crate::storage::header::RERANKER_MODEL_JINA_RERANKER_V1_TINY_EN => Self::JinaRerankerV1TurboEn,
+            crate::storage::header::RERANKER_MODEL_JINA_RERANKER_V2_BASE_MULTILINGUAL => Self::JinaRerankerV2BaseMultilingual,
+            _ => Self::None,
+        }
+    }
+
+    /// Resolves a reranker model type from a CLI string identifier.
+    pub fn from_str_name(name: &str) -> Option<Self> {
+        match name.to_lowercase().replace('_', "-").as_str() {
+            "none" | "disabled" | "off" => Some(Self::None),
+            "bge-reranker-base" | "bge-base" | "default" => Some(Self::BGERerankerBase),
+            "bge-reranker-v2-m3" | "bge-m3" | "bge-large" => Some(Self::BGERerankerV2M3),
+            "jina-reranker-v1-turbo-en" | "jina-tiny" | "jina-turbo" => Some(Self::JinaRerankerV1TurboEn),
+            "jina-reranker-v2-base-multilingual" | "jina-v2" | "jina-multilingual" => Some(Self::JinaRerankerV2BaseMultilingual),
+            _ => None,
+        }
+    }
+
+    /// Returns the user-friendly CLI identifier string.
+    pub fn name(&self) -> &'static str {
+        match self {
+            Self::None => "none",
+            Self::BGERerankerBase => "bge-reranker-base",
+            Self::BGERerankerV2M3 => "bge-reranker-v2-m3",
+            Self::JinaRerankerV1TurboEn => "jina-reranker-v1-turbo-en",
+            Self::JinaRerankerV2BaseMultilingual => "jina-reranker-v2-base-multilingual",
+            Self::Custom => "custom",
+        }
+    }
+
+    /// Returns a human-readable display string for interactive menus.
+    pub fn display_label(&self) -> &'static str {
+        match self {
+            Self::BGERerankerBase => "BGE-Reranker-Base (~1.11 GB) - Padrão / Multilíngue (Recomendado)",
+            Self::BGERerankerV2M3 => "BGE-Reranker-V2-M3 (~2.2 GB) - SOTA Multilíngue / Contexto 8k",
+            Self::JinaRerankerV2BaseMultilingual => "Jina-Reranker-V2-Multilingual (~1.1 GB) - Excelente para Português",
+            Self::JinaRerankerV1TurboEn => "Jina-Reranker-V1-Turbo (~130 MB) - Ultraleve / CPU Fraca",
+            Self::None => "Nenhum / Desativado (Busca Híbrida Leve < 10ms)",
+            Self::Custom => "Custom (Personalizado)",
+        }
+    }
+}
+
 /// Local in-memory Cross-Encoder Reranker for deep semantic re-ranking.
 pub struct LocalReranker {
     #[cfg(feature = "fastembed")]
     model: Mutex<TextRerank>,
+    model_type: RerankerModelType,
 }
 
 /// Returns the global standard user cache directory for storing ONNX model files (~/.cache/graphite/models).
@@ -50,11 +130,19 @@ fn default_model_cache_dir() -> std::path::PathBuf {
 }
 
 impl LocalReranker {
-    /// Initializes a new local reranker using `bge-reranker-base`.
+    /// Initializes a local reranker from a `RerankerModelType`.
     #[cfg(feature = "fastembed")]
-    pub fn new_bge_base() -> Result<Self> {
+    pub fn from_model_type(model_type: RerankerModelType) -> Result<Option<Self>> {
+        let fastembed_model = match model_type {
+            RerankerModelType::None | RerankerModelType::Custom => return Ok(None),
+            RerankerModelType::BGERerankerBase => RerankerModel::BGERerankerBase,
+            RerankerModelType::BGERerankerV2M3 => RerankerModel::BGERerankerV2M3,
+            RerankerModelType::JinaRerankerV1TurboEn => RerankerModel::JINARerankerV1TurboEn,
+            RerankerModelType::JinaRerankerV2BaseMultilingual => RerankerModel::JINARerankerV2BaseMultiligual,
+        };
+
         let mut options = RerankInitOptions::default();
-        options.model_name = RerankerModel::BGERerankerBase;
+        options.model_name = fastembed_model;
         options.show_download_progress = true;
         let cache_dir = default_model_cache_dir();
         options.cache_dir = cache_dir.clone();
@@ -80,9 +168,22 @@ impl LocalReranker {
         let model = TextRerank::try_new(options)
             .map_err(|e| GraphiteError::Io(std::io::Error::other(e.to_string())))?;
 
-        Ok(Self {
+        Ok(Some(Self {
             model: Mutex::new(model),
-        })
+            model_type,
+        }))
+    }
+
+    /// Initializes a new local reranker using `bge-reranker-base`.
+    #[cfg(feature = "fastembed")]
+    pub fn new_bge_base() -> Result<Self> {
+        Self::from_model_type(RerankerModelType::BGERerankerBase)
+            .and_then(|opt| opt.ok_or_else(|| GraphiteError::Io(std::io::Error::other("Failed to create bge-reranker-base"))))
+    }
+
+    /// Returns the model type configured for this reranker.
+    pub fn model_type(&self) -> RerankerModelType {
+        self.model_type
     }
 
     /// Reranks a slice of candidate documents against a query string.

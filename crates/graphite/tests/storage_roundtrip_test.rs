@@ -91,7 +91,7 @@ fn test_large_scale_storage_roundtrip_fidelity() {
 
     // 3. Atomically write `.graph` database to disk
     write_database_atomic(
-        &db_path, &nodes, &csr, &vectors, &interner, vector_dim, 0, // Cosine metric
+        &db_path, &nodes, &csr, &vectors, &interner, vector_dim, 0, 0, 1, // Cosine metric, MiniLM, BGE Reranker
     )
     .unwrap();
 
@@ -145,7 +145,7 @@ fn test_forced_corruption_and_checksum_verification() {
     );
     let csr = CsrGraph::new(vec![0, 0], vec![], 1);
 
-    write_database_atomic(&db_path, &[node0], &csr, &[], &interner, 0, 0).unwrap();
+    write_database_atomic(&db_path, &[node0], &csr, &[], &interner, 0, 0, 0, 1).unwrap();
 
     // 1. Initial open must succeed
     assert!(MmapGraphReader::open(&db_path).is_ok());
@@ -201,7 +201,7 @@ fn test_atomic_overwrite_clean_replacement() {
     let csr_v1 = CsrGraph::new(vec![0, 0], vec![], 1);
 
     // Write Version 1
-    write_database_atomic(&db_path, &[node_v1], &csr_v1, &[], &interner_v1, 0, 0).unwrap();
+    write_database_atomic(&db_path, &[node_v1], &csr_v1, &[], &interner_v1, 0, 0, 0, 1).unwrap();
     let reader_v1 = MmapGraphReader::open(&db_path).unwrap();
     assert_eq!(reader_v1.header().node_count, 1);
     assert_eq!(reader_v1.resolve_string(s_v1), Some("Versão 1"));
@@ -233,6 +233,8 @@ fn test_atomic_overwrite_clean_replacement() {
         &interner_v2,
         0,
         0,
+        0,
+        1,
     )
     .unwrap();
 

@@ -17,6 +17,23 @@ pub const FLAG_QUANTIZED_SQ8: u16 = 1 << 0;
 pub const FLAG_COMPRESSED: u16 = 1 << 1;
 pub const FLAG_DIRECTED: u16 = 1 << 2;
 
+// Embedding Model Identifiers
+pub const EMBEDDING_MODEL_ALL_MINILM_L6_V2: u8 = 0;
+pub const EMBEDDING_MODEL_BGE_SMALL_EN_V15: u8 = 1;
+pub const EMBEDDING_MODEL_MULTILINGUAL_MINILM_L12_V2: u8 = 2;
+pub const EMBEDDING_MODEL_MULTILINGUAL_E5_BASE: u8 = 3;
+pub const EMBEDDING_MODEL_BGE_M3: u8 = 4;
+pub const EMBEDDING_MODEL_NOMIC_EMBED_TEXT_V15: u8 = 5;
+pub const EMBEDDING_MODEL_CUSTOM: u8 = 255;
+
+// Reranker Model Identifiers
+pub const RERANKER_MODEL_NONE: u8 = 0;
+pub const RERANKER_MODEL_BGE_RERANKER_BASE: u8 = 1;
+pub const RERANKER_MODEL_BGE_RERANKER_LARGE: u8 = 2;
+pub const RERANKER_MODEL_JINA_RERANKER_V1_TINY_EN: u8 = 3;
+pub const RERANKER_MODEL_JINA_RERANKER_V2_BASE_MULTILINGUAL: u8 = 4;
+pub const RERANKER_MODEL_CUSTOM: u8 = 255;
+
 /// Fixed 64-byte header at the beginning of every `.graph` database file.
 ///
 /// Ensures zero-copy memory mapping and instantaneous validation upon file open.
@@ -52,7 +69,7 @@ pub struct GraphHeader {
     pub string_section_offset: u64,
     /// 56..60: CRC32 checksum computed over the rest of the database file.
     pub checksum: u32,
-    /// 60..64: Reserved for future extensions, padded to ensure exact 64-byte alignment.
+    /// 60..64: Reserved bytes. `_reserved[0]` = embedding_model_id, `_reserved[1]` = reranker_model_id.
     pub _reserved: [u8; 4],
 }
 
@@ -76,6 +93,25 @@ impl GraphHeader {
             checksum: 0,
             _reserved: [0; 4],
         }
+    }
+
+    /// Sets the configured embedding and reranker model identifiers.
+    pub fn with_models(mut self, embedding_model_id: u8, reranker_model_id: u8) -> Self {
+        self._reserved[0] = embedding_model_id;
+        self._reserved[1] = reranker_model_id;
+        self
+    }
+
+    /// Returns the embedding model ID stored in the header.
+    #[inline]
+    pub fn embedding_model_id(&self) -> u8 {
+        self._reserved[0]
+    }
+
+    /// Returns the reranker model ID stored in the header.
+    #[inline]
+    pub fn reranker_model_id(&self) -> u8 {
+        self._reserved[1]
     }
 
     /// Returns `true` if this database stores 8-bit Scalarly Quantized vectors (SQ8).

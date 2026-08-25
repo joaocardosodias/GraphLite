@@ -67,7 +67,8 @@ fn load_or_default_config(db_path: &Path) -> GraphiteConfig {
             return GraphiteConfig::new()
                 .with_dim(dim)
                 .with_metric(metric)
-                .with_quantization(quant);
+                .with_quantization(quant)
+                .with_models(reader.header().embedding_model_id(), reader.header().reranker_model_id());
         }
     }
     GraphiteConfig::default()
@@ -88,8 +89,12 @@ pub fn execute_query(db_path: &Path, args: &QueryArgs, verbose: bool) -> Result<
     let query_vector = if let Some(raw) = args.vector.as_deref() {
         parse_vector_arg(Some(raw))?
     } else if let Some(ref text) = args.query_text {
-        let embedder = graphite::LocalEmbedder::new_minilm()
-            .with_context(|| "Failed to initialize local ONNX embedding model")?;
+        let emb_type = graphite::vector::embedding::EmbeddingModelType::from_id(
+            engine.config().embedding_model_id,
+            engine.config().vector_dim,
+        );
+        let embedder = graphite::LocalEmbedder::from_model_type(emb_type)
+            .with_context(|| format!("Failed to initialize local ONNX embedding model ({})", emb_type.name()))?;
         Some(embedder.embed_one(text)?)
     } else {
         None
@@ -118,7 +123,17 @@ pub fn execute_query(db_path: &Path, args: &QueryArgs, verbose: bool) -> Result<
             .collect()
     });
 
-    let is_reranking = args.rerank && args.query_text.is_some();
+    // Reranking is active by default if the database was created with a reranker, unless --no-rerank is passed
+    let rerank_type = graphite::vector::reranker::RerankerModelType::from_id(engine.config().reranker_model_id);
+    let should_rerank = if args.no_rerank {
+        false
+    } else if args.rerank {
+        true
+    } else {
+        rerank_type != graphite::vector::reranker::RerankerModelType::None
+    };
+
+    let is_reranking = should_rerank && args.query_text.is_some();
     let seed_count = if is_reranking {
         args.top_k.max(40)
     } else {
@@ -151,11 +166,18 @@ pub fn execute_query(db_path: &Path, args: &QueryArgs, verbose: bool) -> Result<
         unreachable!()
     };
 
-    if args.rerank {
+    if should_rerank {
         if let Some(ref q_text) = args.query_text {
-            eprintln!("info: initializing local Cross-Encoder reranker (bge-reranker-base)...");
-            let reranker = graphite::LocalReranker::new_bge_base()
-                .with_context(|| "Failed to initialize local ONNX Cross-Encoder reranker")?;
+            let active_rerank_type = if rerank_type != graphite::vector::reranker::RerankerModelType::None {
+                rerank_type
+            } else {
+                graphite::vector::reranker::RerankerModelType::BGERerankerBase
+            };
+
+            if verbose {
+                eprintln!("info: running local Cross-Encoder reranker ({})...", active_rerank_type.name());
+            }
+            if let Some(reranker) = graphite::LocalReranker::from_model_type(active_rerank_type)? {
 
             let candidate_docs: Vec<String> = result
                 .scored_entities
@@ -233,6 +255,7 @@ pub fn execute_query(db_path: &Path, args: &QueryArgs, verbose: bool) -> Result<
                     scored_entities: connected_subgraph.entities,
                     pruned_subgraph: pruned,
                 };
+            }
             }
         }
     }

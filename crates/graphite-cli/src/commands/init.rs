@@ -5,11 +5,35 @@ use std::path::Path;
 use graphite::engine::config::GraphiteConfig;
 use graphite::engine::instance::GraphiteEngine;
 use graphite::vector::distance::Metric;
+use graphite::vector::embedding::{EmbeddingModelType, LocalEmbedder};
 use graphite::vector::quantization::Quantization;
+use graphite::vector::reranker::{LocalReranker, RerankerModelType};
 
 use crate::args::{CliMetric, CliQuantization, InitArgs};
+use crate::commands::wizard::run_interactive_wizard;
 
 pub fn execute_init(db_path: &Path, args: &InitArgs) -> Result<()> {
+    if args.interactive {
+        let (final_path, config) = run_interactive_wizard(db_path)?;
+        if final_path.exists() {
+            let _ = fs::remove_file(&final_path);
+        }
+        let engine = GraphiteEngine::open_or_create(&final_path, config.clone())?;
+        engine.flush()?;
+
+        let emb_type = EmbeddingModelType::from_id(config.embedding_model_id, config.vector_dim);
+        let rerank_type = RerankerModelType::from_id(config.reranker_model_id);
+
+        println!("=== Graphite Database Initialized ===");
+        println!("  Database File:        {:?}", final_path);
+        println!("  Embedding Model:      {} ({}d)", emb_type.name(), config.vector_dim);
+        println!("  Reranker Model:       {}", rerank_type.name());
+        println!("  Distance Metric:      {:?}", config.metric);
+        println!("  Quantization:         {:?}", config.quantization);
+        println!("  Default Token Budget: {}", config.default_max_tokens);
+        return Ok(());
+    }
+
     if db_path.exists() {
         if !args.force {
             bail!(
@@ -18,6 +42,41 @@ pub fn execute_init(db_path: &Path, args: &InitArgs) -> Result<()> {
             );
         } else {
             fs::remove_file(db_path)?;
+        }
+    }
+
+    // 1. Resolve Embedding Model & Dimensionality
+    let emb_type = if let Some(ref name) = args.embedding_model {
+        EmbeddingModelType::from_str_name(name).unwrap_or_else(|| {
+            EmbeddingModelType::Custom(args.dim.unwrap_or(384))
+        })
+    } else if let Some(dim) = args.dim {
+        EmbeddingModelType::Custom(dim)
+    } else {
+        EmbeddingModelType::AllMiniLML6V2
+    };
+
+    let dim = emb_type.dimension();
+
+    // 2. Resolve Reranker Model
+    let rerank_type = if let Some(ref name) = args.reranker_model {
+        RerankerModelType::from_str_name(name).unwrap_or(RerankerModelType::BGERerankerBase)
+    } else {
+        RerankerModelType::BGERerankerBase
+    };
+
+    // 3. Pre-download models if requested
+    if args.download {
+        if let EmbeddingModelType::Custom(_) = emb_type {
+            // custom dimension has no local download
+        } else {
+            println!("Pre-downloading Embedding Model: {}...", emb_type.name());
+            LocalEmbedder::from_model_type(emb_type)?;
+        }
+
+        if rerank_type != RerankerModelType::None {
+            println!("Pre-downloading Reranker Model: {}...", rerank_type.name());
+            LocalReranker::from_model_type(rerank_type)?;
         }
     }
 
@@ -34,9 +93,10 @@ pub fn execute_init(db_path: &Path, args: &InitArgs) -> Result<()> {
     };
 
     let config = GraphiteConfig::new()
-        .with_dim(args.dim)
+        .with_dim(dim)
         .with_metric(metric)
         .with_quantization(quantization)
+        .with_models(emb_type.id(), rerank_type.id())
         .with_max_tokens(args.max_tokens)
         .with_auto_flush(true);
 
@@ -45,7 +105,8 @@ pub fn execute_init(db_path: &Path, args: &InitArgs) -> Result<()> {
 
     println!("=== Graphite Database Initialized ===");
     println!("  Database File:        {:?}", db_path);
-    println!("  Vector Dimension:     {} dimensions", args.dim);
+    println!("  Embedding Model:      {} ({} dimensions)", emb_type.name(), dim);
+    println!("  Reranker Model:       {}", rerank_type.name());
     println!("  Distance Metric:      {:?}", args.metric);
     println!("  Quantization:         {:?}", args.quantization);
     println!("  Default Token Budget: {}", args.max_tokens);

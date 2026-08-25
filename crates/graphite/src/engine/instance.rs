@@ -119,9 +119,13 @@ impl GraphiteEngine {
                 dirty: false,
             };
 
+            let mut final_config = config;
+            final_config.embedding_model_id = reader.header().embedding_model_id();
+            final_config.reranker_model_id = reader.header().reranker_model_id();
+
             Ok(Self {
                 path: Some(p),
-                config,
+                config: final_config,
                 state: Arc::new(RwLock::new(state)),
             })
         } else {
@@ -228,6 +232,8 @@ impl GraphiteEngine {
                 &state.interner,
                 self.config.vector_dim,
                 metric_u8,
+                self.config.embedding_model_id,
+                self.config.reranker_model_id,
             )?;
         } else {
             write_database_atomic(
@@ -238,6 +244,8 @@ impl GraphiteEngine {
                 &state.interner,
                 self.config.vector_dim,
                 metric_u8,
+                self.config.embedding_model_id,
+                self.config.reranker_model_id,
             )?;
         }
 

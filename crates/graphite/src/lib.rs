@@ -99,8 +99,8 @@ pub use storage::{
 pub use vector::{
     cosine_similarity, dot_product, euclidean_distance, manhattan_distance, norm, norm_squared,
     normalize_in_place, normalized, simd_cosine_similarity, simd_dot_product,
-    simd_euclidean_distance, simd_norm_squared, LocalEmbedder, LocalReranker, Metric, Quantization,
-    QuantizedVector, RerankResult, TopKQueue, VectorStore,
+    simd_euclidean_distance, simd_norm_squared, EmbeddingModelType, LocalEmbedder, LocalReranker,
+    Metric, Quantization, QuantizedVector, RerankResult, RerankerModelType, TopKQueue, VectorStore,
 };
 
 /// High-level alias for `GraphiteEngine`.
@@ -113,7 +113,9 @@ pub mod prelude {
     pub use crate::id::{EdgeId, NodeId, StringId};
     pub use crate::prompt::markdown::MarkdownStyle;
     pub use crate::vector::distance::Metric;
+    pub use crate::vector::embedding::EmbeddingModelType;
     pub use crate::vector::quantization::Quantization;
+    pub use crate::vector::reranker::RerankerModelType;
     pub use crate::Graphite;
 }
 

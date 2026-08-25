@@ -5,3 +5,4 @@ pub mod inspect;
 pub mod query;
 pub mod remember;
 pub mod serve;
+pub mod wizard;
