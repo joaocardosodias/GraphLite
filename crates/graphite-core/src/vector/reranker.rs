@@ -35,9 +35,15 @@ pub struct LocalReranker {
 #[cfg(feature = "fastembed")]
 fn default_model_cache_dir() -> std::path::PathBuf {
     if let Ok(home) = std::env::var("HOME") {
-        std::path::PathBuf::from(home).join(".cache").join("graphite").join("models")
+        std::path::PathBuf::from(home)
+            .join(".cache")
+            .join("graphite")
+            .join("models")
     } else if let Ok(userprofile) = std::env::var("USERPROFILE") {
-        std::path::PathBuf::from(userprofile).join(".cache").join("graphite").join("models")
+        std::path::PathBuf::from(userprofile)
+            .join(".cache")
+            .join("graphite")
+            .join("models")
     } else {
         std::env::temp_dir().join("graphite_models")
     }
