@@ -6,6 +6,7 @@
     "cli",
     "ingestion-and-chunking",
     "rust-sdk",
+    "python-sdk",
     "rest-api",
     "benchmarks",
     "engine-internals"

@@ -36,3 +36,20 @@ docs/.turbo/
 .agents/skills/
 .claude/skills/
 skills-lock.json
+
+# Python & Maturin
+*.so
+*.pyd
+*.dylib
+*.dll
+*.whl
+__pycache__/
+*.pyc
+*.pyo
+.pytest_cache/
+.venv/
+venv/
+env/
+dist/
+wheels/
+target/wheels/

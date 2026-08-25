@@ -2,6 +2,7 @@
 members = [
     "crates/graphite",
     "crates/graphite-cli",
+    "bindings/python",
 ]
 resolver = "2"
 

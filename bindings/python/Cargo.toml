@@ -1,0 +1,20 @@
+[package]
+name = "graphite-python"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+repository.workspace = true
+description = "Official Python bindings for Graphite: embedded GraphRAG and knowledge graph engine"
+readme = "README.md"
+
+[lib]
+name = "_graphite_db"
+crate-type = ["cdylib"]
+
+[dependencies]
+pyo3 = { version = "0.23", features = ["extension-module", "abi3-py38"] }
+graphite-db = { path = "../../crates/graphite", default-features = true, features = ["fastembed", "tiktoken", "serde"] }
+serde = { workspace = true }
+serde_json = { workspace = true }
+anyhow = { workspace = true }
