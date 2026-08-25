@@ -19,7 +19,7 @@
 
 ---
 
-## ⚡ Quick Install
+## Quick Install
 
 ### Linux & macOS (One-line installer):
 ```bash
@@ -38,7 +38,7 @@ cargo install graphite-cli
 
 ---
 
-## 🌟 Key Highlights
+## Key Highlights
 
 - **Single-File Zero-Copy Storage (`.graphite`):** Compressed Sparse Row (CSR) graph topology, scalar-quantized vectors (SQ8), inverted lexical index (BM25), and string tables packed into a single binary file with CRC32 integrity verification and atomic safe rename commits.
 - **Sub-Millisecond Hybrid Retrieval (RRF):** Fuses SIMD-accelerated 256-bit AVX2 cosine distance with inverted BM25 lexical ranking via Reciprocal Rank Fusion (RRF with $k=60$).
@@ -49,7 +49,7 @@ cargo install graphite-cli
 
 ---
 
-## 🏗️ GraphRAG Architecture
+## GraphRAG Architecture
 
 ```text
 [User / Query Text]
@@ -76,7 +76,7 @@ cargo install graphite-cli
 
 ---
 
-## 🚀 Quickstart CLI Guide
+## Quickstart CLI Guide
 
 ### 1. Initialize a Database
 ```bash
@@ -105,7 +105,7 @@ graphite serve -d knowledge.graphite --port 8080 --host 0.0.0.0
 
 ---
 
-## 🦀 Rust SDK Example
+## Rust SDK Example
 
 Add `graphite-core` to your `Cargo.toml`:
 
@@ -147,7 +147,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
 ---
 
-## 📊 Benchmarks
+## Benchmarks
 
 | Benchmark Metric | Scale | Latency / Performance | Speedup vs Baseline |
 | :--- | :--- | :--- | :--- |
@@ -158,13 +158,13 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
 ---
 
-## 📦 Workspace Layout
+## Workspace Layout
 
 - [`crates/graphite-core`](crates/graphite-core/): Pure Rust embedded storage engine, zero-copy mmap reader, SIMD AVX2 kernels, SQ8 quantization, CSR graph topology, BM25, and MMR token budgeting.
 - [`crates/graphite-cli`](crates/graphite-cli/): The `graphite` command-line executable, multi-format document chunker, and embedded REST API server.
 
 ---
 
-## 📄 License
+## License
 
 Dual-licensed under either [MIT](LICENSE-MIT) or [Apache-2.0](LICENSE-APACHE) at your option.

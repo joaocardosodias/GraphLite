@@ -2,11 +2,16 @@
 $ErrorActionPreference = 'Stop'
 
 $Repo = "joaocardosodias/Graphite"
-$InstallDir = "$HOME\.graphite\bin"
+$InstallDir = if ($env:GRAPHITE_INSTALL_DIR) { $env:GRAPHITE_INSTALL_DIR } else { "$HOME\.graphite\bin" }
 
-Write-Host "==========================================================" -ForegroundColor Cyan
-Write-Host "  🚀 Installing Graphite (GraphRAG Embedded Engine)" -ForegroundColor Cyan
-Write-Host "==========================================================" -ForegroundColor Cyan
+function Write-Info($msg) {
+    Write-Host "info: $msg"
+}
+
+function Write-ErrorExit($msg) {
+    Write-Error "error: $msg"
+    exit 1
+}
 
 $Target = "x86_64-pc-windows-msvc"
 
@@ -21,26 +26,27 @@ $Version = $Tag.TrimStart('v')
 $ArchiveName = "graphite-v$Version-$Target.zip"
 $DownloadUrl = "https://github.com/$Repo/releases/download/$Tag/$ArchiveName"
 
-Write-Host "Downloading $DownloadUrl..." -ForegroundColor Yellow
+Write-Info "Downloading graphite $Tag for $Target..."
 
 $TempZip = Join-Path $env:TEMP $ArchiveName
 $TempExtract = Join-Path $env:TEMP "graphite-extract"
 
-Invoke-WebRequest -Uri $DownloadUrl -OutFile $TempZip
-
-if (Test-Path $TempExtract) { Remove-Item -Recurse -Force $TempExtract }
-Expand-Archive -Path $TempZip -DestinationPath $TempExtract
-
-if (!(Test-Path $InstallDir)) {
-    New-Item -ItemType Directory -Force -Path $InstallDir | Out-Null
+try {
+    Invoke-WebRequest -Uri $DownloadUrl -OutFile $TempZip -UseBasicParsing
+    
+    if (Test-Path $TempExtract) { Remove-Item -Recurse -Force $TempExtract }
+    Expand-Archive -Path $TempZip -DestinationPath $TempExtract
+    
+    if (!(Test-Path $InstallDir)) {
+        New-Item -ItemType Directory -Force -Path $InstallDir | Out-Null
+    }
+    
+    Get-ChildItem -Path $TempExtract -Recurse -Filter "graphite.exe" | Copy-Item -Destination $InstallDir -Force
+    
+    Write-Info "Graphite binary installed to $InstallDir\graphite.exe"
+} catch {
+    Write-ErrorExit "Failed to download and install binary archive."
+} finally {
+    if (Test-Path $TempZip) { Remove-Item -Force $TempZip -ErrorAction SilentlyContinue }
+    if (Test-Path $TempExtract) { Remove-Item -Recurse -Force $TempExtract -ErrorAction SilentlyContinue }
 }
-
-Get-ChildItem -Path $TempExtract -Recurse -Filter "graphite.exe" | Copy-Item -Destination $InstallDir -Force
-
-Remove-Item -Force $TempZip
-Remove-Item -Recurse -Force $TempExtract
-
-Write-Host ""
-Write-Host "✅ Successfully installed to $InstallDir" -ForegroundColor Green
-Write-Host "Make sure $InstallDir is in your User PATH environment variable." -ForegroundColor Gray
-Write-Host "Run 'graphite --help' to verify installation." -ForegroundColor Cyan
