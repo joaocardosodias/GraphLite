@@ -118,16 +118,23 @@ pub fn execute_query(db_path: &Path, args: &QueryArgs, verbose: bool) -> Result<
             .collect()
     });
 
+    let is_reranking = args.rerank && args.query_text.is_some();
+    let seed_count = if is_reranking {
+        args.top_k.max(40)
+    } else {
+        args.top_k
+    };
+
     let options = QueryOptions {
-        top_k_seeds: args.top_k,
+        top_k_seeds: seed_count,
         query_text: args.query_text.clone(),
-        max_tokens: args.tokens,
+        max_tokens: if is_reranking { Some(100_000) } else { args.tokens },
         markdown_style: MarkdownStyle::Hierarchical,
         max_depth: args.depth,
         min_score_threshold: None,
         alpha: args.alpha,
-        relative_drop_off: Some(0.60),
-        redundancy_threshold: Some(0.82),
+        relative_drop_off: if is_reranking { None } else { Some(0.60) },
+        redundancy_threshold: if is_reranking { None } else { Some(0.82) },
         type_filter,
     };
 

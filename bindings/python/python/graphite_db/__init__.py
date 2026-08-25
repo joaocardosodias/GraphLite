@@ -33,13 +33,24 @@ def _chunk_text(text: str, chunk_size: int = 400, overlap: int = 50) -> List[Dic
     sections = re.split(r'(?m)^(#{1,6}\s+.+)$', text)
     if len(sections) > 1:
         i = 1
+        prefix_context = ""
         while i < len(sections):
             header = sections[i].strip().lstrip("#").strip()
             content = sections[i + 1].strip() if i + 1 < len(sections) else ""
-            if content:
-                full_chunk_text = f"{header}\n\n{content}"
+            
+            # Se for um cabecalho curto sem corpo de artigo, guarda como contexto para o proximo
+            if len(content.split()) < 10 and not re.search(r'Art\.?\s*\d+', header, re.IGNORECASE):
+                prefix_context = f"{header} - {content}".strip().strip("-").strip()
+                i += 2
+                continue
+
+            full_chunk_text = f"{prefix_context}\n\n{header}\n\n{content}".strip() if prefix_context else f"{header}\n\n{content}".strip()
+            chunk_title = f"{header} ({prefix_context})"[:80] if prefix_context else header[:80]
+            prefix_context = ""
+
+            if full_chunk_text:
                 chunks.append({
-                    "title": header[:80],
+                    "title": chunk_title,
                     "content": full_chunk_text
                 })
             i += 2

@@ -32,6 +32,23 @@ pub struct Bm25Index {
     params: Bm25Params,
 }
 
+/// Normalizes accented characters to ASCII equivalents for robust multi-language search.
+#[inline]
+pub fn fold_accents(s: &str) -> String {
+    s.chars()
+        .map(|c| match c {
+            'á' | 'à' | 'ã' | 'â' | 'ä' | 'Á' | 'À' | 'Ã' | 'Â' | 'Ä' => 'a',
+            'é' | 'è' | 'ê' | 'ë' | 'É' | 'È' | 'Ê' | 'Ë' => 'e',
+            'í' | 'ì' | 'î' | 'ï' | 'Í' | 'Ì' | 'Î' | 'Ï' => 'i',
+            'ó' | 'ò' | 'õ' | 'ô' | 'ö' | 'Ó' | 'Ò' | 'Õ' | 'Ô' | 'Ö' => 'o',
+            'ú' | 'ù' | 'û' | 'ü' | 'Ú' | 'Ù' | 'Û' | 'Ü' => 'u',
+            'ç' | 'Ç' => 'c',
+            'ñ' | 'Ñ' => 'n',
+            _ => c,
+        })
+        .collect()
+}
+
 impl Bm25Index {
     /// Creates a new empty `Bm25Index`.
     pub fn new() -> Self {
@@ -47,24 +64,35 @@ impl Bm25Index {
     }
 
     /// Tokenizes input text into normalized lowercase alphanumeric terms,
-    /// with intelligent CamelCase splitting, snake_case splitting, and bilingual code synonym expansion.
+    /// with accent folding, number normalization, CamelCase splitting, and bilingual code synonym expansion.
     pub fn tokenize(text: &str) -> Vec<String> {
         let mut tokens = Vec::new();
+        let folded = fold_accents(text);
 
-        // 0. Extract normalized digit sequences (e.g. Art. 1.228 -> 1228, Lei 10.406 -> 10406)
-        for word in text.split_whitespace() {
+        // 0. Extract normalized digit sequences and article numbers (e.g. Art. 121 -> "121", "art121", "artigo121")
+        for word in folded.split_whitespace() {
             let digits_only: String = word.chars().filter(|c| c.is_ascii_digit()).collect();
-            if digits_only.len() >= 3 && digits_only.len() <= 6 && !tokens.contains(&digits_only) {
-                tokens.push(digits_only);
+            if !digits_only.is_empty() && digits_only.len() <= 8 {
+                if !tokens.contains(&digits_only) {
+                    tokens.push(digits_only.clone());
+                }
+                let art_alias = format!("art{}", digits_only);
+                if !tokens.contains(&art_alias) {
+                    tokens.push(art_alias);
+                }
+                let artigo_alias = format!("artigo{}", digits_only);
+                if !tokens.contains(&artigo_alias) {
+                    tokens.push(artigo_alias);
+                }
             }
         }
 
-        // 1. Initial split on whitespace and punctuation (preserving underscore for compound identifiers)
-        let raw_parts = text.split(|c: char| !c.is_alphanumeric() && c != '_');
+        // 1. Initial split on whitespace and punctuation
+        let raw_parts = folded.split(|c: char| !c.is_alphanumeric() && c != '_');
 
         for part in raw_parts {
             let trimmed = part.trim();
-            if trimmed.len() < 2 {
+            if trimmed.is_empty() {
                 continue;
             }
 
