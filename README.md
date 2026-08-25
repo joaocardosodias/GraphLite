@@ -1,5 +1,8 @@
 <p align="center">
-  <img src="assets/logo.png" alt="Graphite Logo" width="120" />
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/joaocardosodias/Graphite/main/assets/logo-white.png">
+    <img src="https://raw.githubusercontent.com/joaocardosodias/Graphite/main/assets/logo-black.png" alt="Graphite Logo" width="120" />
+  </picture>
 </p>
 
 <h1 align="center">Graphite</h1>
