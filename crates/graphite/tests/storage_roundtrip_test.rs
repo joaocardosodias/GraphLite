@@ -91,7 +91,8 @@ fn test_large_scale_storage_roundtrip_fidelity() {
 
     // 3. Atomically write `.graph` database to disk
     write_database_atomic(
-        &db_path, &nodes, &csr, &vectors, &interner, vector_dim, 0, 0, 1, // Cosine metric, MiniLM, BGE Reranker
+        &db_path, &nodes, &csr, &vectors, &interner, vector_dim, 0, 0,
+        1, // Cosine metric, MiniLM, BGE Reranker
     )
     .unwrap();
 

@@ -103,16 +103,19 @@ pub fn execute_inspect(db_path: &Path, args: &InspectArgs) -> Result<()> {
             header.embedding_model_id(),
             header.vector_dim as usize,
         );
-        let rerank_type = graphite::vector::reranker::RerankerModelType::from_id(
-            header.reranker_model_id(),
-        );
+        let rerank_type =
+            graphite::vector::reranker::RerankerModelType::from_id(header.reranker_model_id());
 
         println!("------------------------------------------------------------");
         println!(
             "Binary Format:         {} (Version: {})",
             magic_str, header.version
         );
-        println!("Embedding Model:       {} ({}d)", emb_type.name(), header.vector_dim);
+        println!(
+            "Embedding Model:       {} ({}d)",
+            emb_type.name(),
+            header.vector_dim
+        );
         println!("Reranker Model:        {}", rerank_type.name());
         println!("Distance Metric:       {}", metric_str);
         println!("Quantization Mode:     {}", quant_str);

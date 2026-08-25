@@ -73,7 +73,10 @@ fn load_or_default_config(db_path: &Path) -> GraphiteConfig {
                 .with_dim(dim)
                 .with_metric(metric)
                 .with_quantization(quant)
-                .with_models(reader.header().embedding_model_id(), reader.header().reranker_model_id());
+                .with_models(
+                    reader.header().embedding_model_id(),
+                    reader.header().reranker_model_id(),
+                );
         }
     }
     GraphiteConfig::default()
@@ -137,17 +140,23 @@ pub fn execute_serve(db_path: &Path, args: &ServeArgs) -> Result<()> {
         engine.read().config().embedding_model_id,
         engine.read().config().vector_dim,
     );
-    let embedder = Arc::new(
-        LocalEmbedder::from_model_type(emb_type)
-            .with_context(|| format!("Failed to initialize local ONNX embedding model ({})", emb_type.name()))?,
-    );
+    let embedder = Arc::new(LocalEmbedder::from_model_type(emb_type).with_context(|| {
+        format!(
+            "Failed to initialize local ONNX embedding model ({})",
+            emb_type.name()
+        )
+    })?);
 
     println!("========================================================");
     println!("  Graphite Embedded REST API Server Running");
     println!("========================================================");
     println!("  * Base URL:     http://{}", bind_addr);
     println!("  * Database:     {}", db_path.display());
-    println!("  * Embedding:    {} ({}d)", emb_type.name(), engine.read().config().vector_dim);
+    println!(
+        "  * Embedding:    {} ({}d)",
+        emb_type.name(),
+        engine.read().config().vector_dim
+    );
     println!("  * Total Nodes:  {}", engine.read().node_count());
     println!("  * Total Edges:  {}", engine.read().edge_count());
     println!("  * Endpoints:");

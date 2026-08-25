@@ -68,7 +68,10 @@ fn load_or_default_config(db_path: &Path) -> GraphiteConfig {
                 .with_dim(dim)
                 .with_metric(metric)
                 .with_quantization(quant)
-                .with_models(reader.header().embedding_model_id(), reader.header().reranker_model_id());
+                .with_models(
+                    reader.header().embedding_model_id(),
+                    reader.header().reranker_model_id(),
+                );
         }
     }
     GraphiteConfig::default()
@@ -93,8 +96,12 @@ pub fn execute_query(db_path: &Path, args: &QueryArgs, verbose: bool) -> Result<
             engine.config().embedding_model_id,
             engine.config().vector_dim,
         );
-        let embedder = graphite::LocalEmbedder::from_model_type(emb_type)
-            .with_context(|| format!("Failed to initialize local ONNX embedding model ({})", emb_type.name()))?;
+        let embedder = graphite::LocalEmbedder::from_model_type(emb_type).with_context(|| {
+            format!(
+                "Failed to initialize local ONNX embedding model ({})",
+                emb_type.name()
+            )
+        })?;
         Some(embedder.embed_one(text)?)
     } else {
         None
@@ -124,7 +131,8 @@ pub fn execute_query(db_path: &Path, args: &QueryArgs, verbose: bool) -> Result<
     });
 
     // Reranking is active by default if the database was created with a reranker, unless --no-rerank is passed
-    let rerank_type = graphite::vector::reranker::RerankerModelType::from_id(engine.config().reranker_model_id);
+    let rerank_type =
+        graphite::vector::reranker::RerankerModelType::from_id(engine.config().reranker_model_id);
     let should_rerank = if args.no_rerank {
         false
     } else if args.rerank {
@@ -168,94 +176,100 @@ pub fn execute_query(db_path: &Path, args: &QueryArgs, verbose: bool) -> Result<
 
     if should_rerank {
         if let Some(ref q_text) = args.query_text {
-            let active_rerank_type = if rerank_type != graphite::vector::reranker::RerankerModelType::None {
-                rerank_type
-            } else {
-                graphite::vector::reranker::RerankerModelType::BGERerankerBase
-            };
+            let active_rerank_type =
+                if rerank_type != graphite::vector::reranker::RerankerModelType::None {
+                    rerank_type
+                } else {
+                    graphite::vector::reranker::RerankerModelType::BGERerankerBase
+                };
 
             if verbose {
-                eprintln!("info: running local Cross-Encoder reranker ({})...", active_rerank_type.name());
+                eprintln!(
+                    "info: running local Cross-Encoder reranker ({})...",
+                    active_rerank_type.name()
+                );
             }
             if let Some(reranker) = graphite::LocalReranker::from_model_type(active_rerank_type)? {
+                let candidate_docs: Vec<String> = result
+                    .scored_entities
+                    .iter()
+                    .map(|e| {
+                        if let Some(rec) = e.node_record {
+                            let name = engine.resolve_string(rec.name_id).unwrap_or_default();
+                            let desc = engine
+                                .resolve_string(rec.description_id)
+                                .unwrap_or_default();
+                            format!("{} - {}", name, desc)
+                        } else {
+                            String::new()
+                        }
+                    })
+                    .collect();
 
-            let candidate_docs: Vec<String> = result
-                .scored_entities
-                .iter()
-                .map(|e| {
-                    if let Some(rec) = e.node_record {
-                        let name = engine.resolve_string(rec.name_id).unwrap_or_default();
-                        let desc = engine
-                            .resolve_string(rec.description_id)
-                            .unwrap_or_default();
-                        format!("{} - {}", name, desc)
-                    } else {
-                        String::new()
+                if !candidate_docs.is_empty() {
+                    let rerank_res = reranker.rerank(q_text, &candidate_docs)?;
+                    let top_score = rerank_res.first().map(|r| r.score).unwrap_or(0.0);
+                    let mut reranked_entities = Vec::new();
+                    for (rank, r) in rerank_res.into_iter().enumerate() {
+                        // Always preserve the top candidate; filter out subsequent low-confidence items
+                        if rank > 0 && r.score < top_score * 0.30 {
+                            continue;
+                        }
+                        if r.index < result.scored_entities.len() {
+                            let mut entity = result.scored_entities[r.index].clone();
+                            entity.final_score = r.score;
+                            reranked_entities.push(entity);
+                        }
                     }
-                })
-                .collect();
 
-            if !candidate_docs.is_empty() {
-                let rerank_res = reranker.rerank(q_text, &candidate_docs)?;
-                let top_score = rerank_res.first().map(|r| r.score).unwrap_or(0.0);
-                let mut reranked_entities = Vec::new();
-                for (rank, r) in rerank_res.into_iter().enumerate() {
-                    // Always preserve the top candidate; filter out subsequent low-confidence items
-                    if rank > 0 && r.score < top_score * 0.30 {
-                        continue;
-                    }
-                    if r.index < result.scored_entities.len() {
-                        let mut entity = result.scored_entities[r.index].clone();
-                        entity.final_score = r.score;
-                        reranked_entities.push(entity);
-                    }
+                    let interner = {
+                        if let Ok(reader) = MmapGraphReader::open(db_path) {
+                            reader
+                                .string_table()
+                                .map(|st| st.to_interner())
+                                .unwrap_or_default()
+                        } else {
+                            graphite::interner::StringInterner::new()
+                        }
+                    };
+
+                    let connected_subgraph = graphite::ConnectedSubgraph {
+                        entities: reranked_entities,
+                        edges: result.pruned_subgraph.edges.clone(),
+                        seed_ids: Vec::new(),
+                    };
+
+                    let token_budget = args.tokens.unwrap_or(engine.config().default_max_tokens);
+                    let token_counter = graphite::TiktokenCounter::cl100k();
+                    let pruned = graphite::prune_subgraph_by_budget_mmr(
+                        &connected_subgraph,
+                        &interner,
+                        token_budget,
+                        &token_counter,
+                        engine.config().mmr_lambda,
+                    );
+
+                    let format_config = graphite::MarkdownFormatConfig {
+                        header_title: "Retrieved Knowledge Context (Reranked)".to_string(),
+                        include_scores: true,
+                        include_edge_weights: true,
+                        style: MarkdownStyle::Hierarchical,
+                    };
+                    let markdown = graphite::format_pruned_subgraph_markdown(
+                        &pruned,
+                        &interner,
+                        &format_config,
+                    );
+
+                    result = graphite::QueryResult {
+                        markdown,
+                        token_count: pruned.total_tokens,
+                        entities_count: pruned.entities.len(),
+                        edges_count: pruned.edges.len(),
+                        scored_entities: connected_subgraph.entities,
+                        pruned_subgraph: pruned,
+                    };
                 }
-
-                let interner = {
-                    if let Ok(reader) = MmapGraphReader::open(db_path) {
-                        reader
-                            .string_table()
-                            .map(|st| st.to_interner())
-                            .unwrap_or_default()
-                    } else {
-                        graphite::interner::StringInterner::new()
-                    }
-                };
-
-                let connected_subgraph = graphite::ConnectedSubgraph {
-                    entities: reranked_entities,
-                    edges: result.pruned_subgraph.edges.clone(),
-                    seed_ids: Vec::new(),
-                };
-
-                let token_budget = args.tokens.unwrap_or(engine.config().default_max_tokens);
-                let token_counter = graphite::TiktokenCounter::cl100k();
-                let pruned = graphite::prune_subgraph_by_budget_mmr(
-                    &connected_subgraph,
-                    &interner,
-                    token_budget,
-                    &token_counter,
-                    engine.config().mmr_lambda,
-                );
-
-                let format_config = graphite::MarkdownFormatConfig {
-                    header_title: "Retrieved Knowledge Context (Reranked)".to_string(),
-                    include_scores: true,
-                    include_edge_weights: true,
-                    style: MarkdownStyle::Hierarchical,
-                };
-                let markdown =
-                    graphite::format_pruned_subgraph_markdown(&pruned, &interner, &format_config);
-
-                result = graphite::QueryResult {
-                    markdown,
-                    token_count: pruned.total_tokens,
-                    entities_count: pruned.entities.len(),
-                    edges_count: pruned.edges.len(),
-                    scored_entities: connected_subgraph.entities,
-                    pruned_subgraph: pruned,
-                };
-            }
             }
         }
     }

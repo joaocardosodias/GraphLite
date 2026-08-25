@@ -46,8 +46,12 @@ impl EmbeddingModelType {
         match self {
             Self::AllMiniLML6V2 => crate::storage::header::EMBEDDING_MODEL_ALL_MINILM_L6_V2,
             Self::BGESmallENV15 => crate::storage::header::EMBEDDING_MODEL_BGE_SMALL_EN_V15,
-            Self::MultilingualMiniLML12V2 => crate::storage::header::EMBEDDING_MODEL_MULTILINGUAL_MINILM_L12_V2,
-            Self::MultilingualE5Base => crate::storage::header::EMBEDDING_MODEL_MULTILINGUAL_E5_BASE,
+            Self::MultilingualMiniLML12V2 => {
+                crate::storage::header::EMBEDDING_MODEL_MULTILINGUAL_MINILM_L12_V2
+            }
+            Self::MultilingualE5Base => {
+                crate::storage::header::EMBEDDING_MODEL_MULTILINGUAL_E5_BASE
+            }
             Self::BGEM3 => crate::storage::header::EMBEDDING_MODEL_BGE_M3,
             Self::NomicEmbedTextV15 => crate::storage::header::EMBEDDING_MODEL_NOMIC_EMBED_TEXT_V15,
             Self::Custom(_) => crate::storage::header::EMBEDDING_MODEL_CUSTOM,
@@ -59,8 +63,12 @@ impl EmbeddingModelType {
         match id {
             crate::storage::header::EMBEDDING_MODEL_ALL_MINILM_L6_V2 => Self::AllMiniLML6V2,
             crate::storage::header::EMBEDDING_MODEL_BGE_SMALL_EN_V15 => Self::BGESmallENV15,
-            crate::storage::header::EMBEDDING_MODEL_MULTILINGUAL_MINILM_L12_V2 => Self::MultilingualMiniLML12V2,
-            crate::storage::header::EMBEDDING_MODEL_MULTILINGUAL_E5_BASE => Self::MultilingualE5Base,
+            crate::storage::header::EMBEDDING_MODEL_MULTILINGUAL_MINILM_L12_V2 => {
+                Self::MultilingualMiniLML12V2
+            }
+            crate::storage::header::EMBEDDING_MODEL_MULTILINGUAL_E5_BASE => {
+                Self::MultilingualE5Base
+            }
             crate::storage::header::EMBEDDING_MODEL_BGE_M3 => Self::BGEM3,
             crate::storage::header::EMBEDDING_MODEL_NOMIC_EMBED_TEXT_V15 => Self::NomicEmbedTextV15,
             _ => Self::Custom(dim),
@@ -72,7 +80,10 @@ impl EmbeddingModelType {
         match name.to_lowercase().replace('_', "-").as_str() {
             "all-minilm-l6-v2" | "minilm" | "minilm-l6" | "default" => Some(Self::AllMiniLML6V2),
             "bge-small-en-v1.5" | "bge-small" => Some(Self::BGESmallENV15),
-            "paraphrase-multilingual-minilm-l12-v2" | "multilingual-minilm-l12-v2" | "multilingual-minilm" | "minilm-l12" => Some(Self::MultilingualMiniLML12V2),
+            "paraphrase-multilingual-minilm-l12-v2"
+            | "multilingual-minilm-l12-v2"
+            | "multilingual-minilm"
+            | "minilm-l12" => Some(Self::MultilingualMiniLML12V2),
             "multilingual-e5-base" | "e5-base" | "e5" => Some(Self::MultilingualE5Base),
             "bge-m3" | "m3" => Some(Self::BGEM3),
             "nomic-embed-text-v1.5" | "nomic" => Some(Self::NomicEmbedTextV15),
@@ -98,8 +109,12 @@ impl EmbeddingModelType {
         match self {
             Self::AllMiniLML6V2 => "all-MiniLM-L6-v2 (384d, ~90 MB) - Padrão / Inglês / Rápido",
             Self::BGESmallENV15 => "BGE-Small-ENV1.5 (384d, ~130 MB) - Inglês / Alta Precisão",
-            Self::MultilingualMiniLML12V2 => "Multilingual-MiniLM-L12 (384d, ~470 MB) - Multilíngue (Português)",
-            Self::MultilingualE5Base => "Multilingual-E5-Base (768d, ~1.1 GB) - Multilíngue / Jurídico & Técnico",
+            Self::MultilingualMiniLML12V2 => {
+                "Multilingual-MiniLM-L12 (384d, ~470 MB) - Multilíngue (Português)"
+            }
+            Self::MultilingualE5Base => {
+                "Multilingual-E5-Base (768d, ~1.1 GB) - Multilíngue / Jurídico & Técnico"
+            }
             Self::BGEM3 => "BGE-M3 (1024d, ~2.2 GB) - SOTA Multilíngue / Contexto 8k",
             Self::NomicEmbedTextV15 => "Nomic-Embed-Text-V1.5 (768d, ~550 MB) - Código & Texto",
             Self::Custom(_) => "Custom (Dimensão manual personalizada)",
@@ -140,7 +155,9 @@ impl LocalEmbedder {
         let (fastembed_model, dim) = match model_type {
             EmbeddingModelType::AllMiniLML6V2 => (EmbeddingModel::AllMiniLML6V2, 384),
             EmbeddingModelType::BGESmallENV15 => (EmbeddingModel::BGESmallENV15, 384),
-            EmbeddingModelType::MultilingualMiniLML12V2 => (EmbeddingModel::ParaphraseMLMiniLML12V2, 384),
+            EmbeddingModelType::MultilingualMiniLML12V2 => {
+                (EmbeddingModel::ParaphraseMLMiniLML12V2, 384)
+            }
             EmbeddingModelType::MultilingualE5Base => (EmbeddingModel::MultilingualE5Base, 768),
             EmbeddingModelType::BGEM3 => (EmbeddingModel::BGEM3, 1024),
             EmbeddingModelType::NomicEmbedTextV15 => (EmbeddingModel::NomicEmbedTextV15, 768),

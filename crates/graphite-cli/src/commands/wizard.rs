@@ -80,10 +80,7 @@ pub fn run_interactive_wizard(default_path: &Path) -> Result<(PathBuf, GraphiteC
         RerankerModelType::None,
     ];
 
-    let reranker_labels: Vec<&str> = reranker_choices
-        .iter()
-        .map(|r| r.display_label())
-        .collect();
+    let reranker_labels: Vec<&str> = reranker_choices.iter().map(|r| r.display_label()).collect();
 
     let selected_rerank_idx = Select::new(
         "Selecione o Modelo de Reranking (Reclassificador Neural):",

@@ -26,7 +26,11 @@ pub fn execute_init(db_path: &Path, args: &InitArgs) -> Result<()> {
 
         println!("=== Graphite Database Initialized ===");
         println!("  Database File:        {:?}", final_path);
-        println!("  Embedding Model:      {} ({}d)", emb_type.name(), config.vector_dim);
+        println!(
+            "  Embedding Model:      {} ({}d)",
+            emb_type.name(),
+            config.vector_dim
+        );
         println!("  Reranker Model:       {}", rerank_type.name());
         println!("  Distance Metric:      {:?}", config.metric);
         println!("  Quantization:         {:?}", config.quantization);
@@ -47,9 +51,8 @@ pub fn execute_init(db_path: &Path, args: &InitArgs) -> Result<()> {
 
     // 1. Resolve Embedding Model & Dimensionality
     let emb_type = if let Some(ref name) = args.embedding_model {
-        EmbeddingModelType::from_str_name(name).unwrap_or_else(|| {
-            EmbeddingModelType::Custom(args.dim.unwrap_or(384))
-        })
+        EmbeddingModelType::from_str_name(name)
+            .unwrap_or_else(|| EmbeddingModelType::Custom(args.dim.unwrap_or(384)))
     } else if let Some(dim) = args.dim {
         EmbeddingModelType::Custom(dim)
     } else {
@@ -105,7 +108,11 @@ pub fn execute_init(db_path: &Path, args: &InitArgs) -> Result<()> {
 
     println!("=== Graphite Database Initialized ===");
     println!("  Database File:        {:?}", db_path);
-    println!("  Embedding Model:      {} ({} dimensions)", emb_type.name(), dim);
+    println!(
+        "  Embedding Model:      {} ({} dimensions)",
+        emb_type.name(),
+        dim
+    );
     println!("  Reranker Model:       {}", rerank_type.name());
     println!("  Distance Metric:      {:?}", args.metric);
     println!("  Quantization:         {:?}", args.quantization);

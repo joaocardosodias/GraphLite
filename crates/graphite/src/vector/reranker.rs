@@ -49,8 +49,12 @@ impl RerankerModelType {
             Self::None => crate::storage::header::RERANKER_MODEL_NONE,
             Self::BGERerankerBase => crate::storage::header::RERANKER_MODEL_BGE_RERANKER_BASE,
             Self::BGERerankerV2M3 => crate::storage::header::RERANKER_MODEL_BGE_RERANKER_LARGE,
-            Self::JinaRerankerV1TurboEn => crate::storage::header::RERANKER_MODEL_JINA_RERANKER_V1_TINY_EN,
-            Self::JinaRerankerV2BaseMultilingual => crate::storage::header::RERANKER_MODEL_JINA_RERANKER_V2_BASE_MULTILINGUAL,
+            Self::JinaRerankerV1TurboEn => {
+                crate::storage::header::RERANKER_MODEL_JINA_RERANKER_V1_TINY_EN
+            }
+            Self::JinaRerankerV2BaseMultilingual => {
+                crate::storage::header::RERANKER_MODEL_JINA_RERANKER_V2_BASE_MULTILINGUAL
+            }
             Self::Custom => crate::storage::header::RERANKER_MODEL_CUSTOM,
         }
     }
@@ -61,8 +65,12 @@ impl RerankerModelType {
             crate::storage::header::RERANKER_MODEL_NONE => Self::None,
             crate::storage::header::RERANKER_MODEL_BGE_RERANKER_BASE => Self::BGERerankerBase,
             crate::storage::header::RERANKER_MODEL_BGE_RERANKER_LARGE => Self::BGERerankerV2M3,
-            crate::storage::header::RERANKER_MODEL_JINA_RERANKER_V1_TINY_EN => Self::JinaRerankerV1TurboEn,
-            crate::storage::header::RERANKER_MODEL_JINA_RERANKER_V2_BASE_MULTILINGUAL => Self::JinaRerankerV2BaseMultilingual,
+            crate::storage::header::RERANKER_MODEL_JINA_RERANKER_V1_TINY_EN => {
+                Self::JinaRerankerV1TurboEn
+            }
+            crate::storage::header::RERANKER_MODEL_JINA_RERANKER_V2_BASE_MULTILINGUAL => {
+                Self::JinaRerankerV2BaseMultilingual
+            }
             _ => Self::None,
         }
     }
@@ -73,8 +81,12 @@ impl RerankerModelType {
             "none" | "disabled" | "off" => Some(Self::None),
             "bge-reranker-base" | "bge-base" | "default" => Some(Self::BGERerankerBase),
             "bge-reranker-v2-m3" | "bge-m3" | "bge-large" => Some(Self::BGERerankerV2M3),
-            "jina-reranker-v1-turbo-en" | "jina-tiny" | "jina-turbo" => Some(Self::JinaRerankerV1TurboEn),
-            "jina-reranker-v2-base-multilingual" | "jina-v2" | "jina-multilingual" => Some(Self::JinaRerankerV2BaseMultilingual),
+            "jina-reranker-v1-turbo-en" | "jina-tiny" | "jina-turbo" => {
+                Some(Self::JinaRerankerV1TurboEn)
+            }
+            "jina-reranker-v2-base-multilingual" | "jina-v2" | "jina-multilingual" => {
+                Some(Self::JinaRerankerV2BaseMultilingual)
+            }
             _ => None,
         }
     }
@@ -94,10 +106,18 @@ impl RerankerModelType {
     /// Returns a human-readable display string for interactive menus.
     pub fn display_label(&self) -> &'static str {
         match self {
-            Self::BGERerankerBase => "BGE-Reranker-Base (~1.11 GB) - Padrão / Multilíngue (Recomendado)",
-            Self::BGERerankerV2M3 => "BGE-Reranker-V2-M3 (~2.2 GB) - SOTA Multilíngue / Contexto 8k",
-            Self::JinaRerankerV2BaseMultilingual => "Jina-Reranker-V2-Multilingual (~1.1 GB) - Excelente para Português",
-            Self::JinaRerankerV1TurboEn => "Jina-Reranker-V1-Turbo (~130 MB) - Ultraleve / CPU Fraca",
+            Self::BGERerankerBase => {
+                "BGE-Reranker-Base (~1.11 GB) - Padrão / Multilíngue (Recomendado)"
+            }
+            Self::BGERerankerV2M3 => {
+                "BGE-Reranker-V2-M3 (~2.2 GB) - SOTA Multilíngue / Contexto 8k"
+            }
+            Self::JinaRerankerV2BaseMultilingual => {
+                "Jina-Reranker-V2-Multilingual (~1.1 GB) - Excelente para Português"
+            }
+            Self::JinaRerankerV1TurboEn => {
+                "Jina-Reranker-V1-Turbo (~130 MB) - Ultraleve / CPU Fraca"
+            }
             Self::None => "Nenhum / Desativado (Busca Híbrida Leve < 10ms)",
             Self::Custom => "Custom (Personalizado)",
         }
@@ -138,7 +158,9 @@ impl LocalReranker {
             RerankerModelType::BGERerankerBase => RerankerModel::BGERerankerBase,
             RerankerModelType::BGERerankerV2M3 => RerankerModel::BGERerankerV2M3,
             RerankerModelType::JinaRerankerV1TurboEn => RerankerModel::JINARerankerV1TurboEn,
-            RerankerModelType::JinaRerankerV2BaseMultilingual => RerankerModel::JINARerankerV2BaseMultiligual,
+            RerankerModelType::JinaRerankerV2BaseMultilingual => {
+                RerankerModel::JINARerankerV2BaseMultiligual
+            }
         };
 
         let mut options = RerankInitOptions::default();
@@ -177,8 +199,11 @@ impl LocalReranker {
     /// Initializes a new local reranker using `bge-reranker-base`.
     #[cfg(feature = "fastembed")]
     pub fn new_bge_base() -> Result<Self> {
-        Self::from_model_type(RerankerModelType::BGERerankerBase)
-            .and_then(|opt| opt.ok_or_else(|| GraphiteError::Io(std::io::Error::other("Failed to create bge-reranker-base"))))
+        Self::from_model_type(RerankerModelType::BGERerankerBase).and_then(|opt| {
+            opt.ok_or_else(|| {
+                GraphiteError::Io(std::io::Error::other("Failed to create bge-reranker-base"))
+            })
+        })
     }
 
     /// Returns the model type configured for this reranker.

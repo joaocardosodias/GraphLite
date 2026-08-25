@@ -257,10 +257,7 @@ pub struct QueryArgs {
     pub format: CliOutputFormat,
 
     /// Enable local Cross-Encoder semantic re-ranking on candidate entities (active by default if database has reranker).
-    #[arg(
-        long,
-        help = "Force enable local Cross-Encoder semantic reranking"
-    )]
+    #[arg(long, help = "Force enable local Cross-Encoder semantic reranking")]
     pub rerank: bool,
 
     /// Disable Cross-Encoder reranking and use pure fast hybrid retrieval (< 10ms).
