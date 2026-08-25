@@ -1028,7 +1028,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "graphite"
+name = "graphite-db"
 version = "0.1.0"
 dependencies = [
  "anyhow",
@@ -1046,12 +1046,12 @@ dependencies = [
 ]
 
 [[package]]
-name = "graphite-cli"
+name = "graphite-db-cli"
 version = "0.1.0"
 dependencies = [
  "anyhow",
  "clap",
- "graphite",
+ "graphite-db",
  "indicatif 0.17.11",
  "parking_lot",
  "serde",

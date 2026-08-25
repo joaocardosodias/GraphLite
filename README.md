@@ -10,7 +10,7 @@
 
 <p align="center">
   <a href="LICENSE"><img src="https://img.shields.io/badge/License-MIT%20OR%20Apache--2.0-black.svg" alt="License" /></a>
-  <a href="https://crates.io/crates/graphite"><img src="https://img.shields.io/crates/v/graphite.svg?color=black" alt="Crates.io" /></a>
+  <a href="https://crates.io/crates/graphite-db"><img src="https://img.shields.io/crates/v/graphite-db.svg?color=black" alt="Crates.io" /></a>
   <a href="https://github.com/joaocardosodias/Graphite/actions"><img src="https://img.shields.io/badge/CI-passing-black.svg" alt="CI Status" /></a>
   <a href="https://joaocardosodias.github.io/Graphite"><img src="https://img.shields.io/badge/docs-fumadocs-black.svg" alt="Documentation" /></a>
 </p>
@@ -33,7 +33,7 @@ irm https://raw.githubusercontent.com/joaocardosodias/Graphite/main/install.ps1 
 
 ### Via Cargo (Rust CLI):
 ```bash
-cargo install graphite-cli
+cargo install graphite-db-cli
 ```
 
 ---
@@ -102,11 +102,11 @@ graphite serve -d knowledge.graphite --port 8080 --host 0.0.0.0
 
 ## Rust SDK Example
 
-Add `graphite` to your `Cargo.toml`:
+Add `graphite-db` to your `Cargo.toml`:
 
 ```toml
 [dependencies]
-graphite = "0.1"
+graphite-db = "0.1"
 ```
 
 ```rust
@@ -155,8 +155,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
 ## Workspace Layout
 
-- [`crates/graphite`](crates/graphite/): Pure Rust embedded storage engine, zero-copy mmap reader, SIMD AVX2 kernels, SQ8 quantization, CSR graph topology, BM25, and MMR token budgeting.
-- [`crates/graphite-cli`](crates/graphite-cli/): The `graphite` command-line executable, multi-format document chunker, and embedded REST API server.
+- [`crates/graphite`](crates/graphite/): Pure Rust embedded storage engine, zero-copy mmap reader, SIMD AVX2 kernels, SQ8 quantization, CSR graph topology, BM25, and MMR token budgeting (`graphite-db`).
+- [`crates/graphite-cli`](crates/graphite-cli/): The `graphite` command-line executable, multi-format document chunker, and embedded REST API server (`graphite-db-cli`).
 
 ---
 

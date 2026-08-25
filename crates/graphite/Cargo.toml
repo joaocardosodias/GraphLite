@@ -1,5 +1,5 @@
 [package]
-name = "graphite"
+name = "graphite-db"
 version.workspace = true
 edition.workspace = true
 authors.workspace = true
@@ -7,6 +7,10 @@ license.workspace = true
 repository.workspace = true
 description = "Embedded single-file GraphRAG engine in pure Rust: Knowledge Graphs, SIMD vector search, and token-budgeted prompt synthesis"
 readme = "../../README.md"
+
+[lib]
+name = "graphite"
+path = "src/lib.rs"
 
 [dependencies]
 thiserror.workspace = true
