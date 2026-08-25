@@ -128,7 +128,11 @@ pub fn execute_query(db_path: &Path, args: &QueryArgs, verbose: bool) -> Result<
     let options = QueryOptions {
         top_k_seeds: seed_count,
         query_text: args.query_text.clone(),
-        max_tokens: if is_reranking { Some(100_000) } else { args.tokens },
+        max_tokens: if is_reranking {
+            Some(100_000)
+        } else {
+            args.tokens
+        },
         markdown_style: MarkdownStyle::Hierarchical,
         max_depth: args.depth,
         min_score_threshold: None,
