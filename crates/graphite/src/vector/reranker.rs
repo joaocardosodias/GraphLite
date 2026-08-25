@@ -67,7 +67,7 @@ impl LocalReranker {
                         let blobs = entry.path().join("blobs");
                         if let Ok(blob_entries) = std::fs::read_dir(blobs) {
                             for b in blob_entries.flatten() {
-                                if b.path().extension().map_or(false, |ext| ext == "lock") {
+                                if b.path().extension().is_some_and(|ext| ext == "lock") {
                                     let _ = std::fs::remove_file(b.path());
                                 }
                             }
