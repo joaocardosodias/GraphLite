@@ -15,43 +15,55 @@ use commands::remember::execute_remember;
 use commands::serve::execute_serve;
 use ingestion::execute_ingest;
 
+fn normalize_db_path(path: &std::path::Path) -> std::path::PathBuf {
+    let s = path.to_string_lossy();
+    if !s.ends_with(".graphite") && !s.ends_with(".graph") {
+        let mut p = path.to_path_buf();
+        p.set_extension("graphite");
+        p
+    } else {
+        path.to_path_buf()
+    }
+}
+
 fn main() -> Result<()> {
     let cli = Cli::parse();
+    let db_path = normalize_db_path(&cli.db_path);
 
     match &cli.command {
         Commands::Init(args) => {
-            execute_init(&cli.db_path, args)?;
+            execute_init(&db_path, args)?;
         }
         Commands::Create(args) => {
             let mut create_args = args.clone();
             if create_args.embedding_model.is_none() && create_args.dim.is_none() {
                 create_args.interactive = true;
             }
-            execute_init(&cli.db_path, &create_args)?;
+            execute_init(&db_path, &create_args)?;
         }
         Commands::InsertNode(args) => {
-            execute_insert_node(&cli.db_path, args)?;
+            execute_insert_node(&db_path, args)?;
         }
         Commands::InsertEdge(args) => {
-            execute_insert_edge(&cli.db_path, args)?;
+            execute_insert_edge(&db_path, args)?;
         }
         Commands::Query(args) => {
-            execute_query(&cli.db_path, args, cli.verbose)?;
+            execute_query(&db_path, args, cli.verbose)?;
         }
         Commands::Inspect(args) => {
-            execute_inspect(&cli.db_path, args)?;
+            execute_inspect(&db_path, args)?;
         }
         Commands::Dump(args) => {
-            execute_dump(&cli.db_path, args)?;
+            execute_dump(&db_path, args)?;
         }
         Commands::Ingest(args) => {
-            execute_ingest(&cli.db_path, args)?;
+            execute_ingest(&db_path, args)?;
         }
         Commands::Remember(args) => {
-            execute_remember(&cli.db_path, args)?;
+            execute_remember(&db_path, args)?;
         }
         Commands::Serve(args) => {
-            execute_serve(&cli.db_path, args)?;
+            execute_serve(&db_path, args)?;
         }
     }
 

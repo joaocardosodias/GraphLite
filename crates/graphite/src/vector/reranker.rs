@@ -107,20 +107,33 @@ impl RerankerModelType {
     pub fn display_label(&self) -> &'static str {
         match self {
             Self::BGERerankerBase => {
-                "BGE-Reranker-Base (~1.11 GB) - Padrão / Multilíngue (Recomendado)"
-            }
-            Self::BGERerankerV2M3 => {
-                "BGE-Reranker-V2-M3 (~2.2 GB) - SOTA Multilíngue / Contexto 8k"
+                "bge-reranker-base               1.1 GB   (Recommended, Multilingual)"
             }
             Self::JinaRerankerV2BaseMultilingual => {
-                "Jina-Reranker-V2-Multilingual (~1.1 GB) - Excelente para Português"
+                "jina-reranker-v2-multilingual   1.1 GB   (SOTA Multilingual / Portuguese)"
+            }
+            Self::BGERerankerV2M3 => {
+                "bge-reranker-v2-m3              2.2 GB   (SOTA Multilingual / 8k Context)"
             }
             Self::JinaRerankerV1TurboEn => {
-                "Jina-Reranker-V1-Turbo (~130 MB) - Ultraleve / CPU Fraca"
+                "jina-reranker-v1-turbo          130 MB   (Ultralight / Low CPU)"
             }
-            Self::None => "Nenhum / Desativado (Busca Híbrida Leve < 10ms)",
-            Self::Custom => "Custom (Personalizado)",
+            Self::None => "None                                     (Fast Hybrid Retrieval, < 10ms)",
+            Self::Custom => "Custom",
         }
+    }
+
+    /// Returns `true` if this reranker model's ONNX weights are already downloaded and cached locally.
+    pub fn is_cached(&self) -> bool {
+        let pattern = match self {
+            Self::None | Self::Custom => return true,
+            Self::BGERerankerBase => "bge-reranker-base",
+            Self::BGERerankerV2M3 => "bge-reranker-v2-m3",
+            Self::JinaRerankerV1TurboEn => "jina-reranker-v1-turbo",
+            Self::JinaRerankerV2BaseMultilingual => "jina-reranker-v2-base-multilingual",
+        };
+
+        crate::vector::embedding::is_model_cached(pattern)
     }
 }
 
@@ -129,24 +142,6 @@ pub struct LocalReranker {
     #[cfg(feature = "fastembed")]
     model: Mutex<TextRerank>,
     model_type: RerankerModelType,
-}
-
-/// Returns the global standard user cache directory for storing ONNX model files (~/.cache/graphite/models).
-#[cfg(feature = "fastembed")]
-fn default_model_cache_dir() -> std::path::PathBuf {
-    if let Ok(home) = std::env::var("HOME") {
-        std::path::PathBuf::from(home)
-            .join(".cache")
-            .join("graphite")
-            .join("models")
-    } else if let Ok(userprofile) = std::env::var("USERPROFILE") {
-        std::path::PathBuf::from(userprofile)
-            .join(".cache")
-            .join("graphite")
-            .join("models")
-    } else {
-        std::env::temp_dir().join("graphite_models")
-    }
 }
 
 impl LocalReranker {
@@ -163,10 +158,11 @@ impl LocalReranker {
             }
         };
 
+        let cached = model_type.is_cached();
         let mut options = RerankInitOptions::default();
         options.model_name = fastembed_model;
-        options.show_download_progress = true;
-        let cache_dir = default_model_cache_dir();
+        options.show_download_progress = !cached;
+        let cache_dir = crate::vector::embedding::default_model_cache_dir();
         options.cache_dir = cache_dir.clone();
 
         // Clean any stale .lock files from interrupted downloads

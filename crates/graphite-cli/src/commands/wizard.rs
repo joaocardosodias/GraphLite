@@ -6,38 +6,52 @@ use graphite::vector::distance::Metric;
 use graphite::vector::embedding::{EmbeddingModelType, LocalEmbedder};
 use graphite::vector::quantization::Quantization;
 use graphite::vector::reranker::{LocalReranker, RerankerModelType};
+use inquire::ui::{Color, RenderConfig, StyleSheet, Styled};
 use inquire::{Confirm, CustomType, Select, Text};
+
+fn get_render_config() -> RenderConfig<'static> {
+    let mut config = RenderConfig::default_colored();
+    config.prompt_prefix = Styled::new("› ").with_fg(Color::LightCyan);
+    config.highlighted_option_prefix = Styled::new("› ").with_fg(Color::LightCyan);
+    config.selected_option = Some(StyleSheet::new().with_fg(Color::LightCyan));
+    config.help_message = StyleSheet::new().with_fg(Color::DarkGrey);
+    config.answer = StyleSheet::new().with_fg(Color::White);
+    config
+}
 
 /// Runs the interactive terminal setup wizard to configure and initialize a Graphite database.
 pub fn run_interactive_wizard(default_path: &Path) -> Result<(PathBuf, GraphiteConfig)> {
-    println!();
-    println!("=== Assistente de Criação do Graphite DB ===");
-    println!("Configure o seu banco de dados vetorial e grafo de conhecimento.");
-    println!();
+    let render_config = get_render_config();
 
-    // 1. Caminho do arquivo
+    // 1. Target file path with automatic .graphite extension
     let default_path_str = default_path
         .to_str()
         .unwrap_or("knowledge.graphite")
         .to_string();
 
-    let path_input = Text::new("Caminho do arquivo do banco (.graphite):")
+    let path_input = Text::new("Database path:")
         .with_default(&default_path_str)
-        .with_help_message("Pressione Enter para usar o caminho padrão ou digite um novo")
+        .with_render_config(render_config)
         .prompt()?;
 
-    let db_path = PathBuf::from(path_input.trim());
+    let mut raw_path = path_input.trim().to_string();
+    if !raw_path.is_empty() && !raw_path.ends_with(".graphite") && !raw_path.ends_with(".graph") {
+        raw_path.push_str(".graphite");
+    }
+
+    let db_path = PathBuf::from(raw_path);
 
     if db_path.exists() {
-        let overwrite = Confirm::new("O arquivo já existe. Deseja sobrescrever?")
+        let overwrite = Confirm::new("File already exists. Overwrite?")
             .with_default(false)
+            .with_render_config(render_config)
             .prompt()?;
         if !overwrite {
-            bail!("Criação cancelada: o arquivo já existe.");
+            bail!("Initialization aborted: database file already exists.");
         }
     }
 
-    // 2. Modelo de Embedding
+    // 2. Embedding Model
     let embedding_choices = vec![
         EmbeddingModelType::AllMiniLML6V2,
         EmbeddingModelType::MultilingualMiniLML12V2,
@@ -48,30 +62,39 @@ pub fn run_interactive_wizard(default_path: &Path) -> Result<(PathBuf, GraphiteC
         EmbeddingModelType::Custom(384),
     ];
 
-    let embedding_labels: Vec<&str> = embedding_choices
+    let embedding_labels: Vec<String> = embedding_choices
         .iter()
-        .map(|m| m.display_label())
+        .map(|m| {
+            if *m == EmbeddingModelType::Custom(384) {
+                m.display_label().to_string()
+            } else if m.is_cached() {
+                format!("{}  [Cached]", m.display_label())
+            } else {
+                m.display_label().to_string()
+            }
+        })
         .collect();
 
     let selected_emb_idx = Select::new(
-        "Selecione o Modelo de Embedding (Vetorização):",
+        "Embedding model:",
         embedding_labels,
     )
-    .with_help_message("Use as setas para cima/baixo e Enter para selecionar")
+    .with_render_config(render_config)
     .raw_prompt()?
     .index;
 
     let selected_emb = embedding_choices[selected_emb_idx];
 
     let dim = if let EmbeddingModelType::Custom(_) = selected_emb {
-        CustomType::<usize>::new("Digite a dimensão manual dos vetores:")
+        CustomType::<usize>::new("Vector dimension:")
             .with_default(384)
+            .with_render_config(render_config)
             .prompt()?
     } else {
         selected_emb.dimension()
     };
 
-    // 3. Modelo de Reranking
+    // 3. Reranking Model
     let reranker_choices = vec![
         RerankerModelType::BGERerankerBase,
         RerankerModelType::JinaRerankerV2BaseMultilingual,
@@ -80,27 +103,39 @@ pub fn run_interactive_wizard(default_path: &Path) -> Result<(PathBuf, GraphiteC
         RerankerModelType::None,
     ];
 
-    let reranker_labels: Vec<&str> = reranker_choices.iter().map(|r| r.display_label()).collect();
+    let reranker_labels: Vec<String> = reranker_choices
+        .iter()
+        .map(|r| {
+            if *r == RerankerModelType::None || *r == RerankerModelType::Custom {
+                r.display_label().to_string()
+            } else if r.is_cached() {
+                format!("{}  [Cached]", r.display_label())
+            } else {
+                r.display_label().to_string()
+            }
+        })
+        .collect();
 
     let selected_rerank_idx = Select::new(
-        "Selecione o Modelo de Reranking (Reclassificador Neural):",
+        "Reranking model:",
         reranker_labels,
     )
-    .with_help_message("O Reranker aplica atenção cruzada para máxima precisão semântica")
+    .with_render_config(render_config)
     .raw_prompt()?
     .index;
 
     let selected_rerank = reranker_choices[selected_rerank_idx];
 
-    // 4. Métrica de Distância
+    // 4. Distance Metric
     let metric_options = vec![
-        "Cosine (Similaridade de Cosseno) - Recomendado para Embeddings",
-        "DotProduct (Produto Escalar)",
-        "Euclidean (Distância Euclidiana L2)",
-        "Manhattan (Distância de Manhattan L1)",
+        "Cosine Similarity       (Recommended for dense vectors)",
+        "Dot Product             (Normalized embeddings)",
+        "Euclidean Distance      (L2)",
+        "Manhattan Distance      (L1)",
     ];
 
-    let metric_idx = Select::new("Métrica de Distância:", metric_options)
+    let metric_idx = Select::new("Distance metric:", metric_options)
+        .with_render_config(render_config)
         .raw_prompt()?
         .index;
 
@@ -111,13 +146,14 @@ pub fn run_interactive_wizard(default_path: &Path) -> Result<(PathBuf, GraphiteC
         _ => Metric::Manhattan,
     };
 
-    // 5. Quantização
+    // 5. Quantization
     let quant_options = vec![
-        "ScalarInt8 (SQ8 - Redução de 75% de memória e disco) - Recomendado",
-        "Float32 (Sem quantização, precisão decimal completa)",
+        "ScalarInt8 (SQ8)        (Recommended: 75% smaller, SIMD accelerated)",
+        "Float32                 (Full 32-bit decimal precision)",
     ];
 
-    let quant_idx = Select::new("Modo de Armazenamento Vetorial:", quant_options)
+    let quant_idx = Select::new("Storage quantization:", quant_options)
+        .with_render_config(render_config)
         .raw_prompt()?
         .index;
 
@@ -126,40 +162,41 @@ pub fn run_interactive_wizard(default_path: &Path) -> Result<(PathBuf, GraphiteC
         _ => Quantization::None,
     };
 
-    // 6. Pré-download
-    let pre_download = if selected_emb != EmbeddingModelType::Custom(dim)
-        || selected_rerank != RerankerModelType::None
-    {
-        Confirm::new("Deseja baixar e verificar os pesos dos modelos agora?")
+    // 6. Pre-download / Cache verification
+    let emb_cached = selected_emb.is_cached();
+    let rerank_cached = selected_rerank.is_cached();
+
+    if !emb_cached || !rerank_cached {
+        let download_confirmed = Confirm::new("Download missing ONNX model weights now?")
             .with_default(true)
-            .with_help_message("Garante que os modelos estejam prontos para uso offline")
-            .prompt()?
-    } else {
-        false
-    };
+            .with_render_config(render_config)
+            .prompt()?;
 
-    if pre_download {
-        println!();
-        if let EmbeddingModelType::Custom(_) = selected_emb {
-            // No local download needed
-        } else {
-            println!(
-                "Verificando / Baixando modelo de Embedding: {}...",
-                selected_emb.name()
-            );
-            LocalEmbedder::from_model_type(selected_emb)?;
-            println!("Modelo de Embedding pronto.");
-        }
+        if download_confirmed {
+            println!();
+            if !emb_cached {
+                if let EmbeddingModelType::Custom(_) = selected_emb {
+                    // No download needed
+                } else {
+                    println!(
+                        "  Downloading embedding model: {}...",
+                        selected_emb.name()
+                    );
+                    LocalEmbedder::from_model_type(selected_emb)?;
+                    println!("  Embedding model ready.");
+                }
+            }
 
-        if selected_rerank != RerankerModelType::None {
-            println!(
-                "Verificando / Baixando modelo de Reranking: {}...",
-                selected_rerank.name()
-            );
-            LocalReranker::from_model_type(selected_rerank)?;
-            println!("Modelo de Reranking pronto.");
+            if !rerank_cached && selected_rerank != RerankerModelType::None {
+                println!(
+                    "  Downloading reranker model: {}...",
+                    selected_rerank.name()
+                );
+                LocalReranker::from_model_type(selected_rerank)?;
+                println!("  Reranker model ready.");
+            }
+            println!();
         }
-        println!();
     }
 
     let config = GraphiteConfig::new()

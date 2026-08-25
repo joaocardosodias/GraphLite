@@ -107,32 +107,44 @@ impl EmbeddingModelType {
     /// Returns a human-readable display string for interactive menus.
     pub fn display_label(&self) -> &'static str {
         match self {
-            Self::AllMiniLML6V2 => "all-MiniLM-L6-v2 (384d, ~90 MB) - Padrão / Inglês / Rápido",
-            Self::BGESmallENV15 => "BGE-Small-ENV1.5 (384d, ~130 MB) - Inglês / Alta Precisão",
+            Self::AllMiniLML6V2 => "all-MiniLM-L6-v2                 384d  ·   90 MB   (Default, Fast)",
             Self::MultilingualMiniLML12V2 => {
-                "Multilingual-MiniLM-L12 (384d, ~470 MB) - Multilíngue (Português)"
+                "paraphrase-multilingual-minilm   384d  ·  470 MB   (Multilingual / Portuguese)"
             }
             Self::MultilingualE5Base => {
-                "Multilingual-E5-Base (768d, ~1.1 GB) - Multilíngue / Jurídico & Técnico"
+                "multilingual-e5-base             768d  ·  1.1 GB   (Multilingual / Legal & Tech)"
             }
-            Self::BGEM3 => "BGE-M3 (1024d, ~2.2 GB) - SOTA Multilíngue / Contexto 8k",
-            Self::NomicEmbedTextV15 => "Nomic-Embed-Text-V1.5 (768d, ~550 MB) - Código & Texto",
-            Self::Custom(_) => "Custom (Dimensão manual personalizada)",
+            Self::BGEM3 => {
+                "bge-m3                          1024d  ·  2.2 GB   (SOTA Multilingual / 8k Context)"
+            }
+            Self::BGESmallENV15 => {
+                "bge-small-en-v1.5                384d  ·  130 MB   (High Accuracy / English)"
+            }
+            Self::NomicEmbedTextV15 => {
+                "nomic-embed-text-v1.5            768d  ·  550 MB   (Code & Text)"
+            }
+            Self::Custom(_) => "Custom                                     (Manual dimension)",
         }
+    }
+
+    /// Returns `true` if this model's ONNX weights are already downloaded and cached locally.
+    pub fn is_cached(&self) -> bool {
+        let pattern = match self {
+            Self::AllMiniLML6V2 => "all-MiniLM-L6-v2",
+            Self::BGESmallENV15 => "bge-small-en",
+            Self::MultilingualMiniLML12V2 => "paraphrase-multilingual-MiniLM-L12",
+            Self::MultilingualE5Base => "multilingual-e5-base",
+            Self::BGEM3 => "bge-m3",
+            Self::NomicEmbedTextV15 => "nomic-embed-text",
+            Self::Custom(_) => return true,
+        };
+
+        is_model_cached(pattern)
     }
 }
 
-/// Local in-memory embedding model runner for computing vector embeddings in pure Rust.
-pub struct LocalEmbedder {
-    #[cfg(feature = "fastembed")]
-    model: Mutex<TextEmbedding>,
-    dim: usize,
-    model_type: EmbeddingModelType,
-}
-
 /// Returns the global standard user cache directory for storing ONNX model files (~/.cache/graphite/models).
-#[cfg(feature = "fastembed")]
-fn default_model_cache_dir() -> std::path::PathBuf {
+pub fn default_model_cache_dir() -> std::path::PathBuf {
     if let Ok(home) = std::env::var("HOME") {
         std::path::PathBuf::from(home)
             .join(".cache")
@@ -146,6 +158,43 @@ fn default_model_cache_dir() -> std::path::PathBuf {
     } else {
         std::env::temp_dir().join("graphite_models")
     }
+}
+
+/// Checks if an ONNX model matching the given pattern is already downloaded in the cache.
+pub fn is_model_cached(pattern: &str) -> bool {
+    let cache_dir = default_model_cache_dir();
+    if !cache_dir.exists() {
+        return false;
+    }
+
+    if let Ok(entries) = std::fs::read_dir(&cache_dir) {
+        for entry in entries.flatten() {
+            let name = entry.file_name();
+            let name_str = name.to_string_lossy();
+            if name_str.to_lowercase().contains(&pattern.to_lowercase()) {
+                let snapshots = entry.path().join("snapshots");
+                if snapshots.exists() {
+                    if let Ok(snap_entries) = std::fs::read_dir(snapshots) {
+                        for snap in snap_entries.flatten() {
+                            let model_file = snap.path().join("model.onnx");
+                            if model_file.exists() {
+                                return true;
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+    false
+}
+
+/// Local in-memory embedding model runner for computing vector embeddings in pure Rust.
+pub struct LocalEmbedder {
+    #[cfg(feature = "fastembed")]
+    model: Mutex<TextEmbedding>,
+    dim: usize,
+    model_type: EmbeddingModelType,
 }
 
 impl LocalEmbedder {
@@ -164,9 +213,10 @@ impl LocalEmbedder {
             EmbeddingModelType::Custom(d) => (EmbeddingModel::AllMiniLML6V2, d),
         };
 
+        let cached = model_type.is_cached();
         let mut options = InitOptions::default();
         options.model_name = fastembed_model;
-        options.show_download_progress = true;
+        options.show_download_progress = !cached;
         let cache_dir = default_model_cache_dir();
         options.cache_dir = cache_dir.clone();
 

@@ -24,17 +24,13 @@ pub fn execute_init(db_path: &Path, args: &InitArgs) -> Result<()> {
         let emb_type = EmbeddingModelType::from_id(config.embedding_model_id, config.vector_dim);
         let rerank_type = RerankerModelType::from_id(config.reranker_model_id);
 
-        println!("=== Graphite Database Initialized ===");
-        println!("  Database File:        {:?}", final_path);
-        println!(
-            "  Embedding Model:      {} ({}d)",
-            emb_type.name(),
-            config.vector_dim
-        );
-        println!("  Reranker Model:       {}", rerank_type.name());
-        println!("  Distance Metric:      {:?}", config.metric);
+        println!("------------------------------------------------------------");
+        println!("  Database initialized: {}", final_path.display());
+        println!("  Embedding model:      {} ({}d)", emb_type.name(), config.vector_dim);
+        println!("  Reranker model:       {}", rerank_type.name());
+        println!("  Distance metric:      {:?}", config.metric);
         println!("  Quantization:         {:?}", config.quantization);
-        println!("  Default Token Budget: {}", config.default_max_tokens);
+        println!("------------------------------------------------------------");
         return Ok(());
     }
 
@@ -72,14 +68,20 @@ pub fn execute_init(db_path: &Path, args: &InitArgs) -> Result<()> {
     if args.download {
         if let EmbeddingModelType::Custom(_) = emb_type {
             // custom dimension has no local download
+        } else if emb_type.is_cached() {
+            println!("  Embedding model '{}' is already cached.", emb_type.name());
         } else {
-            println!("Pre-downloading Embedding Model: {}...", emb_type.name());
+            println!("  Downloading Embedding Model: {}...", emb_type.name());
             LocalEmbedder::from_model_type(emb_type)?;
         }
 
         if rerank_type != RerankerModelType::None {
-            println!("Pre-downloading Reranker Model: {}...", rerank_type.name());
-            LocalReranker::from_model_type(rerank_type)?;
+            if rerank_type.is_cached() {
+                println!("  Reranker model '{}' is already cached.", rerank_type.name());
+            } else {
+                println!("  Downloading Reranker Model: {}...", rerank_type.name());
+                LocalReranker::from_model_type(rerank_type)?;
+            }
         }
     }
 
@@ -106,17 +108,13 @@ pub fn execute_init(db_path: &Path, args: &InitArgs) -> Result<()> {
     let engine = GraphiteEngine::open_or_create(db_path, config)?;
     engine.flush()?;
 
-    println!("=== Graphite Database Initialized ===");
-    println!("  Database File:        {:?}", db_path);
-    println!(
-        "  Embedding Model:      {} ({} dimensions)",
-        emb_type.name(),
-        dim
-    );
-    println!("  Reranker Model:       {}", rerank_type.name());
-    println!("  Distance Metric:      {:?}", args.metric);
+    println!("------------------------------------------------------------");
+    println!("  Database initialized: {}", db_path.display());
+    println!("  Embedding model:      {} ({}d)", emb_type.name(), dim);
+    println!("  Reranker model:       {}", rerank_type.name());
+    println!("  Distance metric:      {:?}", args.metric);
     println!("  Quantization:         {:?}", args.quantization);
-    println!("  Default Token Budget: {}", args.max_tokens);
+    println!("------------------------------------------------------------");
 
     Ok(())
 }
