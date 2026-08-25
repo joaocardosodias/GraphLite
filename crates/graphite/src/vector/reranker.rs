@@ -55,8 +55,27 @@ impl LocalReranker {
     pub fn new_bge_base() -> Result<Self> {
         let mut options = RerankInitOptions::default();
         options.model_name = RerankerModel::BGERerankerBase;
-        options.show_download_progress = false;
-        options.cache_dir = default_model_cache_dir();
+        options.show_download_progress = true;
+        let cache_dir = default_model_cache_dir();
+        options.cache_dir = cache_dir.clone();
+
+        // Clean any stale .lock files from interrupted downloads
+        if let Ok(entries) = std::fs::read_dir(&cache_dir) {
+            for entry in entries.flatten() {
+                if let Ok(ft) = entry.file_type() {
+                    if ft.is_dir() {
+                        let blobs = entry.path().join("blobs");
+                        if let Ok(blob_entries) = std::fs::read_dir(blobs) {
+                            for b in blob_entries.flatten() {
+                                if b.path().extension().map_or(false, |ext| ext == "lock") {
+                                    let _ = std::fs::remove_file(b.path());
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
 
         let model = TextRerank::try_new(options)
             .map_err(|e| GraphiteError::Io(std::io::Error::other(e.to_string())))?;

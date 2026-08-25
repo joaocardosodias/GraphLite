@@ -142,6 +142,7 @@ pub fn execute_query(db_path: &Path, args: &QueryArgs, verbose: bool) -> Result<
 
     if args.rerank {
         if let Some(ref q_text) = args.query_text {
+            eprintln!("info: initializing local Cross-Encoder reranker (bge-reranker-base)...");
             let reranker = graphite::LocalReranker::new_bge_base()
                 .with_context(|| "Failed to initialize local ONNX Cross-Encoder reranker")?;
 

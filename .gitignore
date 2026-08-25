@@ -22,10 +22,13 @@ target
 examples/.fastembed_cache/
 
 
+# Example artifacts
+*.graphite
+example/*.graphite
+example/python/*.graphite
+example/python/*_baixado.md
 examples/documents/
 examples/graphite.graphite
-example/documents/
-example/
 
 # Docs / Next.js
 docs/node_modules/
@@ -53,3 +56,7 @@ env/
 dist/
 wheels/
 target/wheels/
+example/python/
+example/python/README.md
+example/python/codigo_penal.md
+example/python/main.py
