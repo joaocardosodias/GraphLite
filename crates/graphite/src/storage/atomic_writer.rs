@@ -15,6 +15,7 @@ use crate::storage::vector_block::serialize_quantized_vector_block;
 use crate::vector::quantization::QuantizedVector;
 
 /// Serializes all database components into a complete in-memory `.graph` file buffer.
+#[allow(clippy::too_many_arguments)]
 pub fn serialize_database(
     nodes: &[NodeRecord],
     csr: &CsrGraph,
@@ -70,6 +71,7 @@ pub fn serialize_database(
 /// 2. Writes to a temporary staging file (`<path>.tmp.<pid>`).
 /// 3. Flushes and executes `sync_all` (fsync) to guarantee physical persistence.
 /// 4. Atomically renames the temporary file to the final destination.
+#[allow(clippy::too_many_arguments)]
 pub fn write_database_atomic<P: AsRef<Path>>(
     target_path: P,
     nodes: &[NodeRecord],
@@ -126,6 +128,7 @@ pub fn write_database_atomic<P: AsRef<Path>>(
 }
 
 /// Directly writes a `.graph` database file to disk without creating any temporary staging files.
+#[allow(clippy::too_many_arguments)]
 pub fn write_database_direct<P: AsRef<Path>>(
     target_path: P,
     nodes: &[NodeRecord],

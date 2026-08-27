@@ -13,7 +13,8 @@ use crate::args::{CliMetric, CliQuantization, InitArgs};
 use crate::commands::wizard::run_interactive_wizard;
 
 pub fn execute_init(db_path: &Path, args: &InitArgs) -> Result<()> {
-    if args.interactive {
+    let is_interactive = args.interactive || (args.embedding_model.is_none() && args.dim.is_none());
+    if is_interactive {
         let (final_path, config) = run_interactive_wizard(db_path)?;
         if final_path.exists() {
             let _ = fs::remove_file(&final_path);

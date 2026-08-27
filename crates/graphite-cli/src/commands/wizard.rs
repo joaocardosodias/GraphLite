@@ -52,7 +52,7 @@ pub fn run_interactive_wizard(default_path: &Path) -> Result<(PathBuf, GraphiteC
     }
 
     // 2. Embedding Model
-    let embedding_choices = vec![
+    let embedding_choices = [
         EmbeddingModelType::AllMiniLML6V2,
         EmbeddingModelType::MultilingualMiniLML12V2,
         EmbeddingModelType::MultilingualE5Base,
@@ -92,7 +92,7 @@ pub fn run_interactive_wizard(default_path: &Path) -> Result<(PathBuf, GraphiteC
     };
 
     // 3. Reranking Model (always required for maximum retrieval precision)
-    let reranker_choices = vec![
+    let reranker_choices = [
         RerankerModelType::BGERerankerBase,
         RerankerModelType::JinaRerankerV2BaseMultilingual,
         RerankerModelType::BGERerankerV2M3,

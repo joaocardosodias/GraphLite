@@ -317,7 +317,7 @@ pub fn run_ingest_pass(
 
         let vectors = embedder.embed_batch(&texts)?;
 
-        for (chunk, vector) in chunk_batch.iter().zip(vectors.into_iter()) {
+        for (chunk, vector) in chunk_batch.iter().zip(vectors) {
             pb.set_message(format!("{}: {}", chunk.chunk_type, chunk.title));
 
             let initial_node_count = engine.node_count();

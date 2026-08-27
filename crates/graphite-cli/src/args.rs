@@ -32,10 +32,11 @@ pub struct Cli {
 
 #[derive(Subcommand, Debug)]
 pub enum Commands {
-    /// Initialize a new empty `.graph` database file with custom or interactive configuration.
+    /// Initialize or create a new `.graph` database file with interactive setup wizard.
+    #[command(alias = "create")]
     Init(InitArgs),
 
-    /// Create a new `.graph` database file (alias for init, interactive by default when run in a terminal).
+    /// Create a new `.graph` database file (alias for init).
     Create(InitArgs),
 
     /// Insert or update an entity node with optional embedding vector.

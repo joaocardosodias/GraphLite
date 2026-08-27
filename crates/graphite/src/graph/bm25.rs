@@ -98,42 +98,43 @@ impl Bm25Index {
                 .chars()
                 .filter(|c| c.is_ascii_alphanumeric())
                 .collect();
-            if !clean_code.is_empty() && clean_code.len() <= 12 {
-                if clean_code.chars().any(|c| c.is_ascii_digit()) {
-                    if !tokens.contains(&clean_code) {
-                        tokens.push(clean_code.clone());
-                    }
-                    if clean_code.starts_with("artigo") {
-                        let stripped = clean_code.trim_start_matches("artigo");
-                        if !stripped.is_empty() {
-                            if !tokens.contains(&stripped.to_string()) {
-                                tokens.push(stripped.to_string());
-                            }
-                            let art_alias = format!("art{}", stripped);
-                            if !tokens.contains(&art_alias) {
-                                tokens.push(art_alias);
-                            }
+            if !clean_code.is_empty()
+                && clean_code.len() <= 12
+                && clean_code.chars().any(|c| c.is_ascii_digit())
+            {
+                if !tokens.contains(&clean_code) {
+                    tokens.push(clean_code.clone());
+                }
+                if clean_code.starts_with("artigo") {
+                    let stripped = clean_code.trim_start_matches("artigo");
+                    if !stripped.is_empty() {
+                        if !tokens.contains(&stripped.to_string()) {
+                            tokens.push(stripped.to_string());
                         }
-                    } else if clean_code.starts_with("art") {
-                        let stripped = clean_code.trim_start_matches("art");
-                        if !stripped.is_empty() {
-                            if !tokens.contains(&stripped.to_string()) {
-                                tokens.push(stripped.to_string());
-                            }
-                            let artigo_alias = format!("artigo{}", stripped);
-                            if !tokens.contains(&artigo_alias) {
-                                tokens.push(artigo_alias);
-                            }
-                        }
-                    } else {
-                        let art_alias = format!("art{}", clean_code);
+                        let art_alias = format!("art{}", stripped);
                         if !tokens.contains(&art_alias) {
                             tokens.push(art_alias);
                         }
-                        let artigo_alias = format!("artigo{}", clean_code);
+                    }
+                } else if clean_code.starts_with("art") {
+                    let stripped = clean_code.trim_start_matches("art");
+                    if !stripped.is_empty() {
+                        if !tokens.contains(&stripped.to_string()) {
+                            tokens.push(stripped.to_string());
+                        }
+                        let artigo_alias = format!("artigo{}", stripped);
                         if !tokens.contains(&artigo_alias) {
                             tokens.push(artigo_alias);
                         }
+                    }
+                } else {
+                    let art_alias = format!("art{}", clean_code);
+                    if !tokens.contains(&art_alias) {
+                        tokens.push(art_alias);
+                    }
+                    let artigo_alias = format!("artigo{}", clean_code);
+                    if !tokens.contains(&artigo_alias) {
+                        tokens.push(artigo_alias);
                     }
                 }
             }

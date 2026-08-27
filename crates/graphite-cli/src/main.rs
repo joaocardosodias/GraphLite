@@ -31,15 +31,12 @@ fn main() -> Result<()> {
     let db_path = normalize_db_path(&cli.db_path);
 
     match &cli.command {
-        Commands::Init(args) => {
-            execute_init(&db_path, args)?;
-        }
-        Commands::Create(args) => {
-            let mut create_args = args.clone();
-            if create_args.embedding_model.is_none() && create_args.dim.is_none() {
-                create_args.interactive = true;
+        Commands::Init(args) | Commands::Create(args) => {
+            let mut init_args = args.clone();
+            if init_args.embedding_model.is_none() && init_args.dim.is_none() {
+                init_args.interactive = true;
             }
-            execute_init(&db_path, &create_args)?;
+            execute_init(&db_path, &init_args)?;
         }
         Commands::InsertNode(args) => {
             execute_insert_node(&db_path, args)?;
