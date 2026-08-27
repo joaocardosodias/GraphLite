@@ -72,13 +72,14 @@ pub struct PyGraphite {
 impl PyGraphite {
     /// Creates or opens a Graphite database.
     #[new]
-    #[pyo3(signature = (path = None, dim = 384, max_tokens = 400, metric = "cosine", quantization = "sq8"))]
+    #[pyo3(signature = (path = None, dim = 384, max_tokens = 400, metric = "cosine", quantization = "sq8", device = "auto"))]
     fn new(
         path: Option<String>,
         dim: usize,
         max_tokens: usize,
         metric: &str,
         quantization: &str,
+        device: &str,
     ) -> PyResult<Self> {
         let metric_enum = match metric.to_lowercase().as_str() {
             "cosine" => Metric::Cosine,
@@ -104,11 +105,14 @@ impl PyGraphite {
             }
         };
 
+        let device_type = graphite::vector::DeviceType::from_str_name(device);
+
         let config = GraphiteConfig::new()
             .with_dim(dim)
             .with_max_tokens(max_tokens)
             .with_metric(metric_enum)
-            .with_quantization(quant_enum);
+            .with_quantization(quant_enum)
+            .with_device(device_type);
 
         let engine = match path {
             Some(p) => GraphiteEngine::open_or_create(Path::new(&p), config)
@@ -117,7 +121,12 @@ impl PyGraphite {
                 .map_err(|e| PyRuntimeError::new_err(e.to_string()))?,
         };
 
-        let embedder = LocalEmbedder::new_minilm().ok().map(Arc::new);
+        let embedder = LocalEmbedder::from_model_type_and_device(
+            graphite::vector::EmbeddingModelType::AllMiniLML6V2,
+            device_type,
+        )
+        .ok()
+        .map(Arc::new);
 
         Ok(Self {
             engine: Some(Arc::new(engine)),
@@ -127,27 +136,29 @@ impl PyGraphite {
 
     /// Opens an existing or new `.graphite` database file.
     #[staticmethod]
-    #[pyo3(signature = (path, dim = 384, max_tokens = 400, metric = "cosine", quantization = "sq8"))]
+    #[pyo3(signature = (path, dim = 384, max_tokens = 400, metric = "cosine", quantization = "sq8", device = "auto"))]
     fn open(
         path: String,
         dim: usize,
         max_tokens: usize,
         metric: &str,
         quantization: &str,
+        device: &str,
     ) -> PyResult<Self> {
-        Self::new(Some(path), dim, max_tokens, metric, quantization)
+        Self::new(Some(path), dim, max_tokens, metric, quantization, device)
     }
 
     /// Creates an in-memory ephemeral Graphite instance.
     #[staticmethod]
-    #[pyo3(signature = (dim = 384, max_tokens = 400, metric = "cosine", quantization = "sq8"))]
+    #[pyo3(signature = (dim = 384, max_tokens = 400, metric = "cosine", quantization = "sq8", device = "auto"))]
     fn in_memory(
         dim: usize,
         max_tokens: usize,
         metric: &str,
         quantization: &str,
+        device: &str,
     ) -> PyResult<Self> {
-        Self::new(None, dim, max_tokens, metric, quantization)
+        Self::new(None, dim, max_tokens, metric, quantization, device)
     }
 
     /// Queries the knowledge graph using a plain text prompt with automatic local embedding.

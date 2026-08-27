@@ -96,7 +96,11 @@ pub fn execute_query(db_path: &Path, args: &QueryArgs, verbose: bool) -> Result<
             engine.config().embedding_model_id,
             engine.config().vector_dim,
         );
-        let embedder = graphite::LocalEmbedder::from_model_type(emb_type).with_context(|| {
+        let embedder = graphite::LocalEmbedder::from_model_type_and_device(
+            emb_type,
+            args.device.into(),
+        )
+        .with_context(|| {
             format!(
                 "Failed to initialize local ONNX embedding model ({})",
                 emb_type.name()
@@ -180,11 +184,15 @@ pub fn execute_query(db_path: &Path, args: &QueryArgs, verbose: bool) -> Result<
 
         if verbose {
             eprintln!(
-                "info: running local Cross-Encoder reranker ({})...",
-                active_rerank_type.name()
+                "info: running local Cross-Encoder reranker ({}, device: {:?})...",
+                active_rerank_type.name(),
+                args.device
             );
         }
-        if let Some(reranker) = graphite::LocalReranker::from_model_type(active_rerank_type)? {
+        if let Some(reranker) = graphite::LocalReranker::from_model_type_and_device(
+            active_rerank_type,
+            args.device.into(),
+        )? {
             let (valid_indices, candidate_docs): (Vec<usize>, Vec<String>) = result
                 .scored_entities
                 .iter()

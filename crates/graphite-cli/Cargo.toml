@@ -24,3 +24,7 @@ parking_lot = { workspace = true }
 rayon = { workspace = true }
 tiny_http = "0.12"
 inquire = "0.7"
+
+[features]
+default = []
+cuda = ["graphite-db/cuda"]

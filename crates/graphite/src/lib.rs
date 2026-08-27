@@ -99,7 +99,7 @@ pub use storage::{
 pub use vector::{
     cosine_similarity, dot_product, euclidean_distance, manhattan_distance, norm, norm_squared,
     normalize_in_place, normalized, simd_cosine_similarity, simd_dot_product,
-    simd_euclidean_distance, simd_norm_squared, EmbeddingModelType, LocalEmbedder, LocalReranker,
+    simd_euclidean_distance, simd_norm_squared, CudaStatus, DeviceType, EmbeddingModelType, LocalEmbedder, LocalReranker,
     Metric, Quantization, QuantizedVector, RerankResult, RerankerModelType, TopKQueue, VectorStore,
 };
 

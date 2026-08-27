@@ -200,13 +200,24 @@ pub struct LocalEmbedder {
     model: Mutex<TextEmbedding>,
     dim: usize,
     model_type: EmbeddingModelType,
+    device: crate::vector::DeviceType,
     query_cache: Mutex<HashMap<u64, Vec<f32>>>,
 }
 
 impl LocalEmbedder {
-    /// Initializes an embedder from an `EmbeddingModelType`.
+    /// Initializes an embedder from an `EmbeddingModelType` using automatic device detection.
     #[cfg(feature = "fastembed")]
     pub fn from_model_type(model_type: EmbeddingModelType) -> Result<Self> {
+        Self::from_model_type_and_device(model_type, crate::vector::DeviceType::Auto)
+    }
+
+    /// Initializes an embedder from an `EmbeddingModelType` on a specified execution device (CPU or CUDA).
+    #[cfg(feature = "fastembed")]
+    pub fn from_model_type_and_device(
+        model_type: EmbeddingModelType,
+        device: crate::vector::DeviceType,
+    ) -> Result<Self> {
+        let resolved_device = device.resolve();
         let (fastembed_model, dim) = match model_type {
             EmbeddingModelType::AllMiniLML6V2 => (EmbeddingModel::AllMiniLML6V2, 384),
             EmbeddingModelType::BGESmallENV15 => (EmbeddingModel::BGESmallENV15, 384),
@@ -225,6 +236,19 @@ impl LocalEmbedder {
         options.show_download_progress = !cached;
         let cache_dir = default_model_cache_dir();
         options.cache_dir = cache_dir.clone();
+
+        #[cfg(feature = "cuda")]
+        if resolved_device.is_cuda() {
+            options.execution_providers = vec![
+                ort::execution_providers::CUDA::default().build(),
+                ort::execution_providers::CPU::default().build(),
+            ];
+        }
+
+        #[cfg(not(feature = "cuda"))]
+        if resolved_device.is_cuda() {
+            // Graphite was compiled without static CUDA feature; defaults gracefully to high-performance CPU SIMD
+        }
 
         // Clean any stale .lock files from interrupted downloads
         if let Ok(entries) = std::fs::read_dir(&cache_dir) {
@@ -251,6 +275,7 @@ impl LocalEmbedder {
             model: Mutex::new(model),
             dim,
             model_type,
+            device: resolved_device,
             query_cache: Mutex::new(HashMap::with_capacity(DEFAULT_QUERY_CACHE_CAPACITY)),
         })
     }
@@ -265,6 +290,11 @@ impl LocalEmbedder {
     #[cfg(feature = "fastembed")]
     pub fn new_bge_small() -> Result<Self> {
         Self::from_model_type(EmbeddingModelType::BGESmallENV15)
+    }
+
+    /// Returns the execution device used by this embedder.
+    pub fn device(&self) -> crate::vector::DeviceType {
+        self.device
     }
 
     /// Embeds a single text prompt into a normalized `Vec<f32>` with 0ms in-memory query cache.
@@ -299,43 +329,44 @@ impl LocalEmbedder {
 
         let vector = embeddings.into_iter().next().ok_or_else(|| {
             GraphiteError::Io(std::io::Error::other(
-                "Empty embedding output from ONNX runtime",
+                "Embedding model produced empty output vector",
             ))
         })?;
 
-        // 3. Populate bounded query vector cache
-        {
-            let mut cache = self.query_cache.lock();
-            if cache.len() >= DEFAULT_QUERY_CACHE_CAPACITY {
-                cache.clear();
-            }
-            cache.insert(hash_key, vector.clone());
+        // 3. Cache the normalized query vector for instant retrieval
+        let mut cache = self.query_cache.lock();
+        if cache.len() >= DEFAULT_QUERY_CACHE_CAPACITY {
+            cache.clear();
         }
+        cache.insert(hash_key, vector.clone());
 
         Ok(vector)
     }
 
-    /// Embeds a batch of texts into normalized `Vec<Vec<f32>>` using parallel SIMD batching.
+    /// Batch embeds a slice of text strings in parallel chunks.
     #[cfg(feature = "fastembed")]
     pub fn embed_batch<S: AsRef<str>>(&self, texts: &[S]) -> Result<Vec<Vec<f32>>> {
         if texts.is_empty() {
             return Ok(Vec::new());
         }
-        let texts_vec: Vec<&str> = texts.iter().map(|s| s.as_ref()).collect();
+
+        let str_refs: Vec<&str> = texts.iter().map(|s| s.as_ref()).collect();
+        let batch_size = if self.device.is_cuda() { 256 } else { 64 };
         let mut guard = self.model.lock();
-        guard
-            .embed(texts_vec, Some(64))
-            .map_err(|e| GraphiteError::Io(std::io::Error::other(e.to_string())))
+
+        let embeddings = guard
+            .embed(str_refs, Some(batch_size))
+            .map_err(|e| GraphiteError::Io(std::io::Error::other(e.to_string())))?;
+
+        Ok(embeddings)
     }
 
-    /// Returns the vector embedding dimensionality (e.g. 384).
-    #[inline]
+    /// Returns the embedding dimension.
     pub fn dim(&self) -> usize {
         self.dim
     }
 
-    /// Returns the configured embedding model type.
-    #[inline]
+    /// Returns the model type configured for this embedder.
     pub fn model_type(&self) -> EmbeddingModelType {
         self.model_type
     }

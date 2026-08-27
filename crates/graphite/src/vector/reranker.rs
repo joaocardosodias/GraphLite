@@ -144,12 +144,22 @@ pub struct LocalReranker {
     #[cfg(feature = "fastembed")]
     model: Mutex<TextRerank>,
     model_type: RerankerModelType,
+    device: crate::vector::DeviceType,
 }
 
 impl LocalReranker {
-    /// Initializes a local reranker from a `RerankerModelType`.
+    /// Initializes a local reranker from a `RerankerModelType` using automatic device detection.
     #[cfg(feature = "fastembed")]
     pub fn from_model_type(model_type: RerankerModelType) -> Result<Option<Self>> {
+        Self::from_model_type_and_device(model_type, crate::vector::DeviceType::Auto)
+    }
+
+    /// Initializes a local reranker from a `RerankerModelType` on a specified execution device (CPU or CUDA).
+    #[cfg(feature = "fastembed")]
+    pub fn from_model_type_and_device(
+        model_type: RerankerModelType,
+        device: crate::vector::DeviceType,
+    ) -> Result<Option<Self>> {
         let fastembed_model = match model_type {
             RerankerModelType::None | RerankerModelType::Custom => return Ok(None),
             RerankerModelType::BGERerankerBase => RerankerModel::BGERerankerBase,
@@ -160,12 +170,26 @@ impl LocalReranker {
             }
         };
 
+        let resolved_device = device.resolve();
         let cached = model_type.is_cached();
         let mut options = RerankInitOptions::default();
         options.model_name = fastembed_model;
         options.show_download_progress = !cached;
         let cache_dir = crate::vector::embedding::default_model_cache_dir();
         options.cache_dir = cache_dir.clone();
+
+        #[cfg(feature = "cuda")]
+        if resolved_device.is_cuda() {
+            options.execution_providers = vec![
+                ort::execution_providers::CUDA::default().build(),
+                ort::execution_providers::CPU::default().build(),
+            ];
+        }
+
+        #[cfg(not(feature = "cuda"))]
+        if resolved_device.is_cuda() {
+            // Graphite was compiled without static CUDA feature; defaults gracefully to high-performance CPU SIMD
+        }
 
         // Clean any stale .lock files from interrupted downloads
         if let Ok(entries) = std::fs::read_dir(&cache_dir) {
@@ -191,6 +215,7 @@ impl LocalReranker {
         Ok(Some(Self {
             model: Mutex::new(model),
             model_type,
+            device: resolved_device,
         }))
     }
 
@@ -209,6 +234,11 @@ impl LocalReranker {
         self.model_type
     }
 
+    /// Returns the execution device used by this reranker.
+    pub fn device(&self) -> crate::vector::DeviceType {
+        self.device
+    }
+
     /// Reranks a slice of candidate documents against a query string.
     ///
     /// Returns a list of `RerankResult` sorted in descending order of normalized relevance score.
@@ -219,10 +249,11 @@ impl LocalReranker {
         }
 
         let doc_strs: Vec<&str> = documents.iter().map(|s| s.as_ref()).collect();
+        let batch_size = if self.device.is_cuda() { 128 } else { 32 };
         let mut guard = self.model.lock();
 
         let results = guard
-            .rerank(query, doc_strs, true, Some(32))
+            .rerank(query, doc_strs, true, Some(batch_size))
             .map_err(|e| GraphiteError::Io(std::io::Error::other(e.to_string())))?;
 
         let mapped = results

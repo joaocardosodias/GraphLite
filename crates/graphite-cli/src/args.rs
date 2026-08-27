@@ -62,6 +62,10 @@ pub enum Commands {
 
     /// Launch embedded HTTP / REST API server for Python, Node.js, and web clients.
     Serve(ServeArgs),
+
+    /// Diagnose system hardware, NVIDIA GPU presence, CUDA installation, and drivers.
+    #[command(alias = "check-gpu")]
+    Doctor(DoctorArgs),
 }
 
 #[derive(Args, Debug, Clone)]
@@ -121,6 +125,15 @@ pub struct InitArgs {
         help = "Default token budget for prompts"
     )]
     pub max_tokens: usize,
+
+    /// Hardware acceleration execution device (auto, cpu, cuda).
+    #[arg(
+        long,
+        value_enum,
+        default_value_t = CliDevice::Auto,
+        help = "Hardware acceleration device (auto, cpu, cuda)"
+    )]
+    pub device: CliDevice,
 
     /// Overwrite existing database file if it already exists.
     #[arg(short = 'f', long, help = "Overwrite existing database file")]
@@ -253,6 +266,15 @@ pub struct QueryArgs {
     )]
     pub entity_type: Option<String>,
 
+    /// Hardware acceleration execution device (auto, cpu, cuda).
+    #[arg(
+        long,
+        value_enum,
+        default_value_t = CliDevice::Auto,
+        help = "Hardware acceleration device (auto, cpu, cuda)"
+    )]
+    pub device: CliDevice,
+
     /// Output formatting mode.
     #[arg(short = 'f', long, value_enum, default_value_t = CliOutputFormat::Markdown, help = "Output format")]
     pub format: CliOutputFormat,
@@ -307,6 +329,15 @@ pub struct IngestArgs {
         help = "Maximum number of files to ingest"
     )]
     pub max_files: usize,
+
+    /// Hardware acceleration execution device (auto, cpu, cuda).
+    #[arg(
+        long,
+        value_enum,
+        default_value_t = CliDevice::Auto,
+        help = "Hardware acceleration device (auto, cpu, cuda)"
+    )]
+    pub device: CliDevice,
 
     /// Continuous watch mode: auto-reingest when files are modified or added.
     #[arg(
@@ -374,6 +405,39 @@ pub struct ServeArgs {
         help = "Port number to listen on"
     )]
     pub port: u16,
+
+    /// Hardware acceleration execution device (auto, cpu, cuda).
+    #[arg(
+        long,
+        value_enum,
+        default_value_t = CliDevice::Auto,
+        help = "Hardware acceleration device (auto, cpu, cuda)"
+    )]
+    pub device: CliDevice,
+}
+
+#[derive(ValueEnum, Clone, Copy, Debug, PartialEq, Eq)]
+pub enum CliDevice {
+    Auto,
+    Cpu,
+    Cuda,
+}
+
+impl From<CliDevice> for graphite::vector::DeviceType {
+    fn from(d: CliDevice) -> Self {
+        match d {
+            CliDevice::Auto => graphite::vector::DeviceType::Auto,
+            CliDevice::Cpu => graphite::vector::DeviceType::Cpu,
+            CliDevice::Cuda => graphite::vector::DeviceType::Cuda(0),
+        }
+    }
+}
+
+#[derive(Args, Debug, Clone)]
+pub struct DoctorArgs {
+    /// Attempt to automatically install missing CUDA drivers/packages if available.
+    #[arg(short = 'i', long, help = "Automatically execute recommended installation command")]
+    pub install: bool,
 }
 
 #[derive(ValueEnum, Clone, Copy, Debug, PartialEq, Eq)]

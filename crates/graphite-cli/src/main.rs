@@ -62,6 +62,9 @@ fn main() -> Result<()> {
         Commands::Serve(args) => {
             execute_serve(&db_path, args)?;
         }
+        Commands::Doctor(args) => {
+            commands::doctor::execute_doctor(args)?;
+        }
     }
 
     Ok(())

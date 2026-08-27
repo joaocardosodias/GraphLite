@@ -398,12 +398,13 @@ pub fn execute_ingest(db_path: &Path, args: &IngestArgs) -> Result<()> {
         graphite::vector::embedding::EmbeddingModelType::AllMiniLML6V2
     };
 
-    let embedder = LocalEmbedder::from_model_type(emb_type).with_context(|| {
-        format!(
-            "Failed to initialize local ONNX embedding model ({})",
-            emb_type.name()
-        )
-    })?;
+    let embedder = LocalEmbedder::from_model_type_and_device(emb_type, args.device.into())
+        .with_context(|| {
+            format!(
+                "Failed to initialize local ONNX embedding model ({})",
+                emb_type.name()
+            )
+        })?;
 
     // 1. Initial ingestion pass
     run_ingest_pass(db_path, args, &embedder, false)?;

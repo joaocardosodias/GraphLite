@@ -153,7 +153,70 @@ pub fn run_interactive_wizard(default_path: &Path) -> Result<(PathBuf, GraphiteC
         _ => Quantization::None,
     };
 
-    // 6. Pre-download / Cache verification
+    // 6. Hardware Acceleration (CPU vs CUDA)
+    let cuda_status = graphite::vector::device::CudaStatus::detect();
+    let auto_label = match &cuda_status {
+        graphite::vector::device::CudaStatus::Available { device_count } => {
+            format!(
+                "Auto (Recommended: {} NVIDIA GPU(s) detected with CUDA)",
+                device_count
+            )
+        }
+        graphite::vector::device::CudaStatus::GpuDetectedDriverMissing { .. } => {
+            "Auto (NVIDIA GPU detected, driver missing -> runs on CPU)".to_string()
+        }
+        graphite::vector::device::CudaStatus::NoGpuDetected => {
+            "Auto (CPU SIMD AVX2/AVX-512 acceleration)".to_string()
+        }
+    };
+
+    let device_options = vec![
+        auto_label,
+        "CPU (Force standard multi-threaded SIMD execution)".to_string(),
+        "CUDA (Force NVIDIA GPU Tensor Cores execution)".to_string(),
+    ];
+
+    let device_idx = Select::new("Hardware acceleration:", device_options)
+        .with_render_config(render_config)
+        .raw_prompt()?
+        .index;
+
+    let device = match device_idx {
+        1 => graphite::vector::DeviceType::Cpu,
+        2 => graphite::vector::DeviceType::Cuda(0),
+        _ => graphite::vector::DeviceType::Auto,
+    };
+
+    // If GPU is detected but driver is missing, offer installation prompt
+    if let graphite::vector::device::CudaStatus::GpuDetectedDriverMissing {
+        ref distro_id,
+        ref install_command,
+    } = cuda_status
+    {
+        if device == graphite::vector::DeviceType::Auto || device.is_cuda() {
+            println!();
+            println!("  [!] NVIDIA GPU detected on system, but CUDA runtime is not active.");
+            println!("      To enable full GPU acceleration on {}:", distro_id);
+            println!("        {}", install_command);
+            let should_install = Confirm::new("Would you like to run the installation command now?")
+                .with_default(false)
+                .with_render_config(render_config)
+                .prompt()
+                .unwrap_or(false);
+
+            if should_install {
+                println!("\nExecuting: {}\n", install_command);
+                let _ = std::process::Command::new("sh")
+                    .arg("-c")
+                    .arg(install_command)
+                    .status();
+            } else {
+                println!("  Graphite will proceed smoothly on CPU with SIMD acceleration.\n");
+            }
+        }
+    }
+
+    // 7. Pre-download / Cache verification
     let emb_cached = selected_emb.is_cached();
     let rerank_cached = selected_rerank.is_cached();
 
@@ -170,7 +233,7 @@ pub fn run_interactive_wizard(default_path: &Path) -> Result<(PathBuf, GraphiteC
                     // No download needed
                 } else {
                     println!("  Downloading embedding model: {}...", selected_emb.name());
-                    LocalEmbedder::from_model_type(selected_emb)?;
+                    LocalEmbedder::from_model_type_and_device(selected_emb, device)?;
                     println!("  Embedding model ready.");
                 }
             }
@@ -180,7 +243,7 @@ pub fn run_interactive_wizard(default_path: &Path) -> Result<(PathBuf, GraphiteC
                     "  Downloading reranker model: {}...",
                     selected_rerank.name()
                 );
-                LocalReranker::from_model_type(selected_rerank)?;
+                LocalReranker::from_model_type_and_device(selected_rerank, device)?;
                 println!("  Reranker model ready.");
             }
             println!();
@@ -192,6 +255,7 @@ pub fn run_interactive_wizard(default_path: &Path) -> Result<(PathBuf, GraphiteC
         .with_metric(metric)
         .with_quantization(quantization)
         .with_models(selected_emb.id(), selected_rerank.id())
+        .with_device(device)
         .with_auto_flush(true);
 
     Ok((db_path, config))

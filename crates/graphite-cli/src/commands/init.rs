@@ -88,7 +88,7 @@ pub fn execute_init(db_path: &Path, args: &InitArgs) -> Result<()> {
                 );
             } else {
                 println!("  Downloading Reranker Model: {}...", rerank_type.name());
-                LocalReranker::from_model_type(rerank_type)?;
+                LocalReranker::from_model_type_and_device(rerank_type, args.device.into())?;
             }
         }
     }
@@ -110,6 +110,7 @@ pub fn execute_init(db_path: &Path, args: &InitArgs) -> Result<()> {
         .with_metric(metric)
         .with_quantization(quantization)
         .with_models(emb_type.id(), rerank_type.id())
+        .with_device(args.device.into())
         .with_max_tokens(args.max_tokens)
         .with_auto_flush(true);
 
@@ -120,6 +121,7 @@ pub fn execute_init(db_path: &Path, args: &InitArgs) -> Result<()> {
     println!("  Database initialized: {}", db_path.display());
     println!("  Embedding model:      {} ({}d)", emb_type.name(), dim);
     println!("  Reranker model:       {}", rerank_type.name());
+    println!("  Device:               {:?}", args.device);
     println!("  Distance metric:      {:?}", args.metric);
     println!("  Quantization:         {:?}", args.quantization);
     println!("------------------------------------------------------------");

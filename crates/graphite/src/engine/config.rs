@@ -56,6 +56,8 @@ pub struct GraphiteConfig {
     pub embedding_model_id: u8,
     /// Configured local Reranker Model identifier (0: none, 1: bge-reranker-base, etc.).
     pub reranker_model_id: u8,
+    /// Target hardware acceleration device (Auto, Cpu, Cuda).
+    pub device: crate::vector::DeviceType,
 }
 
 impl Default for GraphiteConfig {
@@ -86,6 +88,7 @@ impl Default for GraphiteConfig {
             mmr_lambda: 0.75,
             embedding_model_id: 0, // all-MiniLM-L6-v2
             reranker_model_id: 1,  // bge-reranker-base
+            device: crate::vector::DeviceType::Auto,
         }
     }
 }
@@ -101,6 +104,12 @@ impl GraphiteConfig {
     /// ```
     pub fn new() -> Self {
         Self::default()
+    }
+
+    /// Sets the hardware execution device (Auto, Cpu, Cuda).
+    pub fn with_device(mut self, device: crate::vector::DeviceType) -> Self {
+        self.device = device;
+        self
     }
 
     /// Sets the configured embedding and reranker model identifiers.

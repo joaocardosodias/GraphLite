@@ -140,18 +140,21 @@ pub fn execute_serve(db_path: &Path, args: &ServeArgs) -> Result<()> {
         engine.read().config().embedding_model_id,
         engine.read().config().vector_dim,
     );
-    let embedder = Arc::new(LocalEmbedder::from_model_type(emb_type).with_context(|| {
-        format!(
-            "Failed to initialize local ONNX embedding model ({})",
-            emb_type.name()
-        )
-    })?);
+    let embedder = Arc::new(
+        LocalEmbedder::from_model_type_and_device(emb_type, args.device.into()).with_context(|| {
+            format!(
+                "Failed to initialize local ONNX embedding model ({})",
+                emb_type.name()
+            )
+        })?,
+    );
 
     println!("========================================================");
     println!("  Graphite Embedded REST API Server Running");
     println!("========================================================");
     println!("  * Base URL:     http://{}", bind_addr);
     println!("  * Database:     {}", db_path.display());
+    println!("  * Device:       {:?}", args.device);
     println!(
         "  * Embedding:    {} ({}d)",
         emb_type.name(),
@@ -343,6 +346,7 @@ pub fn execute_serve(db_path: &Path, args: &ServeArgs) -> Result<()> {
                             max_files: 1000,
                             watch: false,
                             force: req.force.unwrap_or(false),
+                            device: args.device,
                             no_tmp: false,
                         };
 
