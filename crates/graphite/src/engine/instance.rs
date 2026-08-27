@@ -81,7 +81,21 @@ impl GraphiteEngine {
                             let name = interner.resolve(node.name_id).unwrap_or("");
                             let ty = interner.resolve(node.type_id).unwrap_or("");
                             let desc = interner.resolve(node.description_id).unwrap_or("");
-                            let text = format!("{} {} {} {} {}", name, name, name, ty, desc);
+                            let text = format!(
+                                "{} {} {} {} {} {} {} {} {} {} {} {}",
+                                name,
+                                name,
+                                name,
+                                name,
+                                name,
+                                name,
+                                name,
+                                name,
+                                name,
+                                name,
+                                ty,
+                                desc
+                            );
                             bm25.index_node(node.id, &text);
                         }
                     }

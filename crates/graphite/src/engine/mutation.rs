@@ -82,9 +82,16 @@ impl GraphiteEngine {
                 state.vectors.insert(target_node_id, v)?;
             }
 
-            // Update BM25 lexical index with 3x title boosting
+            // Update BM25 lexical index with 10x title boosting
             let text_to_index = format!(
-                "{} {} {} {} {}",
+                "{} {} {} {} {} {} {} {} {} {} {} {}",
+                trimmed_name,
+                trimmed_name,
+                trimmed_name,
+                trimmed_name,
+                trimmed_name,
+                trimmed_name,
+                trimmed_name,
                 trimmed_name,
                 trimmed_name,
                 trimmed_name,

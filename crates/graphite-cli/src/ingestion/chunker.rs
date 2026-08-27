@@ -143,11 +143,7 @@ pub fn chunk_markdown_document(
             chunk_id: section_node_name.clone(),
             title: sec_title.to_string(),
             chunk_type: "Section".to_string(),
-            content: format!(
-                "[{}]\n{}",
-                breadcrumb_header,
-                full_section_text
-            ),
+            content: format!("[{}]\n{}", breadcrumb_header, full_section_text),
             file_path: file_path.to_string(),
             line_number: section_start_line,
             section_hierarchy: breadcrumbs.clone(),
@@ -180,11 +176,7 @@ pub fn chunk_markdown_document(
                 chunk_id: chunk_node_name,
                 title: format!("{} (Part {})", sec_title, p_idx + 1),
                 chunk_type: "Chunk".to_string(),
-                content: format!(
-                    "[{}]\n{}",
-                    breadcrumb_header,
-                    paragraph_text.trim()
-                ),
+                content: format!("[{}]\n{}", breadcrumb_header, paragraph_text.trim()),
                 file_path: file_path.to_string(),
                 line_number: section_start_line,
                 section_hierarchy: breadcrumbs.clone(),
@@ -296,12 +288,7 @@ pub fn chunk_plain_document(
             chunk_id: chunk_node_name,
             title: format!("{} (Chunk {})", file_basename, idx + 1),
             chunk_type: "Chunk".to_string(),
-            content: format!(
-                "[{}: Chunk {}]\n{}",
-                file_basename,
-                idx + 1,
-                p_text.trim()
-            ),
+            content: format!("[{}: Chunk {}]\n{}", file_basename, idx + 1, p_text.trim()),
             file_path: file_path.to_string(),
             line_number: 1,
             section_hierarchy: vec![file_basename.to_string(), format!("Chunk {}", idx + 1)],

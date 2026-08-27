@@ -236,6 +236,27 @@ impl GraphiteEngine {
                 };
                 top_fused.push((id, score));
             }
+
+            // Direct Exact Title / Name matching boost:
+            // If an entity name contains exact query codes (e.g. "Art. 121" or "121"), guarantee it as a seed candidate.
+            let q_tokens = crate::graph::bm25::Bm25Index::tokenize(text);
+            for (name_str_id, &node_id) in state.graph.name_to_node().iter() {
+                if let Some(node_name) = state.interner.resolve(*name_str_id) {
+                    let node_name_lower = node_name.to_lowercase();
+                    for q_token in &q_tokens {
+                        if q_token.len() >= 2
+                            && q_token.chars().any(|c| c.is_ascii_digit())
+                            && node_name_lower
+                                .split(|c: char| !c.is_alphanumeric())
+                                .any(|w| w == q_token)
+                            && !top_fused.iter().any(|(nid, _)| *nid == node_id)
+                        {
+                            top_fused.insert(0, (node_id, 1.0));
+                        }
+                    }
+                }
+            }
+
             top_fused
         } else {
             let vector_raw = state.vectors.search(query_vector, candidate_pool_size)?;

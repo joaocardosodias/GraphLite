@@ -40,6 +40,12 @@ impl AdjacencyGraph {
         }
     }
 
+    /// Returns the internal index mapping entity name `StringId` to `NodeId`.
+    #[inline]
+    pub fn name_to_node(&self) -> &HashMap<crate::id::StringId, NodeId> {
+        &self.name_to_node
+    }
+
     /// Adds a `NodeRecord` to the graph.
     ///
     /// If a node with the same `NodeId` already exists, returns an error.

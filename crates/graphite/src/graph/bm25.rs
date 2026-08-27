@@ -54,20 +54,130 @@ pub fn fold_accents(s: &str) -> String {
 pub fn is_stopword(w: &str) -> bool {
     matches!(
         w,
-        "a" | "ao" | "aos" | "as" | "com" | "da" | "das" | "de" | "del" | "dele" | "deles"
-            | "dela" | "delas" | "deste" | "desta" | "destes" | "destas" | "desse" | "dessa"
-            | "desses" | "dessas" | "diz" | "do" | "dos" | "e" | "ela" | "elas" | "ele"
-            | "eles" | "em" | "era" | "eram" | "essa" | "essas" | "esse" | "esses" | "esta"
-            | "estas" | "este" | "estes" | "eu" | "fala" | "foi" | "foram" | "ha" | "isso"
-            | "isto" | "la" | "lhe" | "lhes" | "me" | "meu" | "meus" | "minha" | "minhas"
-            | "na" | "nas" | "no" | "nos" | "nosso" | "nossa" | "nossos" | "nossas" | "num"
-            | "numa" | "nums" | "numas" | "o" | "os" | "ou" | "para" | "pela" | "pelas"
-            | "pelo" | "pelos" | "por" | "pra" | "qual" | "quais" | "quando" | "que" | "quem"
-            | "sao" | "se" | "sem" | "ser" | "seu" | "seus" | "sob" | "sobre" | "sua" | "suas"
-            | "te" | "tem" | "têm" | "teu" | "teus" | "trata" | "tu" | "tua" | "tuas" | "um"
-            | "uma" | "uns" | "umas" | "voce" | "voces" | "vos" | "the" | "is" | "at" | "which"
-            | "on" | "and" | "or" | "of" | "to" | "in" | "an" | "for" | "with" | "what"
-            | "does" | "say" | "about"
+        "a" | "ao"
+            | "aos"
+            | "as"
+            | "com"
+            | "da"
+            | "das"
+            | "de"
+            | "del"
+            | "dele"
+            | "deles"
+            | "dela"
+            | "delas"
+            | "deste"
+            | "desta"
+            | "destes"
+            | "destas"
+            | "desse"
+            | "dessa"
+            | "desses"
+            | "dessas"
+            | "diz"
+            | "do"
+            | "dos"
+            | "e"
+            | "ela"
+            | "elas"
+            | "ele"
+            | "eles"
+            | "em"
+            | "era"
+            | "eram"
+            | "essa"
+            | "essas"
+            | "esse"
+            | "esses"
+            | "esta"
+            | "estas"
+            | "este"
+            | "estes"
+            | "eu"
+            | "fala"
+            | "foi"
+            | "foram"
+            | "ha"
+            | "isso"
+            | "isto"
+            | "la"
+            | "lhe"
+            | "lhes"
+            | "me"
+            | "meu"
+            | "meus"
+            | "minha"
+            | "minhas"
+            | "na"
+            | "nas"
+            | "no"
+            | "nos"
+            | "nosso"
+            | "nossa"
+            | "nossos"
+            | "nossas"
+            | "num"
+            | "numa"
+            | "nums"
+            | "numas"
+            | "o"
+            | "os"
+            | "ou"
+            | "para"
+            | "pela"
+            | "pelas"
+            | "pelo"
+            | "pelos"
+            | "por"
+            | "pra"
+            | "qual"
+            | "quais"
+            | "quando"
+            | "que"
+            | "quem"
+            | "sao"
+            | "se"
+            | "sem"
+            | "ser"
+            | "seu"
+            | "seus"
+            | "sob"
+            | "sobre"
+            | "sua"
+            | "suas"
+            | "te"
+            | "tem"
+            | "têm"
+            | "teu"
+            | "teus"
+            | "trata"
+            | "tu"
+            | "tua"
+            | "tuas"
+            | "um"
+            | "uma"
+            | "uns"
+            | "umas"
+            | "voce"
+            | "voces"
+            | "vos"
+            | "the"
+            | "is"
+            | "at"
+            | "which"
+            | "on"
+            | "and"
+            | "or"
+            | "of"
+            | "to"
+            | "in"
+            | "an"
+            | "for"
+            | "with"
+            | "what"
+            | "does"
+            | "say"
+            | "about"
     )
 }
 
@@ -91,8 +201,25 @@ impl Bm25Index {
         let mut tokens = Vec::new();
         let folded = fold_accents(text);
 
+        // Pre-normalize hyphens in alphanumeric codes (e.g. "121-A" -> "121a", "art-121" -> "art121")
+        let chars: Vec<char> = folded.chars().collect();
+        let mut normalized_text = String::with_capacity(folded.len());
+        let len = chars.len();
+        for i in 0..len {
+            if chars[i] == '-' {
+                let prev_is_digit = i > 0 && chars[i - 1].is_ascii_digit();
+                let next_is_alpha = i + 1 < len && chars[i + 1].is_ascii_alphabetic();
+                let prev_is_alpha = i > 0 && chars[i - 1].is_ascii_alphabetic();
+                let next_is_digit = i + 1 < len && chars[i + 1].is_ascii_digit();
+                if (prev_is_digit && next_is_alpha) || (prev_is_alpha && next_is_digit) {
+                    continue; // Skip hyphen so "121-A" merges to "121a"
+                }
+            }
+            normalized_text.push(chars[i]);
+        }
+
         // 0. Extract normalized alphanumeric article/code tokens (e.g. Art. 121 -> "121", "art121", "artigo121")
-        for word in folded.split_whitespace() {
+        for word in normalized_text.split_whitespace() {
             let lower_w = word.to_lowercase();
             let clean_code: String = lower_w
                 .chars()
@@ -141,7 +268,7 @@ impl Bm25Index {
         }
 
         // 1. Split on whitespace and non-alphanumeric characters
-        let raw_parts = folded.split(|c: char| !c.is_alphanumeric() && c != '_');
+        let raw_parts = normalized_text.split(|c: char| !c.is_alphanumeric() && c != '_');
 
         for part in raw_parts {
             let trimmed = part.trim();
@@ -162,7 +289,10 @@ impl Bm25Index {
             if trimmed.contains('_') {
                 for sub in trimmed.split('_') {
                     let sub_lower = sub.trim().to_lowercase();
-                    if sub_lower.len() >= 2 && !is_stopword(&sub_lower) && !tokens.contains(&sub_lower) {
+                    if sub_lower.len() >= 2
+                        && !is_stopword(&sub_lower)
+                        && !tokens.contains(&sub_lower)
+                    {
                         tokens.push(sub_lower);
                     }
                 }
