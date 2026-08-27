@@ -445,7 +445,7 @@ impl GraphiteEngine {
         let mut seed_matches = Vec::new();
         for &name in seed_names {
             if let Some(name_id) = state.interner.get_id(name.trim()) {
-                if let Some(node) = state.graph.nodes().find(|n| n.name_id == name_id) {
+                if let Some(node) = state.graph.get_node_by_name_id(name_id) {
                     seed_matches.push((node.id, 1.0f32));
                 }
             }

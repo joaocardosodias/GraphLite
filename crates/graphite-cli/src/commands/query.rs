@@ -143,7 +143,7 @@ pub fn execute_query(db_path: &Path, args: &QueryArgs, verbose: bool) -> Result<
 
     let is_reranking = should_rerank && args.query_text.is_some();
     let seed_count = if is_reranking {
-        args.top_k.max(40)
+        (args.top_k * 2).clamp(12, 24)
     } else {
         args.top_k
     };
@@ -190,21 +190,30 @@ pub fn execute_query(db_path: &Path, args: &QueryArgs, verbose: bool) -> Result<
                 );
             }
             if let Some(reranker) = graphite::LocalReranker::from_model_type(active_rerank_type)? {
-                let candidate_docs: Vec<String> = result
+                let (valid_indices, candidate_docs): (Vec<usize>, Vec<String>) = result
                     .scored_entities
                     .iter()
-                    .map(|e| {
+                    .enumerate()
+                    .filter_map(|(idx, e)| {
+                        if idx > 8 && e.final_score < 0.15 {
+                            return None;
+                        }
                         if let Some(rec) = e.node_record {
                             let name = engine.resolve_string(rec.name_id).unwrap_or_default();
                             let desc = engine
                                 .resolve_string(rec.description_id)
                                 .unwrap_or_default();
-                            format!("{} - {}", name, desc)
+                            let text = format!("{} - {}", name, desc);
+                            if text.trim().len() > 1 {
+                                Some((idx, text))
+                            } else {
+                                None
+                            }
                         } else {
-                            String::new()
+                            None
                         }
                     })
-                    .collect();
+                    .unzip();
 
                 if !candidate_docs.is_empty() {
                     let rerank_res = reranker.rerank(q_text, &candidate_docs)?;
@@ -215,10 +224,13 @@ pub fn execute_query(db_path: &Path, args: &QueryArgs, verbose: bool) -> Result<
                         if rank > 0 && r.score < top_score * 0.30 {
                             continue;
                         }
-                        if r.index < result.scored_entities.len() {
-                            let mut entity = result.scored_entities[r.index].clone();
-                            entity.final_score = r.score;
-                            reranked_entities.push(entity);
+                        if r.index < valid_indices.len() {
+                            let orig_idx = valid_indices[r.index];
+                            if orig_idx < result.scored_entities.len() {
+                                let mut entity = result.scored_entities[orig_idx].clone();
+                                entity.final_score = r.score;
+                                reranked_entities.push(entity);
+                            }
                         }
                     }
 

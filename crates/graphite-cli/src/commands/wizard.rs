@@ -75,13 +75,10 @@ pub fn run_interactive_wizard(default_path: &Path) -> Result<(PathBuf, GraphiteC
         })
         .collect();
 
-    let selected_emb_idx = Select::new(
-        "Embedding model:",
-        embedding_labels,
-    )
-    .with_render_config(render_config)
-    .raw_prompt()?
-    .index;
+    let selected_emb_idx = Select::new("Embedding model:", embedding_labels)
+        .with_render_config(render_config)
+        .raw_prompt()?
+        .index;
 
     let selected_emb = embedding_choices[selected_emb_idx];
 
@@ -116,13 +113,10 @@ pub fn run_interactive_wizard(default_path: &Path) -> Result<(PathBuf, GraphiteC
         })
         .collect();
 
-    let selected_rerank_idx = Select::new(
-        "Reranking model:",
-        reranker_labels,
-    )
-    .with_render_config(render_config)
-    .raw_prompt()?
-    .index;
+    let selected_rerank_idx = Select::new("Reranking model:", reranker_labels)
+        .with_render_config(render_config)
+        .raw_prompt()?
+        .index;
 
     let selected_rerank = reranker_choices[selected_rerank_idx];
 
@@ -178,10 +172,7 @@ pub fn run_interactive_wizard(default_path: &Path) -> Result<(PathBuf, GraphiteC
                 if let EmbeddingModelType::Custom(_) = selected_emb {
                     // No download needed
                 } else {
-                    println!(
-                        "  Downloading embedding model: {}...",
-                        selected_emb.name()
-                    );
+                    println!("  Downloading embedding model: {}...", selected_emb.name());
                     LocalEmbedder::from_model_type(selected_emb)?;
                     println!("  Embedding model ready.");
                 }

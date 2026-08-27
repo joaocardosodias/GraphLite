@@ -12,6 +12,7 @@ use std::time::{Duration, Instant};
 
 use anyhow::{bail, Context, Result};
 use indicatif::{ProgressBar, ProgressStyle};
+use rayon::prelude::*;
 
 use graphite::engine::config::GraphiteConfig;
 use graphite::engine::instance::GraphiteEngine;
@@ -258,7 +259,7 @@ pub fn run_ingest_pass(
     if files_to_process.is_empty() {
         if !is_watch_pass {
             println!(
-                "✨ All {} document(s) are up to date with cached hashes (0 modifications).",
+                "All {} document(s) are up to date with cached hashes (0 modifications).",
                 unchanged_count
             );
         }
@@ -268,18 +269,24 @@ pub fn run_ingest_pass(
     let start_time = Instant::now();
     println!(
         "{} Processing {} modified/new document(s) ({} cached unchanged)...",
-        if is_watch_pass { "[Watch] 🔄" } else { "▶" },
+        if is_watch_pass { "[Watch]" } else { "" },
         files_to_process.len(),
         unchanged_count
     );
 
-    let mut all_chunks = Vec::new();
-    for (file, hash) in &files_to_process {
-        match parse_document(file, hash, &chunk_config) {
-            Ok(mut chunks) => all_chunks.append(&mut chunks),
-            Err(e) => eprintln!("Warning: Failed to parse '{:?}': {}", file, e),
-        }
-    }
+    let mut all_chunks: Vec<DocumentChunk> = files_to_process
+        .par_iter()
+        .filter_map(
+            |(file, hash)| match parse_document(file, hash, &chunk_config) {
+                Ok(chunks) => Some(chunks),
+                Err(e) => {
+                    eprintln!("Warning: Failed to parse '{:?}': {}", file, e);
+                    None
+                }
+            },
+        )
+        .flatten()
+        .collect();
 
     if all_chunks.is_empty() {
         return Ok(false);
@@ -300,8 +307,8 @@ pub fn run_ingest_pass(
     let mut merged_entities_count = 0;
     let mut edges_created_count = 0;
 
-    // Process nodes in vectorized batches of 32 for massive ONNX SIMD throughput
-    let batch_size = 32;
+    // Process nodes in vectorized batches of 64 for massive ONNX SIMD throughput
+    let batch_size = 64;
     for chunk_batch in all_chunks.chunks(batch_size) {
         let texts: Vec<String> = chunk_batch
             .iter()
@@ -310,7 +317,7 @@ pub fn run_ingest_pass(
 
         let vectors = embedder.embed_batch(&texts)?;
 
-        for (chunk, vector) in chunk_batch.iter().zip(vectors) {
+        for (chunk, vector) in chunk_batch.iter().zip(vectors.into_iter()) {
             pb.set_message(format!("{}: {}", chunk.chunk_type, chunk.title));
 
             let initial_node_count = engine.node_count();
@@ -357,7 +364,7 @@ pub fn run_ingest_pass(
     let elapsed = start_time.elapsed();
     println!(
         "{} Ingestion completed in {:.2?} | Nodes: {} (+{} new, {} updated), Edges: {} (+{})",
-        if is_watch_pass { "[Watch] ✨" } else { "===" },
+        if is_watch_pass { "[Watch]" } else { "===" },
         elapsed,
         engine.node_count(),
         new_entities_count,

@@ -45,12 +45,8 @@ impl GraphiteEngine {
                 state.interner.intern(description.trim())
             };
 
-            // Check if node already exists by name_id
-            let existing_id = state
-                .graph
-                .nodes()
-                .find(|n| n.name_id == name_id)
-                .map(|n| n.id);
+            // Check if node already exists by name_id in O(1)
+            let existing_id = state.graph.get_node_id_by_name_id(name_id);
 
             let target_node_id = match existing_id {
                 Some(id) => {
@@ -153,12 +149,11 @@ impl GraphiteEngine {
         Ok(edge_id)
     }
 
-    /// Retrieves a `NodeRecord` by its textual name.
+    /// Retrieves a `NodeRecord` by its textual name in O(1) time.
     pub fn get_node_by_name(&self, name: &str) -> Option<NodeRecord> {
         let state = self.state.read();
         let name_id = state.interner.get_id(name.trim())?;
-        let node = state.graph.nodes().find(|n| n.name_id == name_id).copied();
-        node
+        state.graph.get_node_by_name_id(name_id).copied()
     }
 
     /// Resolves a `StringId` to an owned `String`.

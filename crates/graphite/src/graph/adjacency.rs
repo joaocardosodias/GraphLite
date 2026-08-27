@@ -13,6 +13,8 @@ use crate::record::{EdgeRecord, NodeRecord};
 pub struct AdjacencyGraph {
     /// Mapping of `NodeId` to its full `NodeRecord`.
     nodes: HashMap<NodeId, NodeRecord>,
+    /// Index mapping `StringId` (name_id) to `NodeId` for O(1) lookups by entity name.
+    name_to_node: HashMap<crate::id::StringId, NodeId>,
     /// Mapping of `EdgeId` to its full `EdgeRecord`.
     edges: HashMap<EdgeId, EdgeRecord>,
     /// Outgoing adjacency list: `source_node -> [edge_id_1, edge_id_2, ...]`.
@@ -31,6 +33,7 @@ impl AdjacencyGraph {
     pub fn with_capacity(node_capacity: usize, edge_capacity: usize) -> Self {
         Self {
             nodes: HashMap::with_capacity(node_capacity),
+            name_to_node: HashMap::with_capacity(node_capacity),
             edges: HashMap::with_capacity(edge_capacity),
             out_edges: HashMap::with_capacity(node_capacity),
             in_edges: HashMap::with_capacity(node_capacity),
@@ -49,6 +52,7 @@ impl AdjacencyGraph {
             )));
         }
 
+        self.name_to_node.insert(record.name_id, id);
         self.nodes.insert(id, record);
         self.out_edges.entry(id).or_default();
         self.in_edges.entry(id).or_default();
@@ -59,6 +63,7 @@ impl AdjacencyGraph {
     /// Upserts a `NodeRecord` into the graph (replaces if exists, inserts otherwise).
     pub fn upsert_node(&mut self, record: NodeRecord) -> NodeId {
         let id = record.id;
+        self.name_to_node.insert(record.name_id, id);
         self.nodes.insert(id, record);
         self.out_edges.entry(id).or_default();
         self.in_edges.entry(id).or_default();
@@ -69,6 +74,20 @@ impl AdjacencyGraph {
     #[inline]
     pub fn get_node(&self, id: NodeId) -> Option<&NodeRecord> {
         self.nodes.get(&id)
+    }
+
+    /// Returns a reference to the `NodeRecord` with the given `name_id` in O(1) time.
+    #[inline]
+    pub fn get_node_by_name_id(&self, name_id: crate::id::StringId) -> Option<&NodeRecord> {
+        self.name_to_node
+            .get(&name_id)
+            .and_then(|id| self.nodes.get(id))
+    }
+
+    /// Returns the `NodeId` associated with the given `name_id` in O(1) time.
+    #[inline]
+    pub fn get_node_id_by_name_id(&self, name_id: crate::id::StringId) -> Option<NodeId> {
+        self.name_to_node.get(&name_id).copied()
     }
 
     /// Returns a mutable reference to the `NodeRecord` with the given `NodeId`.
@@ -181,6 +200,7 @@ impl AdjacencyGraph {
     /// Removes a node and all connected incoming and outgoing edges from the graph.
     pub fn remove_node(&mut self, node_id: NodeId) -> Option<NodeRecord> {
         let node = self.nodes.remove(&node_id)?;
+        self.name_to_node.remove(&node.name_id);
 
         // Remove and cleanup all outgoing edges
         if let Some(out_e) = self.out_edges.remove(&node_id) {

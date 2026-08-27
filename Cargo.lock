@@ -1110,6 +1110,7 @@ dependencies = [
  "indicatif 0.17.11",
  "inquire",
  "parking_lot",
+ "rayon",
  "serde",
  "serde_json",
  "serde_yaml",

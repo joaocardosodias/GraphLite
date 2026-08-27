@@ -75,12 +75,8 @@ impl GraphiteEngine {
                 state.interner.intern(entity_type.trim())
             };
 
-            // 1. Exact string match check
-            let exact_match_id = state
-                .graph
-                .nodes()
-                .find(|n| n.name_id == name_id)
-                .map(|n| n.id);
+            // 1. Exact string match check in O(1)
+            let exact_match_id = state.graph.get_node_id_by_name_id(name_id);
 
             if let Some(existing_id) = exact_match_id {
                 // Exact name exists: update description and vector

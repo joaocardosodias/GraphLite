@@ -26,7 +26,11 @@ pub fn execute_init(db_path: &Path, args: &InitArgs) -> Result<()> {
 
         println!("------------------------------------------------------------");
         println!("  Database initialized: {}", final_path.display());
-        println!("  Embedding model:      {} ({}d)", emb_type.name(), config.vector_dim);
+        println!(
+            "  Embedding model:      {} ({}d)",
+            emb_type.name(),
+            config.vector_dim
+        );
         println!("  Reranker model:       {}", rerank_type.name());
         println!("  Distance metric:      {:?}", config.metric);
         println!("  Quantization:         {:?}", config.quantization);
@@ -77,7 +81,10 @@ pub fn execute_init(db_path: &Path, args: &InitArgs) -> Result<()> {
 
         if rerank_type != RerankerModelType::None {
             if rerank_type.is_cached() {
-                println!("  Reranker model '{}' is already cached.", rerank_type.name());
+                println!(
+                    "  Reranker model '{}' is already cached.",
+                    rerank_type.name()
+                );
             } else {
                 println!("  Downloading Reranker Model: {}...", rerank_type.name());
                 LocalReranker::from_model_type(rerank_type)?;

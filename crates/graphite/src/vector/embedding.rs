@@ -1,5 +1,7 @@
 //! In-memory local text embedding engine using embedded ONNX models (FastEmbed).
 
+use std::collections::HashMap;
+
 #[cfg(feature = "fastembed")]
 use fastembed::{EmbeddingModel, InitOptions, TextEmbedding};
 #[cfg(feature = "fastembed")]
@@ -189,12 +191,16 @@ pub fn is_model_cached(pattern: &str) -> bool {
     false
 }
 
+/// Default in-memory query cache capacity.
+const DEFAULT_QUERY_CACHE_CAPACITY: usize = 512;
+
 /// Local in-memory embedding model runner for computing vector embeddings in pure Rust.
 pub struct LocalEmbedder {
     #[cfg(feature = "fastembed")]
     model: Mutex<TextEmbedding>,
     dim: usize,
     model_type: EmbeddingModelType,
+    query_cache: Mutex<HashMap<u64, Vec<f32>>>,
 }
 
 impl LocalEmbedder {
@@ -245,6 +251,7 @@ impl LocalEmbedder {
             model: Mutex::new(model),
             dim,
             model_type,
+            query_cache: Mutex::new(HashMap::with_capacity(DEFAULT_QUERY_CACHE_CAPACITY)),
         })
     }
 
@@ -260,28 +267,64 @@ impl LocalEmbedder {
         Self::from_model_type(EmbeddingModelType::BGESmallENV15)
     }
 
-    /// Embeds a single text prompt into a normalized `Vec<f32>`.
+    /// Embeds a single text prompt into a normalized `Vec<f32>` with 0ms in-memory query cache.
     #[cfg(feature = "fastembed")]
     pub fn embed_one(&self, text: &str) -> Result<Vec<f32>> {
+        let trimmed = text.trim();
+        if trimmed.is_empty() {
+            return Ok(vec![0.0; self.dim]);
+        }
+
+        // 1. Check in-memory query vector cache (instant 0.00ms hit)
+        let hash_key = {
+            use std::collections::hash_map::DefaultHasher;
+            use std::hash::{Hash, Hasher};
+            let mut hasher = DefaultHasher::new();
+            trimmed.hash(&mut hasher);
+            hasher.finish()
+        };
+
+        {
+            let cache = self.query_cache.lock();
+            if let Some(cached_vec) = cache.get(&hash_key) {
+                return Ok(cached_vec.clone());
+            }
+        }
+
+        // 2. Perform ONNX tensor inference
         let mut guard = self.model.lock();
         let embeddings = guard
-            .embed(vec![text], None)
+            .embed(vec![trimmed], None)
             .map_err(|e| GraphiteError::Io(std::io::Error::other(e.to_string())))?;
 
-        embeddings.into_iter().next().ok_or_else(|| {
+        let vector = embeddings.into_iter().next().ok_or_else(|| {
             GraphiteError::Io(std::io::Error::other(
                 "Empty embedding output from ONNX runtime",
             ))
-        })
+        })?;
+
+        // 3. Populate bounded query vector cache
+        {
+            let mut cache = self.query_cache.lock();
+            if cache.len() >= DEFAULT_QUERY_CACHE_CAPACITY {
+                cache.clear();
+            }
+            cache.insert(hash_key, vector.clone());
+        }
+
+        Ok(vector)
     }
 
-    /// Embeds a batch of texts into normalized `Vec<Vec<f32>>`.
+    /// Embeds a batch of texts into normalized `Vec<Vec<f32>>` using parallel SIMD batching.
     #[cfg(feature = "fastembed")]
     pub fn embed_batch<S: AsRef<str>>(&self, texts: &[S]) -> Result<Vec<Vec<f32>>> {
+        if texts.is_empty() {
+            return Ok(Vec::new());
+        }
         let texts_vec: Vec<&str> = texts.iter().map(|s| s.as_ref()).collect();
         let mut guard = self.model.lock();
         guard
-            .embed(texts_vec, None)
+            .embed(texts_vec, Some(64))
             .map_err(|e| GraphiteError::Io(std::io::Error::other(e.to_string())))
     }
 

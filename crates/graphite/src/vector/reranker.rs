@@ -118,7 +118,9 @@ impl RerankerModelType {
             Self::JinaRerankerV1TurboEn => {
                 "jina-reranker-v1-turbo          130 MB   (Ultralight / Low CPU)"
             }
-            Self::None => "None                                     (Fast Hybrid Retrieval, < 10ms)",
+            Self::None => {
+                "None                                     (Fast Hybrid Retrieval, < 10ms)"
+            }
             Self::Custom => "Custom",
         }
     }
@@ -220,7 +222,7 @@ impl LocalReranker {
         let mut guard = self.model.lock();
 
         let results = guard
-            .rerank(query, doc_strs, true, None)
+            .rerank(query, doc_strs, true, Some(32))
             .map_err(|e| GraphiteError::Io(std::io::Error::other(e.to_string())))?;
 
         let mapped = results
