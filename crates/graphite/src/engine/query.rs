@@ -219,11 +219,21 @@ impl GraphiteEngine {
             let mut top_fused = Vec::new();
             for (id, rrf_raw) in fused.into_iter().take(opts.top_k_seeds) {
                 let rrf_normalized = (rrf_raw / max_rrf).clamp(0.20, 1.0);
-                let score = vector_matches
+                let vec_score = vector_matches
                     .iter()
                     .find(|(nid, _)| *nid == id)
-                    .map(|(_, s)| *s)
-                    .unwrap_or(rrf_normalized);
+                    .map(|(_, s)| *s);
+                let bm25_score = bm25_matches
+                    .iter()
+                    .find(|(nid, _)| *nid == id)
+                    .map(|(_, s)| *s);
+
+                let score = match (vec_score, bm25_score) {
+                    (Some(v), Some(_)) => (v * 0.6 + rrf_normalized * 0.4).max(v),
+                    (Some(v), None) => v * 0.85 + rrf_normalized * 0.15,
+                    (None, Some(_)) => rrf_normalized,
+                    (None, None) => rrf_normalized,
+                };
                 top_fused.push((id, score));
             }
             top_fused

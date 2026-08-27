@@ -130,20 +130,19 @@ pub fn execute_query(db_path: &Path, args: &QueryArgs, verbose: bool) -> Result<
             .collect()
     });
 
-    // Reranking is active by default if the database was created with a reranker, unless --no-rerank is passed
-    let rerank_type =
-        graphite::vector::reranker::RerankerModelType::from_id(engine.config().reranker_model_id);
-    let should_rerank = if args.no_rerank {
-        false
-    } else if args.rerank {
-        true
-    } else {
-        rerank_type != graphite::vector::reranker::RerankerModelType::None
+    // Cross-Encoder Reranking is always active for high-precision semantic ranking
+    let rerank_type = {
+        let model = graphite::vector::reranker::RerankerModelType::from_id(engine.config().reranker_model_id);
+        if model != graphite::vector::reranker::RerankerModelType::None {
+            model
+        } else {
+            graphite::vector::reranker::RerankerModelType::BGERerankerBase
+        }
     };
 
-    let is_reranking = should_rerank && args.query_text.is_some();
+    let is_reranking = args.query_text.is_some();
     let seed_count = if is_reranking {
-        (args.top_k * 2).clamp(12, 24)
+        (args.top_k * 4).clamp(30, 60)
     } else {
         args.top_k
     };
@@ -174,114 +173,104 @@ pub fn execute_query(db_path: &Path, args: &QueryArgs, verbose: bool) -> Result<
         unreachable!()
     };
 
-    if should_rerank {
-        if let Some(ref q_text) = args.query_text {
-            let active_rerank_type =
-                if rerank_type != graphite::vector::reranker::RerankerModelType::None {
-                    rerank_type
-                } else {
-                    graphite::vector::reranker::RerankerModelType::BGERerankerBase
-                };
+    if let Some(ref q_text) = args.query_text {
+        let active_rerank_type = rerank_type;
 
-            if verbose {
-                eprintln!(
-                    "info: running local Cross-Encoder reranker ({})...",
-                    active_rerank_type.name()
-                );
-            }
-            if let Some(reranker) = graphite::LocalReranker::from_model_type(active_rerank_type)? {
-                let (valid_indices, candidate_docs): (Vec<usize>, Vec<String>) = result
-                    .scored_entities
-                    .iter()
-                    .enumerate()
-                    .filter_map(|(idx, e)| {
-                        if idx > 8 && e.final_score < 0.15 {
-                            return None;
-                        }
-                        if let Some(rec) = e.node_record {
-                            let name = engine.resolve_string(rec.name_id).unwrap_or_default();
-                            let desc = engine
-                                .resolve_string(rec.description_id)
-                                .unwrap_or_default();
-                            let text = format!("{} - {}", name, desc);
-                            if text.trim().len() > 1 {
-                                Some((idx, text))
-                            } else {
-                                None
-                            }
+        if verbose {
+            eprintln!(
+                "info: running local Cross-Encoder reranker ({})...",
+                active_rerank_type.name()
+            );
+        }
+        if let Some(reranker) = graphite::LocalReranker::from_model_type(active_rerank_type)? {
+            let (valid_indices, candidate_docs): (Vec<usize>, Vec<String>) = result
+                .scored_entities
+                .iter()
+                .enumerate()
+                .filter_map(|(idx, e)| {
+                    if let Some(rec) = e.node_record {
+                        let name = engine.resolve_string(rec.name_id).unwrap_or_default();
+                        let desc = engine
+                            .resolve_string(rec.description_id)
+                            .unwrap_or_default();
+                        let text = format!("{} - {}", name, desc);
+                        if text.trim().len() > 1 {
+                            Some((idx, text))
                         } else {
                             None
                         }
-                    })
-                    .unzip();
+                    } else {
+                        None
+                    }
+                })
+                .unzip();
 
-                if !candidate_docs.is_empty() {
-                    let rerank_res = reranker.rerank(q_text, &candidate_docs)?;
-                    let top_score = rerank_res.first().map(|r| r.score).unwrap_or(0.0);
-                    let mut reranked_entities = Vec::new();
-                    for (rank, r) in rerank_res.into_iter().enumerate() {
-                        // Always preserve the top candidate; filter out subsequent low-confidence items
-                        if rank > 0 && r.score < top_score * 0.30 {
-                            continue;
-                        }
-                        if r.index < valid_indices.len() {
-                            let orig_idx = valid_indices[r.index];
-                            if orig_idx < result.scored_entities.len() {
-                                let mut entity = result.scored_entities[orig_idx].clone();
-                                entity.final_score = r.score;
-                                reranked_entities.push(entity);
-                            }
+            if !candidate_docs.is_empty() {
+                let rerank_res = reranker.rerank(q_text, &candidate_docs)?;
+                let top_score = rerank_res.first().map(|r| r.score).unwrap_or(0.0);
+                let mut reranked_entities = Vec::new();
+                for (rank, r) in rerank_res.into_iter().enumerate() {
+                    // Always preserve the top candidate; filter out subsequent low-confidence items
+                    if rank > 0 && r.score < top_score * 0.30 {
+                        continue;
+                    }
+                    if r.index < valid_indices.len() {
+                        let orig_idx = valid_indices[r.index];
+                        if orig_idx < result.scored_entities.len() {
+                            let mut entity = result.scored_entities[orig_idx].clone();
+                            entity.final_score = r.score;
+                            reranked_entities.push(entity);
                         }
                     }
-
-                    let interner = {
-                        if let Ok(reader) = MmapGraphReader::open(db_path) {
-                            reader
-                                .string_table()
-                                .map(|st| st.to_interner())
-                                .unwrap_or_default()
-                        } else {
-                            graphite::interner::StringInterner::new()
-                        }
-                    };
-
-                    let connected_subgraph = graphite::ConnectedSubgraph {
-                        entities: reranked_entities,
-                        edges: result.pruned_subgraph.edges.clone(),
-                        seed_ids: Vec::new(),
-                    };
-
-                    let token_budget = args.tokens.unwrap_or(engine.config().default_max_tokens);
-                    let token_counter = graphite::TiktokenCounter::cl100k();
-                    let pruned = graphite::prune_subgraph_by_budget_mmr(
-                        &connected_subgraph,
-                        &interner,
-                        token_budget,
-                        &token_counter,
-                        engine.config().mmr_lambda,
-                    );
-
-                    let format_config = graphite::MarkdownFormatConfig {
-                        header_title: "Retrieved Knowledge Context (Reranked)".to_string(),
-                        include_scores: true,
-                        include_edge_weights: true,
-                        style: MarkdownStyle::Hierarchical,
-                    };
-                    let markdown = graphite::format_pruned_subgraph_markdown(
-                        &pruned,
-                        &interner,
-                        &format_config,
-                    );
-
-                    result = graphite::QueryResult {
-                        markdown,
-                        token_count: pruned.total_tokens,
-                        entities_count: pruned.entities.len(),
-                        edges_count: pruned.edges.len(),
-                        scored_entities: connected_subgraph.entities,
-                        pruned_subgraph: pruned,
-                    };
                 }
+
+                let interner = {
+                    if let Ok(reader) = MmapGraphReader::open(db_path) {
+                        reader
+                            .string_table()
+                            .map(|st| st.to_interner())
+                            .unwrap_or_default()
+                    } else {
+                        graphite::interner::StringInterner::new()
+                    }
+                };
+
+                let connected_subgraph = graphite::ConnectedSubgraph {
+                    entities: reranked_entities,
+                    edges: result.pruned_subgraph.edges.clone(),
+                    seed_ids: Vec::new(),
+                };
+
+                let token_budget = args.tokens.unwrap_or(engine.config().default_max_tokens);
+                let token_counter = graphite::TiktokenCounter::cl100k();
+                let pruned = graphite::prune_subgraph_by_budget_mmr(
+                    &connected_subgraph,
+                    &interner,
+                    token_budget,
+                    &token_counter,
+                    engine.config().mmr_lambda,
+                );
+
+                let format_config = graphite::MarkdownFormatConfig {
+                    header_title: "Retrieved Knowledge Context (Reranked)".to_string(),
+                    include_scores: true,
+                    include_edge_weights: true,
+                    style: MarkdownStyle::Hierarchical,
+                };
+                let markdown = graphite::format_pruned_subgraph_markdown(
+                    &pruned,
+                    &interner,
+                    &format_config,
+                );
+
+                result = graphite::QueryResult {
+                    markdown,
+                    token_count: pruned.total_tokens,
+                    entities_count: pruned.entities.len(),
+                    edges_count: pruned.edges.len(),
+                    scored_entities: connected_subgraph.entities,
+                    pruned_subgraph: pruned,
+                };
             }
         }
     }

@@ -255,17 +255,6 @@ pub struct QueryArgs {
     /// Output formatting mode.
     #[arg(short = 'f', long, value_enum, default_value_t = CliOutputFormat::Markdown, help = "Output format")]
     pub format: CliOutputFormat,
-
-    /// Enable local Cross-Encoder semantic re-ranking on candidate entities (active by default if database has reranker).
-    #[arg(long, help = "Force enable local Cross-Encoder semantic reranking")]
-    pub rerank: bool,
-
-    /// Disable Cross-Encoder reranking and use pure fast hybrid retrieval (< 10ms).
-    #[arg(
-        long = "no-rerank",
-        help = "Disable Cross-Encoder reranking for ultra-low latency (< 10ms)"
-    )]
-    pub no_rerank: bool,
 }
 
 #[derive(Args, Debug)]

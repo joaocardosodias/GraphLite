@@ -229,13 +229,22 @@ impl LocalReranker {
             .into_iter()
             .map(|r| RerankResult {
                 index: r.index,
-                score: sigmoid(r.score),
+                score: calibrate_reranker_score(r.score),
                 raw_score: r.score,
             })
             .collect();
 
         Ok(mapped)
     }
+}
+
+/// Calibrates raw Cross-Encoder model logits into an intuitive [0.0, 1.0] relevance probability.
+#[inline]
+pub fn calibrate_reranker_score(raw_logit: f32) -> f32 {
+    // Cross-encoder models (BGE / Jina) output logits centered around -3.0 for general domain text.
+    // We calibrate with shift offset -2.8 and temperature 1.6 to map confident matches to 0.75 - 0.98.
+    let shifted = (raw_logit + 2.8) / 1.6;
+    sigmoid(shifted)
 }
 
 #[cfg(test)]
@@ -251,5 +260,20 @@ mod tests {
         // Negative logit maps to < 0.5
         assert!(sigmoid(-0.49) > 0.35 && sigmoid(-0.49) < 0.40);
         assert!(sigmoid(-7.59) < 0.001);
+    }
+
+    #[test]
+    fn test_calibrated_reranker_score() {
+        // Confident match (-1.2 logit) maps to ~0.73
+        let score = calibrate_reranker_score(-1.2);
+        assert!(score > 0.70 && score < 0.76);
+
+        // Strong match (+1.0 logit) maps to ~0.91
+        let strong = calibrate_reranker_score(1.0);
+        assert!(strong > 0.88 && strong < 0.95);
+
+        // Irrelevant match (-8.0 logit) maps to ~0.03
+        let irrelevant = calibrate_reranker_score(-8.0);
+        assert!(irrelevant < 0.05);
     }
 }

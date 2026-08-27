@@ -49,6 +49,28 @@ pub fn fold_accents(s: &str) -> String {
         .collect()
 }
 
+/// Returns true if a token is a common grammatical stopword.
+#[inline]
+pub fn is_stopword(w: &str) -> bool {
+    matches!(
+        w,
+        "a" | "ao" | "aos" | "as" | "com" | "da" | "das" | "de" | "del" | "dele" | "deles"
+            | "dela" | "delas" | "deste" | "desta" | "destes" | "destas" | "desse" | "dessa"
+            | "desses" | "dessas" | "diz" | "do" | "dos" | "e" | "ela" | "elas" | "ele"
+            | "eles" | "em" | "era" | "eram" | "essa" | "essas" | "esse" | "esses" | "esta"
+            | "estas" | "este" | "estes" | "eu" | "fala" | "foi" | "foram" | "ha" | "isso"
+            | "isto" | "la" | "lhe" | "lhes" | "me" | "meu" | "meus" | "minha" | "minhas"
+            | "na" | "nas" | "no" | "nos" | "nosso" | "nossa" | "nossos" | "nossas" | "num"
+            | "numa" | "nums" | "numas" | "o" | "os" | "ou" | "para" | "pela" | "pelas"
+            | "pelo" | "pelos" | "por" | "pra" | "qual" | "quais" | "quando" | "que" | "quem"
+            | "sao" | "se" | "sem" | "ser" | "seu" | "seus" | "sob" | "sobre" | "sua" | "suas"
+            | "te" | "tem" | "têm" | "teu" | "teus" | "trata" | "tu" | "tua" | "tuas" | "um"
+            | "uma" | "uns" | "umas" | "voce" | "voces" | "vos" | "the" | "is" | "at" | "which"
+            | "on" | "and" | "or" | "of" | "to" | "in" | "an" | "for" | "with" | "what"
+            | "does" | "say" | "about"
+    )
+}
+
 impl Bm25Index {
     /// Creates a new empty `Bm25Index`.
     pub fn new() -> Self {
@@ -64,30 +86,60 @@ impl Bm25Index {
     }
 
     /// Tokenizes input text into normalized lowercase alphanumeric terms,
-    /// with accent folding, number normalization, CamelCase splitting, and bilingual code synonym expansion.
+    /// with accent folding, stopword removal, number normalization, and code synonym expansion.
     pub fn tokenize(text: &str) -> Vec<String> {
         let mut tokens = Vec::new();
         let folded = fold_accents(text);
 
-        // 0. Extract normalized digit sequences and article numbers (e.g. Art. 121 -> "121", "art121", "artigo121")
+        // 0. Extract normalized alphanumeric article/code tokens (e.g. Art. 121 -> "121", "art121", "artigo121")
         for word in folded.split_whitespace() {
-            let digits_only: String = word.chars().filter(|c| c.is_ascii_digit()).collect();
-            if !digits_only.is_empty() && digits_only.len() <= 8 {
-                if !tokens.contains(&digits_only) {
-                    tokens.push(digits_only.clone());
-                }
-                let art_alias = format!("art{}", digits_only);
-                if !tokens.contains(&art_alias) {
-                    tokens.push(art_alias);
-                }
-                let artigo_alias = format!("artigo{}", digits_only);
-                if !tokens.contains(&artigo_alias) {
-                    tokens.push(artigo_alias);
+            let lower_w = word.to_lowercase();
+            let clean_code: String = lower_w
+                .chars()
+                .filter(|c| c.is_ascii_alphanumeric())
+                .collect();
+            if !clean_code.is_empty() && clean_code.len() <= 12 {
+                if clean_code.chars().any(|c| c.is_ascii_digit()) {
+                    if !tokens.contains(&clean_code) {
+                        tokens.push(clean_code.clone());
+                    }
+                    if clean_code.starts_with("artigo") {
+                        let stripped = clean_code.trim_start_matches("artigo");
+                        if !stripped.is_empty() {
+                            if !tokens.contains(&stripped.to_string()) {
+                                tokens.push(stripped.to_string());
+                            }
+                            let art_alias = format!("art{}", stripped);
+                            if !tokens.contains(&art_alias) {
+                                tokens.push(art_alias);
+                            }
+                        }
+                    } else if clean_code.starts_with("art") {
+                        let stripped = clean_code.trim_start_matches("art");
+                        if !stripped.is_empty() {
+                            if !tokens.contains(&stripped.to_string()) {
+                                tokens.push(stripped.to_string());
+                            }
+                            let artigo_alias = format!("artigo{}", stripped);
+                            if !tokens.contains(&artigo_alias) {
+                                tokens.push(artigo_alias);
+                            }
+                        }
+                    } else {
+                        let art_alias = format!("art{}", clean_code);
+                        if !tokens.contains(&art_alias) {
+                            tokens.push(art_alias);
+                        }
+                        let artigo_alias = format!("artigo{}", clean_code);
+                        if !tokens.contains(&artigo_alias) {
+                            tokens.push(artigo_alias);
+                        }
+                    }
                 }
             }
         }
 
-        // 1. Initial split on whitespace and punctuation
+        // 1. Split on whitespace and non-alphanumeric characters
         let raw_parts = folded.split(|c: char| !c.is_alphanumeric() && c != '_');
 
         for part in raw_parts {
@@ -97,6 +149,10 @@ impl Bm25Index {
             }
 
             let lower = trimmed.to_lowercase();
+            if is_stopword(&lower) && !lower.chars().any(|c| c.is_ascii_digit()) {
+                continue; // Skip non-substantive grammatical stopwords
+            }
+
             if !tokens.contains(&lower) {
                 tokens.push(lower.clone());
             }
@@ -105,7 +161,7 @@ impl Bm25Index {
             if trimmed.contains('_') {
                 for sub in trimmed.split('_') {
                     let sub_lower = sub.trim().to_lowercase();
-                    if sub_lower.len() >= 2 && !tokens.contains(&sub_lower) {
+                    if sub_lower.len() >= 2 && !is_stopword(&sub_lower) && !tokens.contains(&sub_lower) {
                         tokens.push(sub_lower);
                     }
                 }
@@ -138,7 +194,7 @@ impl Bm25Index {
 
             if sub_tokens.len() > 1 {
                 for st in sub_tokens {
-                    if st.len() >= 2 && !tokens.contains(&st) {
+                    if st.len() >= 2 && !is_stopword(&st) && !tokens.contains(&st) {
                         tokens.push(st);
                     }
                 }
@@ -251,13 +307,17 @@ impl Bm25Index {
             if let Some(postings) = self.inverted_index.get(term) {
                 let df = postings.len() as f32;
                 // Standard Robertson-Spärck Jones IDF
-                let idf = ((n_docs - df + 0.5) / (df + 0.5) + 1.0).ln();
+                let idf = ((n_docs - df + 0.5) / (df + 0.5) + 1.0).ln().max(0.1);
+
+                // Specific numbers, article numbers and codes receive higher weight
+                let is_numeric_or_code = term.chars().any(|c| c.is_ascii_digit());
+                let term_multiplier = if is_numeric_or_code { 5.0 } else { 1.0 };
 
                 for &(nid, tf) in postings {
                     let doc_len = *self.doc_lengths.get(&nid).unwrap_or(&1) as f32;
                     let numerator = (tf as f32) * (k1 + 1.0);
                     let denominator = (tf as f32) + k1 * (1.0 - b + b * (doc_len / avg_dl));
-                    let term_score = idf * (numerator / denominator);
+                    let term_score = idf * (numerator / denominator) * term_multiplier;
 
                     *scores.entry(nid).or_insert(0.0) += term_score;
                 }

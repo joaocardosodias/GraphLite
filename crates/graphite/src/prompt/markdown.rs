@@ -316,17 +316,23 @@ fn clean_description_for_display(desc: &str) -> String {
         }
     }
 
-    // 2. Strip HTML tags
-    let mut no_html = String::new();
-    let mut in_tag = false;
-    for c in text.chars() {
+    // 2. Strip HTML tags safely without eating math or breadcrumbs
+    let mut no_html = String::with_capacity(text.len());
+    let mut chars = text.chars().peekable();
+    while let Some(c) = chars.next() {
         if c == '<' {
-            in_tag = true;
-        } else if c == '>' {
-            in_tag = false;
-        } else if !in_tag {
-            no_html.push(c);
+            if let Some(&next) = chars.peek() {
+                if next.is_ascii_alphabetic() || next == '/' || next == '!' {
+                    for next_c in chars.by_ref() {
+                        if next_c == '>' {
+                            break;
+                        }
+                    }
+                    continue;
+                }
+            }
         }
+        no_html.push(c);
     }
     text = no_html.replace("&emsp;", " ").replace("&nbsp;", " ");
 

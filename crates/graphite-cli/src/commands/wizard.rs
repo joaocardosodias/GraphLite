@@ -91,21 +91,18 @@ pub fn run_interactive_wizard(default_path: &Path) -> Result<(PathBuf, GraphiteC
         selected_emb.dimension()
     };
 
-    // 3. Reranking Model
+    // 3. Reranking Model (always required for maximum retrieval precision)
     let reranker_choices = vec![
         RerankerModelType::BGERerankerBase,
         RerankerModelType::JinaRerankerV2BaseMultilingual,
         RerankerModelType::BGERerankerV2M3,
         RerankerModelType::JinaRerankerV1TurboEn,
-        RerankerModelType::None,
     ];
 
     let reranker_labels: Vec<String> = reranker_choices
         .iter()
         .map(|r| {
-            if *r == RerankerModelType::None || *r == RerankerModelType::Custom {
-                r.display_label().to_string()
-            } else if r.is_cached() {
+            if r.is_cached() {
                 format!("{}  [Cached]", r.display_label())
             } else {
                 r.display_label().to_string()

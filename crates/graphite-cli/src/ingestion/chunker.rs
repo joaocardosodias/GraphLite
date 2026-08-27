@@ -117,24 +117,40 @@ pub fn chunk_markdown_document(
             doc_root_name.clone()
         };
 
+        let mut breadcrumbs = vec![file_basename.to_string()];
+        if let Some(ref parent_h1) = h1 {
+            if parent_h1 != file_basename {
+                breadcrumbs.push(parent_h1.clone());
+            }
+        }
+        if let Some(ref parent_h2) = h2 {
+            if !breadcrumbs.contains(parent_h2) {
+                breadcrumbs.push(parent_h2.clone());
+            }
+        }
+        if !breadcrumbs.contains(&sec_title.to_string()) {
+            breadcrumbs.push(sec_title.to_string());
+        }
+        let breadcrumb_header = breadcrumbs.join(" > ");
+
         // Create Section Node
-        let section_relations = vec![(parent_node, "SECTION_OF".to_string(), 0.95)];
+        let section_relations = vec![
+            (parent_node.clone(), "SECTION_OF".to_string(), 0.95),
+            (doc_root_name.clone(), "PART_OF_DOC".to_string(), 0.90),
+        ];
 
         out.push(DocumentChunk {
             chunk_id: section_node_name.clone(),
             title: sec_title.to_string(),
             chunk_type: "Section".to_string(),
             content: format!(
-                "Section '{}' of document '{}' at {}:{}.\nSummary:\n{}",
-                sec_title,
-                file_basename,
-                file_path,
-                section_start_line,
-                full_section_text.chars().take(400).collect::<String>()
+                "[{}]\n{}",
+                breadcrumb_header,
+                full_section_text
             ),
             file_path: file_path.to_string(),
             line_number: section_start_line,
-            section_hierarchy: vec![file_basename.to_string(), sec_title.to_string()],
+            section_hierarchy: breadcrumbs.clone(),
             relations: section_relations,
         });
 
@@ -149,30 +165,29 @@ pub fn chunk_markdown_document(
                 format!("{}: {} (Part {})", file_basename, sec_title, p_idx + 1)
             };
 
-            let mut chunk_relations =
-                vec![(section_node_name.clone(), "CHUNK_OF".to_string(), 0.95)];
+            let mut chunk_relations = vec![
+                (section_node_name.clone(), "CHUNK_OF".to_string(), 0.95),
+                (doc_root_name.clone(), "PART_OF_DOC".to_string(), 0.85),
+            ];
 
             if let Some(prev) = prev_chunk_id {
-                chunk_relations.push((prev, "FOLLOWS".to_string(), 0.85));
+                chunk_relations.push((prev, "FOLLOWS".to_string(), 0.90));
             }
 
             prev_chunk_id = Some(chunk_node_name.clone());
 
             out.push(DocumentChunk {
                 chunk_id: chunk_node_name,
-                title: format!("{} (p.{})", sec_title, p_idx + 1),
+                title: format!("{} (Part {})", sec_title, p_idx + 1),
                 chunk_type: "Chunk".to_string(),
                 content: format!(
-                    "Knowledge chunk in {}:{} (Section '{}'):\n{}",
-                    file_path, section_start_line, sec_title, paragraph_text
+                    "[{}]\n{}",
+                    breadcrumb_header,
+                    paragraph_text.trim()
                 ),
                 file_path: file_path.to_string(),
                 line_number: section_start_line,
-                section_hierarchy: vec![
-                    file_basename.to_string(),
-                    sec_title.to_string(),
-                    format!("Part {}", p_idx + 1),
-                ],
+                section_hierarchy: breadcrumbs.clone(),
                 relations: chunk_relations,
             });
         }
@@ -282,10 +297,10 @@ pub fn chunk_plain_document(
             title: format!("{} (Chunk {})", file_basename, idx + 1),
             chunk_type: "Chunk".to_string(),
             content: format!(
-                "Knowledge chunk in {} (Chunk {}):\n{}",
-                file_path,
+                "[{}: Chunk {}]\n{}",
+                file_basename,
                 idx + 1,
-                p_text
+                p_text.trim()
             ),
             file_path: file_path.to_string(),
             line_number: 1,
