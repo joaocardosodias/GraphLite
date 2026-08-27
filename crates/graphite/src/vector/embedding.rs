@@ -191,6 +191,20 @@ pub fn is_model_cached(pattern: &str) -> bool {
     false
 }
 
+/// Recursively removes stale `.lock` files from model cache directories.
+pub fn clean_stale_lock_files(dir: &std::path::Path) {
+    if let Ok(entries) = std::fs::read_dir(dir) {
+        for entry in entries.flatten() {
+            let path = entry.path();
+            if path.is_dir() {
+                clean_stale_lock_files(&path);
+            } else if path.extension().is_some_and(|ext| ext == "lock") {
+                let _ = std::fs::remove_file(path);
+            }
+        }
+    }
+}
+
 /// Default in-memory query cache capacity.
 const DEFAULT_QUERY_CACHE_CAPACITY: usize = 512;
 
@@ -250,26 +264,27 @@ impl LocalEmbedder {
             // Graphite was compiled without static CUDA feature; defaults gracefully to high-performance CPU SIMD
         }
 
-        // Clean any stale .lock files from interrupted downloads
-        if let Ok(entries) = std::fs::read_dir(&cache_dir) {
-            for entry in entries.flatten() {
-                if let Ok(ft) = entry.file_type() {
-                    if ft.is_dir() {
-                        let blobs = entry.path().join("blobs");
-                        if let Ok(blob_entries) = std::fs::read_dir(blobs) {
-                            for b in blob_entries.flatten() {
-                                if b.path().extension().is_some_and(|ext| ext == "lock") {
-                                    let _ = std::fs::remove_file(b.path());
-                                }
-                            }
-                        }
-                    }
+        // Clean any stale .lock files from interrupted downloads recursively
+        clean_stale_lock_files(&cache_dir);
+
+        let model = match TextEmbedding::try_new(options.clone()) {
+            Ok(m) => m,
+            Err(orig_err) => {
+                // If direct download failed, automatically retry with mirror
+                if std::env::var("HF_ENDPOINT").is_err() {
+                    std::env::set_var("HF_ENDPOINT", "https://hf-mirror.com");
+                    clean_stale_lock_files(&cache_dir);
+                    TextEmbedding::try_new(options).map_err(|e| {
+                        GraphiteError::Io(std::io::Error::other(format!(
+                            "{}. Mirror retry failed: {}",
+                            orig_err, e
+                        )))
+                    })?
+                } else {
+                    return Err(GraphiteError::Io(std::io::Error::other(orig_err.to_string())));
                 }
             }
-        }
-
-        let model = TextEmbedding::try_new(options)
-            .map_err(|e| GraphiteError::Io(std::io::Error::other(e.to_string())))?;
+        };
 
         Ok(Self {
             model: Mutex::new(model),
