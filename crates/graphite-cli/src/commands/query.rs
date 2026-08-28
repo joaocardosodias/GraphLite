@@ -96,16 +96,14 @@ pub fn execute_query(db_path: &Path, args: &QueryArgs, verbose: bool) -> Result<
             engine.config().embedding_model_id,
             engine.config().vector_dim,
         );
-        let embedder = graphite::LocalEmbedder::from_model_type_and_device(
-            emb_type,
-            args.device.into(),
-        )
-        .with_context(|| {
-            format!(
-                "Failed to initialize local ONNX embedding model ({})",
-                emb_type.name()
-            )
-        })?;
+        let embedder =
+            graphite::LocalEmbedder::from_model_type_and_device(emb_type, args.device.into())
+                .with_context(|| {
+                    format!(
+                        "Failed to initialize local ONNX embedding model ({})",
+                        emb_type.name()
+                    )
+                })?;
         Some(embedder.embed_one(text)?)
     } else {
         None

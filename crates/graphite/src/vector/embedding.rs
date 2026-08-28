@@ -281,7 +281,9 @@ impl LocalEmbedder {
                         )))
                     })?
                 } else {
-                    return Err(GraphiteError::Io(std::io::Error::other(orig_err.to_string())));
+                    return Err(GraphiteError::Io(std::io::Error::other(
+                        orig_err.to_string(),
+                    )));
                 }
             }
         };

@@ -146,14 +146,23 @@ impl CudaStatus {
         {
             if let Ok(os_release) = std::fs::read_to_string("/etc/os-release") {
                 let lower = os_release.to_lowercase();
-                if lower.contains("arch") || lower.contains("omarchy") || lower.contains("manjaro") {
+                if lower.contains("arch") || lower.contains("omarchy") || lower.contains("manjaro")
+                {
                     return ("arch".to_string(), "sudo pacman -S nvidia cuda".to_string());
-                } else if lower.contains("ubuntu") || lower.contains("debian") || lower.contains("pop") || lower.contains("mint") {
+                } else if lower.contains("ubuntu")
+                    || lower.contains("debian")
+                    || lower.contains("pop")
+                    || lower.contains("mint")
+                {
                     return (
                         "ubuntu".to_string(),
-                        "sudo apt update && sudo apt install nvidia-driver-535 nvidia-cuda-toolkit".to_string(),
+                        "sudo apt update && sudo apt install nvidia-driver-535 nvidia-cuda-toolkit"
+                            .to_string(),
                     );
-                } else if lower.contains("fedora") || lower.contains("rhel") || lower.contains("centos") {
+                } else if lower.contains("fedora")
+                    || lower.contains("rhel")
+                    || lower.contains("centos")
+                {
                     return (
                         "fedora".to_string(),
                         "sudo dnf install akmod-nvidia xorg-x11-drv-nvidia-cuda".to_string(),
@@ -161,7 +170,8 @@ impl CudaStatus {
                 } else if lower.contains("suse") {
                     return (
                         "opensuse".to_string(),
-                        "sudo zypper install nvidia-open-driver-G06-signed-kmp-default cuda".to_string(),
+                        "sudo zypper install nvidia-open-driver-G06-signed-kmp-default cuda"
+                            .to_string(),
                     );
                 }
             }
@@ -181,7 +191,8 @@ impl CudaStatus {
         {
             (
                 "other".to_string(),
-                "Install NVIDIA CUDA toolkit from https://developer.nvidia.com/cuda-downloads".to_string(),
+                "Install NVIDIA CUDA toolkit from https://developer.nvidia.com/cuda-downloads"
+                    .to_string(),
             )
         }
     }
@@ -224,7 +235,10 @@ mod tests {
             CudaStatus::Available { device_count } => {
                 assert!(device_count >= 1);
             }
-            CudaStatus::GpuDetectedDriverMissing { distro_id, install_command } => {
+            CudaStatus::GpuDetectedDriverMissing {
+                distro_id,
+                install_command,
+            } => {
                 assert!(!distro_id.is_empty());
                 assert!(!install_command.is_empty());
             }

@@ -198,11 +198,12 @@ pub fn run_interactive_wizard(default_path: &Path) -> Result<(PathBuf, GraphiteC
             println!("  [!] NVIDIA GPU detected on system, but CUDA runtime is not active.");
             println!("      To enable full GPU acceleration on {}:", distro_id);
             println!("        {}", install_command);
-            let should_install = Confirm::new("Would you like to run the installation command now?")
-                .with_default(false)
-                .with_render_config(render_config)
-                .prompt()
-                .unwrap_or(false);
+            let should_install =
+                Confirm::new("Would you like to run the installation command now?")
+                    .with_default(false)
+                    .with_render_config(render_config)
+                    .prompt()
+                    .unwrap_or(false);
 
             if should_install {
                 println!("\nExecuting: {}\n", install_command);

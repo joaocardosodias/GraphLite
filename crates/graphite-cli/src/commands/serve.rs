@@ -141,12 +141,14 @@ pub fn execute_serve(db_path: &Path, args: &ServeArgs) -> Result<()> {
         engine.read().config().vector_dim,
     );
     let embedder = Arc::new(
-        LocalEmbedder::from_model_type_and_device(emb_type, args.device.into()).with_context(|| {
-            format!(
-                "Failed to initialize local ONNX embedding model ({})",
-                emb_type.name()
-            )
-        })?,
+        LocalEmbedder::from_model_type_and_device(emb_type, args.device.into()).with_context(
+            || {
+                format!(
+                    "Failed to initialize local ONNX embedding model ({})",
+                    emb_type.name()
+                )
+            },
+        )?,
     );
 
     println!("========================================================");

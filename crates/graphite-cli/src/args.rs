@@ -436,7 +436,11 @@ impl From<CliDevice> for graphite::vector::DeviceType {
 #[derive(Args, Debug, Clone)]
 pub struct DoctorArgs {
     /// Attempt to automatically install missing CUDA drivers/packages if available.
-    #[arg(short = 'i', long, help = "Automatically execute recommended installation command")]
+    #[arg(
+        short = 'i',
+        long,
+        help = "Automatically execute recommended installation command"
+    )]
     pub install: bool,
 }
 
