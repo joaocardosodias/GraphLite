@@ -32,21 +32,160 @@ pub struct Bm25Index {
     params: Bm25Params,
 }
 
-/// Normalizes accented characters to ASCII equivalents for robust multi-language search.
+/// Normalizes accented characters and diacritics to ASCII equivalents for robust multi-language search.
 #[inline]
 pub fn fold_accents(s: &str) -> String {
     s.chars()
         .map(|c| match c {
-            'á' | 'à' | 'ã' | 'â' | 'ä' | 'Á' | 'À' | 'Ã' | 'Â' | 'Ä' => 'a',
-            'é' | 'è' | 'ê' | 'ë' | 'É' | 'È' | 'Ê' | 'Ë' => 'e',
-            'í' | 'ì' | 'î' | 'ï' | 'Í' | 'Ì' | 'Î' | 'Ï' => 'i',
-            'ó' | 'ò' | 'õ' | 'ô' | 'ö' | 'Ó' | 'Ò' | 'Õ' | 'Ô' | 'Ö' => 'o',
-            'ú' | 'ù' | 'û' | 'ü' | 'Ú' | 'Ù' | 'Û' | 'Ü' => 'u',
-            'ç' | 'Ç' => 'c',
-            'ñ' | 'Ñ' => 'n',
+            'á' | 'à' | 'ã' | 'â' | 'ä' | 'å' | 'ā' | 'ă' | 'ą' | 'Á' | 'À' | 'Ã' | 'Â' | 'Ä'
+            | 'Å' | 'Ā' | 'Ă' | 'Ą' => 'a',
+            'é' | 'è' | 'ê' | 'ë' | 'ē' | 'ė' | 'ę' | 'ě' | 'É' | 'È' | 'Ê' | 'Ë' | 'Ē' | 'Ė'
+            | 'Ę' | 'Ě' => 'e',
+            'í' | 'ì' | 'î' | 'ï' | 'ī' | 'į' | 'Í' | 'Ì' | 'Î' | 'Ï' | 'Ī' | 'Į' => 'i',
+            'ó' | 'ò' | 'õ' | 'ô' | 'ö' | 'ø' | 'ō' | 'ő' | 'Ó' | 'Ò' | 'Õ' | 'Ô' | 'Ö' | 'Ø'
+            | 'Ō' | 'Ő' => 'o',
+            'ú' | 'ù' | 'û' | 'ü' | 'ū' | 'ů' | 'ű' | 'ų' | 'Ú' | 'Ù' | 'Û' | 'Ü' | 'Ū' | 'Ů'
+            | 'Ű' | 'Ų' => 'u',
+            'ç' | 'ć' | 'č' | 'Ç' | 'Ć' | 'Č' => 'c',
+            'ñ' | 'ń' | 'ň' | 'Ñ' | 'Ń' | 'Ň' => 'n',
+            'ý' | 'ÿ' | 'Ý' | 'Ÿ' => 'y',
             _ => c,
         })
         .collect()
+}
+
+/// Applies lightweight Snowball / RSLP-inspired stemming for Portuguese terms.
+pub fn stem_portuguese(w: &str) -> Option<String> {
+    if w.len() <= 3 {
+        return None;
+    }
+
+    let mut s = w.to_string();
+
+    // 1. Plural & Suffix Reductions
+    if s.ends_with("oes") && s.len() >= 5 {
+        s.truncate(s.len() - 3);
+        s.push_str("ao");
+        return Some(s);
+    }
+    if s.ends_with("aes") && s.len() >= 5 {
+        s.truncate(s.len() - 3);
+        s.push_str("ao");
+        return Some(s);
+    }
+    if s.ends_with("ais") && s.len() >= 5 {
+        s.truncate(s.len() - 3);
+        s.push_str("al");
+        return Some(s);
+    }
+    if s.ends_with("eis") && s.len() >= 5 {
+        s.truncate(s.len() - 3);
+        s.push_str("el");
+        return Some(s);
+    }
+    if s.ends_with("ois") && s.len() >= 5 {
+        s.truncate(s.len() - 3);
+        s.push_str("ol");
+        return Some(s);
+    }
+    if s.ends_with("uis") && s.len() >= 5 {
+        s.truncate(s.len() - 3);
+        s.push_str("ul");
+        return Some(s);
+    }
+    if s.ends_with("res") && s.len() >= 5 {
+        s.truncate(s.len() - 2);
+        return Some(s);
+    }
+    if s.ends_with("zes") && s.len() >= 5 {
+        s.truncate(s.len() - 2);
+        return Some(s);
+    }
+    if s.ends_with("nes") && s.len() >= 5 {
+        s.truncate(s.len() - 2);
+        return Some(s);
+    }
+    if s.ends_with("mente") && s.len() >= 7 {
+        s.truncate(s.len() - 5);
+        return Some(s);
+    }
+    if (s.ends_with("issimo") || s.ends_with("issima")) && s.len() >= 8 {
+        s.truncate(s.len() - 6);
+        return Some(s);
+    }
+    if (s.ends_with("issimos") || s.ends_with("issimas")) && s.len() >= 9 {
+        s.truncate(s.len() - 7);
+        return Some(s);
+    }
+
+    // 2. Verb & Participle Reductions
+    let verb_suffixes = [
+        "ando", "endo", "indo", "aram", "eram", "iram", "avam", "asse", "esse", "isse",
+        "aria", "eria", "iria", "ados", "adas", "idos", "idas", "ado", "ada", "ido", "ida",
+        "ara", "era", "ira", "ava", "iam", "emos", "imos", "amos", "eis", "ais", "ou", "eu",
+        "iu", "ar", "er", "ir", "em", "am",
+    ];
+
+    for suffix in verb_suffixes {
+        if s.ends_with(suffix) && s.len() >= suffix.len() + 3 {
+            s.truncate(s.len() - suffix.len());
+            return Some(s);
+        }
+    }
+
+    // 3. Simple plural 's' at the end of vowels
+    if s.ends_with('s') && s.len() >= 4 {
+        let chars: Vec<char> = s.chars().collect();
+        if chars.len() >= 2 {
+            let prev_char = chars[chars.len() - 2];
+            if matches!(prev_char, 'a' | 'e' | 'i' | 'o' | 'u') {
+                s.truncate(s.len() - 1);
+                return Some(s);
+            }
+        }
+    }
+
+    None
+}
+
+/// Applies standard English suffix stemming.
+pub fn stem_english(w: &str) -> Option<String> {
+    if w.len() <= 3 {
+        return None;
+    }
+
+    let mut s = w.to_string();
+    if s.ends_with("ing") && s.len() >= 6 {
+        s.truncate(s.len() - 3);
+        return Some(s);
+    }
+    if s.ends_with("tion") && s.len() >= 6 {
+        s.truncate(s.len() - 4);
+        return Some(s);
+    }
+    if s.ends_with("tions") && s.len() >= 7 {
+        s.truncate(s.len() - 5);
+        return Some(s);
+    }
+    if s.ends_with("ies") && s.len() >= 5 {
+        s.truncate(s.len() - 3);
+        s.push('y');
+        return Some(s);
+    }
+    if s.ends_with("ed") && s.len() >= 5 {
+        s.truncate(s.len() - 2);
+        return Some(s);
+    }
+    if s.ends_with("es") && s.len() >= 5 {
+        s.truncate(s.len() - 2);
+        return Some(s);
+    }
+    if s.ends_with('s') && s.len() >= 4 && !s.ends_with("ss") {
+        s.truncate(s.len() - 1);
+        return Some(s);
+    }
+
+    None
 }
 
 /// Returns true if a token is a common grammatical stopword.
@@ -285,15 +424,34 @@ impl Bm25Index {
                 tokens.push(lower.clone());
             }
 
+            // 1a. Portuguese & English Stemming for morphological invariance
+            if let Some(stem_pt) = stem_portuguese(&lower) {
+                if stem_pt.len() >= 3 && !is_stopword(&stem_pt) && !tokens.contains(&stem_pt) {
+                    tokens.push(stem_pt);
+                }
+            }
+            if let Some(stem_en) = stem_english(&lower) {
+                if stem_en.len() >= 3 && !is_stopword(&stem_en) && !tokens.contains(&stem_en) {
+                    tokens.push(stem_en);
+                }
+            }
+
             // 1b. If it contains `_`, also extract sub-words
             if trimmed.contains('_') {
                 for sub in trimmed.split('_') {
                     let sub_lower = sub.trim().to_lowercase();
-                    if sub_lower.len() >= 2
-                        && !is_stopword(&sub_lower)
-                        && !tokens.contains(&sub_lower)
-                    {
-                        tokens.push(sub_lower);
+                    if sub_lower.len() >= 2 && !is_stopword(&sub_lower) {
+                        if !tokens.contains(&sub_lower) {
+                            tokens.push(sub_lower.clone());
+                        }
+                        if let Some(stem_pt) = stem_portuguese(&sub_lower) {
+                            if stem_pt.len() >= 3
+                                && !is_stopword(&stem_pt)
+                                && !tokens.contains(&stem_pt)
+                            {
+                                tokens.push(stem_pt);
+                            }
+                        }
                     }
                 }
             }
@@ -540,5 +698,44 @@ mod tests {
         // n1 and n2 are in both lists, so they must be scored higher than n3
         assert!(fused[0].0 == n1 || fused[0].0 == n2);
         assert_eq!(fused[2].0, n3);
+    }
+
+    #[test]
+    fn test_accent_folding_and_diacritics() {
+        assert_eq!(fold_accents("Homicídio"), "Homicidio");
+        assert_eq!(fold_accents("Constituição"), "Constituicao");
+        assert_eq!(fold_accents("ações penais"), "acoes penais");
+        assert_eq!(fold_accents("violência fútil"), "violencia futil");
+    }
+
+    #[test]
+    fn test_portuguese_stemmer() {
+        assert_eq!(stem_portuguese("penais"), Some("penal".to_string()));
+        assert_eq!(stem_portuguese("papeis"), Some("papel".to_string()));
+        assert_eq!(stem_portuguese("acoes"), Some("acao".to_string()));
+        assert_eq!(stem_portuguese("cometido"), Some("comet".to_string()));
+        assert_eq!(stem_portuguese("matando"), Some("mat".to_string()));
+        assert_eq!(stem_portuguese("qualificada"), Some("qualific".to_string()));
+    }
+
+    #[test]
+    fn test_cross_morphological_bm25_search() {
+        let mut index = Bm25Index::new();
+        let n1 = NodeId::new(1);
+        let n2 = NodeId::new(2);
+
+        index.index_node(
+            n1,
+            "Art. 121: Matar alguem. Pena de reclusao por homicidio qualificado.",
+        );
+        index.index_node(
+            n2,
+            "Art. 155: Subtrair coisa alheia movel. Crime de furto simples.",
+        );
+
+        // Query with inflected verbs and plurals ("matou", "homicídios qualificados")
+        let results = index.search("quem matou em homicídios qualificados", 5);
+        assert!(!results.is_empty());
+        assert_eq!(results[0].0, n1);
     }
 }
