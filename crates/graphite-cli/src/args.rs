@@ -246,6 +246,15 @@ pub struct QueryArgs {
     )]
     pub threshold: Option<f32>,
 
+    /// Auto-K relative score drop-off ratio (default: 0.85). Discards candidates whose score drops significantly below the top match.
+    #[arg(
+        long = "drop-off",
+        alias = "auto-k",
+        default_value_t = 0.85,
+        help = "Auto-K relative score drop-off ratio (default: 0.85)"
+    )]
+    pub drop_off: f32,
+
     /// Maximum BFS graph exploration depth in hops.
     #[arg(long, help = "Maximum BFS search depth in hops (e.g. 1 or 2)")]
     pub depth: Option<usize>,

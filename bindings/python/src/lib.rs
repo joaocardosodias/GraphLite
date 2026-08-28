@@ -159,14 +159,15 @@ impl PyGraphite {
 
     /// Queries the knowledge graph using a plain text prompt with automatic local embedding.
     #[allow(clippy::too_many_arguments)]
-    #[pyo3(signature = (text, top_k = 5, threshold = None, min_score = None, max_tokens = None, max_depth = None, alpha = None))]
+    #[pyo3(signature = (text, top_k = 10, threshold = None, min_score = None, relative_drop_off = Some(0.85), auto_k = None, max_depth = None, alpha = None))]
     fn query(
         &self,
         text: &str,
         top_k: usize,
         threshold: Option<f32>,
         min_score: Option<f32>,
-        max_tokens: Option<usize>,
+        relative_drop_off: Option<f32>,
+        auto_k: Option<f32>,
         max_depth: Option<usize>,
         alpha: Option<f32>,
     ) -> PyResult<PyQueryResult> {
@@ -188,8 +189,8 @@ impl PyGraphite {
         if let Some(t) = threshold.or(min_score) {
             options = options.with_threshold(t);
         }
-        if let Some(mt) = max_tokens {
-            options = options.with_max_tokens(mt);
+        if let Some(drop) = auto_k.or(relative_drop_off) {
+            options = options.with_auto_k(drop);
         }
         if let Some(md) = max_depth {
             options = options.with_max_depth(md);
@@ -207,7 +208,7 @@ impl PyGraphite {
 
     /// Retrieves prompt context using an explicit query vector.
     #[allow(clippy::too_many_arguments)]
-    #[pyo3(signature = (vector, query_text = None, top_k = 5, threshold = None, min_score = None, max_tokens = None, max_depth = None, alpha = None))]
+    #[pyo3(signature = (vector, query_text = None, top_k = 10, threshold = None, min_score = None, relative_drop_off = Some(0.85), auto_k = None, max_depth = None, alpha = None))]
     fn retrieve_context(
         &self,
         vector: Vec<f32>,
@@ -215,7 +216,8 @@ impl PyGraphite {
         top_k: usize,
         threshold: Option<f32>,
         min_score: Option<f32>,
-        max_tokens: Option<usize>,
+        relative_drop_off: Option<f32>,
+        auto_k: Option<f32>,
         max_depth: Option<usize>,
         alpha: Option<f32>,
     ) -> PyResult<PyQueryResult> {
@@ -228,8 +230,8 @@ impl PyGraphite {
         if let Some(thresh) = threshold.or(min_score) {
             options = options.with_threshold(thresh);
         }
-        if let Some(mt) = max_tokens {
-            options = options.with_max_tokens(mt);
+        if let Some(drop) = auto_k.or(relative_drop_off) {
+            options = options.with_auto_k(drop);
         }
         if let Some(md) = max_depth {
             options = options.with_max_depth(md);

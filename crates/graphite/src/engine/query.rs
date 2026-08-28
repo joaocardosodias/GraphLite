@@ -117,6 +117,18 @@ impl QueryOptions {
         self.type_filter = Some(types.iter().map(|t| t.to_string()).collect());
         self
     }
+
+    /// Enables Auto-K dynamic cutoff: keeps subsequent candidates only if within `ratio` of top candidate (e.g. 0.85).
+    pub fn with_auto_k(mut self, ratio: f32) -> Self {
+        self.relative_drop_off = Some(ratio.clamp(0.0, 1.0));
+        self
+    }
+
+    /// Sets the relative score drop-off ratio (alias for with_auto_k).
+    pub fn with_relative_drop_off(mut self, ratio: f32) -> Self {
+        self.relative_drop_off = Some(ratio.clamp(0.0, 1.0));
+        self
+    }
 }
 
 /// The structured result of an end-to-end Graphite retrieval query.
@@ -461,6 +473,39 @@ impl GraphiteEngine {
                 crate::graph::subgraph::ConnectedSubgraph {
                     entities: filtered_entities,
                     edges: filtered_edges,
+                    seed_ids: connected_subgraph.seed_ids,
+                }
+            } else {
+                connected_subgraph
+            }
+        } else {
+            connected_subgraph
+        };
+
+        // 3.4. Auto-Adaptive Relative Drop-off (Auto-K)
+        // Keeps subsequent candidates only if their score is within drop_ratio of the top match
+        let connected_subgraph = if let Some(drop_ratio) = opts.relative_drop_off {
+            if let Some(top_entity) = connected_subgraph.entities.first() {
+                let top_score = top_entity.final_score;
+                let dynamic_cutoff = top_score * drop_ratio.clamp(0.0, 1.0);
+                let adaptive_entities: Vec<ScoredEntity> = connected_subgraph
+                    .entities
+                    .into_iter()
+                    .filter(|e| e.final_score >= dynamic_cutoff)
+                    .collect();
+
+                let valid_ids: std::collections::HashSet<NodeId> =
+                    adaptive_entities.iter().map(|e| e.node_id).collect();
+
+                let adaptive_edges: Vec<crate::record::EdgeRecord> = connected_subgraph
+                    .edges
+                    .into_iter()
+                    .filter(|e| valid_ids.contains(&e.source) && valid_ids.contains(&e.target))
+                    .collect();
+
+                crate::graph::subgraph::ConnectedSubgraph {
+                    entities: adaptive_entities,
+                    edges: adaptive_edges,
                     seed_ids: connected_subgraph.seed_ids,
                 }
             } else {

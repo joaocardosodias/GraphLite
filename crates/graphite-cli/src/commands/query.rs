@@ -217,13 +217,12 @@ pub fn execute_query(db_path: &Path, args: &QueryArgs, verbose: bool) -> Result<
                 let rerank_res = reranker.rerank(q_text, &candidate_docs)?;
                 let top_score = rerank_res.first().map(|r| r.score).unwrap_or(0.0);
                 let threshold_val = args.threshold.unwrap_or(0.0);
+                let drop_cutoff = top_score * args.drop_off;
+                let effective_cutoff = drop_cutoff.max(threshold_val);
                 let mut reranked_entities = Vec::new();
-                for (rank, r) in rerank_res.into_iter().enumerate() {
-                    // Enforce user-defined threshold and relative dropoff
-                    if r.score < threshold_val {
-                        continue;
-                    }
-                    if rank > 0 && r.score < top_score * 0.40 {
+                for r in rerank_res {
+                    // Auto-K: Enforce user-defined threshold and relative dropoff compared to top candidate
+                    if r.score < effective_cutoff {
                         continue;
                     }
                     if r.index < valid_indices.len() {
