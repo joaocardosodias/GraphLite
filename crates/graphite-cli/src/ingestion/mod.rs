@@ -189,7 +189,10 @@ pub fn run_ingest_pass(
     embedder: &LocalEmbedder,
     is_watch_pass: bool,
 ) -> Result<bool> {
-    let target_path = &args.path;
+    let target_path = match &args.path {
+        Some(p) => p,
+        None => bail!("No file or directory path provided for ingestion pass"),
+    };
     if !target_path.exists() {
         bail!("Target path '{:?}' does not exist.", target_path);
     }
@@ -377,15 +380,96 @@ pub fn run_ingest_pass(
     Ok(true)
 }
 
-/// Executes the end-to-end document ingestion command with optional watch loop.
-pub fn execute_ingest(db_path: &Path, args: &IngestArgs) -> Result<()> {
-    let target_path = &args.path;
-    if !target_path.exists() {
-        bail!("Target path '{:?}' does not exist.", target_path);
+/// Ingests direct text content into the knowledge graph with chunking and embeddings.
+pub fn ingest_direct_text(
+    db_path: &Path,
+    text: &str,
+    title: &str,
+    chunk_size: usize,
+    chunk_overlap: usize,
+    no_tmp: bool,
+    embedder: &LocalEmbedder,
+) -> Result<usize> {
+    let text = text.trim();
+    if text.is_empty() {
+        bail!("Cannot ingest empty text content");
     }
 
-    println!("Scanning documents in '{}'...", target_path.display());
+    let config = load_or_default_config(db_path)
+        .with_direct_write(no_tmp)
+        .with_auto_flush(false);
+    let engine = GraphiteEngine::open_or_create(db_path, config)?;
 
+    let chunk_config = ChunkConfig {
+        target_chars: chunk_size * 4,
+        overlap_chars: chunk_overlap * 4,
+    };
+
+    let hash = compute_file_hash(text.as_bytes());
+    let mut chunks = if text.contains('#') {
+        chunk_markdown_document(text, title, &hash, &chunk_config)
+    } else {
+        chunk_plain_document(text, title, &hash, &chunk_config)
+    };
+
+    if chunks.is_empty() {
+        chunks = vec![DocumentChunk {
+            chunk_id: format!("{}: Section 1", title),
+            title: title.to_string(),
+            file_path: title.to_string(),
+            chunk_type: "Text".to_string(),
+            content: text.to_string(),
+            line_number: 1,
+            section_hierarchy: vec![title.to_string()],
+            relations: Vec::new(),
+        }];
+    }
+
+    link_related_chunks(&mut chunks);
+
+    let formatted_texts: Vec<String> = chunks
+        .iter()
+        .map(|c| format!("{} {}: {}", c.chunk_type, c.title, c.content))
+        .collect();
+
+    let vectors = embedder.embed_batch(&formatted_texts)?;
+
+    let mut name_to_id = HashMap::new();
+    let mut count = 0;
+
+    for (chunk, vector) in chunks.iter().zip(vectors.iter()) {
+        let node_id = engine.upsert_node(
+            &chunk.chunk_id,
+            &chunk.chunk_type,
+            &chunk.content,
+            Some(vector),
+        )?;
+        name_to_id.insert(chunk.chunk_id.clone(), node_id);
+        count += 1;
+    }
+
+    for chunk in &chunks {
+        if let Some(&src_id) = name_to_id.get(&chunk.chunk_id) {
+            for (tgt_name, rel_label, weight) in &chunk.relations {
+                let tgt_id = if let Some(&id) = name_to_id.get(tgt_name) {
+                    Some(id)
+                } else {
+                    engine.get_node_by_name(tgt_name).map(|n| n.id)
+                };
+
+                if let Some(tgt_id) = tgt_id {
+                    let _ = engine.add_edge(src_id, tgt_id, rel_label, *weight, true);
+                }
+            }
+        }
+    }
+
+    engine.flush()?;
+    Ok(count)
+}
+
+/// Executes the end-to-end document ingestion command with optional watch loop.
+pub fn execute_ingest(db_path: &Path, args: &IngestArgs) -> Result<()> {
     let emb_type = if db_path.exists() {
         if let Ok(reader) = graphite::storage::mmap_reader::MmapGraphReader::open(db_path) {
             graphite::vector::embedding::EmbeddingModelType::from_id(
@@ -406,6 +490,38 @@ pub fn execute_ingest(db_path: &Path, args: &IngestArgs) -> Result<()> {
                 emb_type.name()
             )
         })?;
+
+    if let Some(ref text) = args.text {
+        println!("Ingesting direct text input ({} characters)...", text.len());
+        let count = ingest_direct_text(
+            db_path,
+            text,
+            &args.title,
+            args.chunk_size,
+            args.chunk_overlap,
+            args.no_tmp,
+            &embedder,
+        )?;
+        println!(
+            "Direct text ingestion complete: {} chunk(s) stored in '{}'.",
+            count,
+            db_path.display()
+        );
+        return Ok(());
+    }
+
+    let target_path = match &args.path {
+        Some(p) => p,
+        None => {
+            bail!("Please provide a target file/directory path or use -t/--text \"...\"");
+        }
+    };
+
+    if !target_path.exists() {
+        bail!("Target path '{:?}' does not exist.", target_path);
+    }
+
+    println!("Scanning documents in '{}'...", target_path.display());
 
     // 1. Initial ingestion pass
     run_ingest_pass(db_path, args, &embedder, false)?;

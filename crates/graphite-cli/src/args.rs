@@ -54,11 +54,8 @@ pub enum Commands {
     /// Export database content and topology as JSON or Markdown triples.
     Dump(DumpArgs),
 
-    /// Ingest documents (Markdown, PDF, Text, JSON, CSV) with hierarchical semantic chunking into the knowledge graph.
+    /// Ingest documents (Markdown, PDF, Text, JSON, CSV) or direct text with hierarchical semantic chunking into the knowledge graph.
     Ingest(IngestArgs),
-
-    /// Record an agent memory, fact, rule, or preference with automatic embedding and relational linking.
-    Remember(RememberArgs),
 
     /// Launch embedded HTTP / REST API server for Python, Node.js, and web clients.
     Serve(ServeArgs),
@@ -302,11 +299,27 @@ pub struct DumpArgs {
     pub format: CliDumpFormat,
 }
 
-#[derive(Args, Debug)]
+#[derive(Args, Debug, Clone)]
 pub struct IngestArgs {
     /// Path to the file or directory containing documents to ingest.
-    #[arg(default_value = ".", help = "Path to file or directory to ingest")]
-    pub path: std::path::PathBuf,
+    #[arg(help = "Path to file or directory to ingest (optional if -t/--text is provided)")]
+    pub path: Option<std::path::PathBuf>,
+
+    /// Direct text content to ingest into the database.
+    #[arg(
+        short = 't',
+        long = "text",
+        help = "Direct text content to ingest"
+    )]
+    pub text: Option<String>,
+
+    /// Optional document title or category when ingesting direct text.
+    #[arg(
+        long = "title",
+        default_value = "DirectInput",
+        help = "Title for the ingested text"
+    )]
+    pub title: String,
 
     /// Target token size per semantic text chunk (approx 4 chars per token).
     #[arg(
@@ -369,30 +382,6 @@ pub struct IngestArgs {
         help = "Direct write mode without temporary staging files (.tmp)"
     )]
     pub no_tmp: bool,
-}
-
-#[derive(Args, Debug)]
-pub struct RememberArgs {
-    /// The fact, preference, rule, or memory text to record.
-    #[arg(help = "Memory text content to record")]
-    pub text: String,
-
-    /// Optional semantic category or type for the memory (e.g. 'preference', 'fact', 'task', 'rule').
-    #[arg(
-        short = 'c',
-        long,
-        default_value = "AgentMemory",
-        help = "Category/type label for the memory"
-    )]
-    pub category: String,
-
-    /// Optional related entity name to establish an immediate connection with.
-    #[arg(
-        short = 'r',
-        long,
-        help = "Name of an existing related entity to connect to"
-    )]
-    pub relate_to: Option<String>,
 }
 
 #[derive(Args, Debug)]

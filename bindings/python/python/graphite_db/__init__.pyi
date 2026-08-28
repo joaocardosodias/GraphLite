@@ -66,10 +66,14 @@ class Graphite:
         vector: Optional[List[float]] = ...,
     ) -> int: ...
 
-    def remember(
+    def ingest(
         self,
-        text: str,
-        category: str = ...,
+        source: Optional[str] = ...,
+        text: Optional[str] = ...,
+        title: str = ...,
+        chunk_size: int = ...,
+        overlap: int = ...,
+        batch_size: int = ...,
     ) -> int: ...
 
     def connect(
@@ -98,16 +102,16 @@ class Graphite:
 def open(
     path: str = ...,
     dim: int = ...,
-    max_tokens: int = ...,
     metric: str = ...,
     quantization: str = ...,
+    device: str = ...,
 ) -> Graphite: ...
 
 def in_memory(
     dim: int = ...,
-    max_tokens: int = ...,
     metric: str = ...,
     quantization: str = ...,
+    device: str = ...,
 ) -> Graphite: ...
 
 def embed(text: str) -> List[float]: ...

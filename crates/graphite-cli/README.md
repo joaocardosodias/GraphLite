@@ -41,35 +41,32 @@ cargo install graphite-db-cli
 
 ## Command Reference
 
-### 1. Ingest Documents
-Automatically parse, chunk, embed, and index directories containing Markdown, PDF, Plain Text, JSON, and CSV files:
+### 1. Ingest Documents or Direct Text
+Automatically parse, chunk, embed, and index directories or raw text strings:
 
 ```bash
+# Ingest files or folders
 graphite ingest ./docs -d knowledge.graph --chunk-size 350 --chunk-overlap 40
+
+# Ingest direct text
+graphite ingest -t "User prefers concise answers in Portuguese." -d knowledge.graph --title "UserPreference"
 ```
 
 ### 2. Query Knowledge Context
-Execute sub-millisecond GraphRAG retrieval with token budgeting:
+Execute GraphRAG retrieval with automatic embeddings, reranking, and dynamic Auto-K cutoff:
 
 ```bash
-graphite query "How does authentication work?" -d knowledge.graph --max-tokens 400 --top-k 5
+graphite query "How does authentication work?" -d knowledge.graph --threshold 0.80 --drop-off 0.85 -k 5
 ```
 
-### 3. Record Facts & Agent Rules
-Insert single entities, rules, or user preferences with real-time semantic deduplication:
+### 3. Verify System & GPU Acceleration
+Run diagnostics on CUDA acceleration, ONNX runtime, and models:
 
 ```bash
-graphite remember "User prefers concise answers in Portuguese." -d knowledge.graph --category "UserPreference"
+graphite doctor
 ```
 
-### 4. Inspect Database Health & Integrity
-Verify CRC32 checksums, view block counts, and check memory allocation:
-
-```bash
-graphite inspect knowledge.graph
-```
-
-### 5. Launch Embedded REST API Server
+### 4. Launch Embedded REST API Server
 Start a lightweight, zero-dependency local HTTP server with CORS for Python, TypeScript, and web integrations:
 
 ```bash
@@ -78,7 +75,7 @@ graphite serve -d knowledge.graph --port 8080 --host 0.0.0.0
 
 #### REST API Endpoints:
 - `POST /v1/query` — Execute GraphRAG context retrieval
-- `POST /v1/insert` — Upsert entity nodes and embeddings
+- `POST /v1/ingest` — Ingest document files, directories, or direct raw text
 - `GET /health` — Check server status
 
 ---

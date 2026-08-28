@@ -11,7 +11,6 @@ use commands::init::execute_init;
 use commands::insert::{execute_insert_edge, execute_insert_node};
 use commands::inspect::execute_inspect;
 use commands::query::execute_query;
-use commands::remember::execute_remember;
 use commands::serve::execute_serve;
 use ingestion::execute_ingest;
 
@@ -55,9 +54,6 @@ fn main() -> Result<()> {
         }
         Commands::Ingest(args) => {
             execute_ingest(&db_path, args)?;
-        }
-        Commands::Remember(args) => {
-            execute_remember(&db_path, args)?;
         }
         Commands::Serve(args) => {
             execute_serve(&db_path, args)?;

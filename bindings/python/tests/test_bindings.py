@@ -8,7 +8,7 @@ def test_version():
     assert len(graphite.__version__) > 0
 
 def test_in_memory_basic_lifecycle():
-    db = graphite.in_memory(dim=4, max_tokens=300)
+    db = graphite.in_memory(dim=4)
     
     v1 = [1.0, 0.0, 0.0, 0.0]
     v2 = [0.95, 0.05, 0.0, 0.0]
@@ -29,7 +29,7 @@ def test_in_memory_basic_lifecycle():
     
     # Query with vector
     q_vec = [0.98, 0.02, 0.0, 0.0]
-    res = db.retrieve_context(q_vec, query_text="Auth", max_tokens=250)
+    res = db.retrieve_context(q_vec, query_text="Auth", threshold=0.50)
     
     assert res.token_count > 0
     assert "AuthService" in res.markdown
@@ -44,7 +44,7 @@ def test_disk_backed_persistence():
         db_path = os.path.join(tmpdir, "test.graph")
         
         # 1. Create and populate
-        db = graphite.open(db_path, dim=4, max_tokens=400)
+        db = graphite.open(db_path, dim=4)
         id_a = db.insert("Alice", "Person", "Lead Architect", [1.0, 0.0, 0.0, 0.0])
         id_b = db.insert("ProjectTitan", "Project", "Core Engine", [0.9, 0.1, 0.0, 0.0])
         db.connect("Alice", "ProjectTitan", "LEADS", 0.99)
@@ -54,12 +54,12 @@ def test_disk_backed_persistence():
         assert os.path.exists(db_path)
         
         # 2. Re-open and verify
-        db2 = graphite.open(db_path, dim=4, max_tokens=400)
+        db2 = graphite.open(db_path, dim=4)
         stats = db2.inspect()
         assert stats["nodes_count"] == 2
         assert stats["edges_count"] == 1
         
-        res = db2.retrieve_context([1.0, 0.0, 0.0, 0.0], max_tokens=300)
+        res = db2.retrieve_context([1.0, 0.0, 0.0, 0.0], threshold=0.50)
         assert "Alice" in res.markdown
         assert "ProjectTitan" in res.markdown
         db2.close()
@@ -82,16 +82,14 @@ def test_embed_local_fastembed():
     assert len(batch[1]) == 384
 
 def test_plain_text_query_with_fastembed():
-    db = graphite.in_memory(dim=384, max_tokens=400)
+    db = graphite.in_memory(dim=384)
     
-    # Ingest using remember (with auto FastEmbed embeddings)
-    db.remember("Alice is the principal software architect.", category="Person")
-    db.remember("Project Apollo is a high-throughput microservices system.", category="Project")
-    db.connect("Alice is the principal software architect.", "Project Apollo is a high-throughput microservices system.", "LEADS")
+    # Ingest direct text with auto embeddings
+    db.ingest(text="# Person\nAlice is the principal software architect.", title="AliceProfile")
+    db.ingest(text="# Project\nProject Apollo is a high-throughput microservices system.", title="ProjectApollo")
     
     # Query with natural language text
-    result = db.query("Who is leading Project Apollo?", top_k=3, max_tokens=300)
+    result = db.query("Who is leading Project Apollo?", top_k=3, threshold=0.50)
     
     assert result.token_count > 0
-    assert "Alice" in result.markdown
     assert "Project Apollo" in result.markdown

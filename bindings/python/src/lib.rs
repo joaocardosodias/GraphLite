@@ -266,25 +266,6 @@ impl PyGraphite {
         Ok(id.as_u32())
     }
 
-    /// Records a factual statement or memory rule with automatic local embedding and deduplication.
-    #[pyo3(signature = (text, category = "Fact"))]
-    fn remember(&self, text: &str, category: &str) -> PyResult<u32> {
-        let engine = self.get_engine()?;
-
-        let vector = if let Some(embedder) = &self.embedder {
-            embedder.embed_one(text).ok()
-        } else {
-            None
-        };
-
-        let vec_ref = vector.as_deref();
-        let id = engine
-            .upsert_node(text, category, text, vec_ref)
-            .map_err(|e| PyRuntimeError::new_err(e.to_string()))?;
-
-        Ok(id.as_u32())
-    }
-
     /// Connects two entity names with a directed relationship.
     #[pyo3(signature = (source_name, target_name, relation = "RELATES_TO", weight = 1.0))]
     fn connect(

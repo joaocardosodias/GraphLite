@@ -8,177 +8,260 @@
 <h1 align="center">Graphite</h1>
 
 <p align="center">
-  <strong>The Embedded Single-File GraphRAG Engine in Pure Rust</strong>
+  <strong>Embedded Single-File GraphRAG & AI Memory Engine</strong>
 </p>
 
 <p align="center">
   <a href="LICENSE"><img src="https://img.shields.io/badge/License-MIT%20OR%20Apache--2.0-black.svg" alt="License" /></a>
+  <a href="https://pypi.org/project/graphite-database/"><img src="https://img.shields.io/pypi/v/graphite-database.svg?color=black" alt="PyPI" /></a>
   <a href="https://crates.io/crates/graphite-db"><img src="https://img.shields.io/crates/v/graphite-db.svg?color=black" alt="Crates.io" /></a>
   <a href="https://github.com/joaocardosodias/Graphite/actions"><img src="https://img.shields.io/badge/CI-passing-black.svg" alt="CI Status" /></a>
 </p>
 
-> **Graphite** combines Knowledge Graphs (CSR), SIMD Vector Search (AVX2), BM25 Lexical Indexing, and Cross-Encoder Reranking into a single, zero-dependency `.graph` binary file with zero-copy memory-mapped virtual memory (`mmap`).
+Graphite is an embedded, single-file GraphRAG and agent memory engine. It combines relational knowledge graphs, dense vector search, and full-text keyword search into a single portable `.graph` database file.
 
 ---
 
-## Quick Install
+## Installation
 
-### Linux & macOS (One-line installer):
+### Python SDK
+```bash
+pip install graphite-database
+```
+
+### CLI Binary
+
+#### Linux & macOS (One-line installer)
 ```bash
 curl -fsSL https://raw.githubusercontent.com/joaocardosodias/Graphite/main/install.sh | bash
 ```
 
-### Windows (PowerShell):
+#### Windows (PowerShell)
 ```powershell
 irm https://raw.githubusercontent.com/joaocardosodias/Graphite/main/install.ps1 | iex
 ```
 
-### Via Cargo (Rust CLI):
+#### Via Cargo (Rust CLI)
 ```bash
 cargo install graphite-db-cli
 ```
 
----
-
-## Key Highlights
-
-- **Single-File Zero-Copy Storage (`.graph`):** Compressed Sparse Row (CSR) graph topology, scalar-quantized vectors (SQ8), inverted lexical index (BM25), and string tables packed into a single binary file with CRC32 integrity verification and atomic safe rename commits.
-- **Sub-Millisecond Hybrid Retrieval (RRF):** Fuses SIMD-accelerated 256-bit AVX2 cosine distance with inverted BM25 lexical ranking via Reciprocal Rank Fusion (RRF with $k=60$).
-- **Multi-Hop Relational Graph Traversal:** Instantaneous BFS traversal over contiguous memory-mapped CSR buffers with $O(1)$-cycle visited node deduplication (`DenseNodeBitSet`).
-- **Token-Budgeted Context Synthesis (MMR):** Enforces strict prompt token limits (via BPE Tiktoken `cl100k_base` and `o200k_base`) while eliminating redundant chunks via Maximal Marginal Relevance ($\lambda = 0.75$).
-- **Universal Hierarchical Ingestion (`graphite ingest`):** Ingests Markdown, PDF, Plain Text, JSON, and CSV into structured `Document` $\to$ `Section` $\to$ `Chunk` hierarchies with automatic relationship synthesis.
-- **Embedded REST API (`graphite serve`):** Zero-dependency HTTP server with CORS providing endpoints for Python, TypeScript, Go, and web clients.
-
----
-
-## GraphRAG Architecture
-
-```text
-[User / Query Text]
-        │
-        ▼
-┌───────────────────────────────────────────────────────────┐
-│ Stage 1: Candidate Generation (Hybrid Search & RRF)       │
-│  ├─ SIMD AVX2 256-bit Cosine Vector Scan (Top-K Seeds)    │
-│  ├─ Inverted Index BM25 Lexical Scoring (Top-K Seeds)     │
-│  ├─ Seed Fusion via Reciprocal Rank Fusion (RRF k=60)     │
-│  └─ Multi-Hop BFS Relational Traversal over CSR Graph     │
-└─────────────────────────────┬─────────────────────────────┘
-                              │
-                    Top Candidates Subgraph
-                              │
-                              ▼
-┌───────────────────────────────────────────────────────────┐
-│ Stage 2: Prompt Synthesis & Token Budgeting               │
-│  ├─ Maximal Marginal Relevance (MMR) Redundancy Pruning   │
-│  ├─ Exact Token Budget Enforcement (BPE Tiktoken / O200k) │
-│  └─ Structured Markdown Context Generation for LLMs       │
-└───────────────────────────────────────────────────────────┘
+### Rust Library
+```bash
+cargo add graphite-db
 ```
 
 ---
 
-## Quickstart CLI Guide
+## Quickstart
 
-### 1. Ingest Document Acquis
+### Python
+
+```python
+import graphite_db as graphite
+
+# 1. Open or create database
+db = graphite.open("knowledge.graph")
+
+# 2. Ingest Markdown, PDF, text, or structured files
+db.ingest("./docs/manual.md")
+
+# 3. Query knowledge context (Auto-K and threshold enabled)
+result = db.query(
+    "How does authentication work?",
+    threshold=0.80,
+    top_k=5
+)
+
+print(result.markdown)
+
+# 4. Ingest direct text strings
+db.ingest(
+    text="User prefers concise answers in Portuguese",
+    title="UserPreferences"
+)
+```
+
+---
+
+### Command-Line Interface (CLI)
+
+#### 1. Ingest Documents or Direct Text
+Ingest single files, entire directories, or direct text strings into a `.graph` file:
 ```bash
+# Ingest directory/files
 graphite ingest ./docs -d knowledge.graph
+
+# Ingest direct text
+graphite ingest -t "System requires JWT RS256 authentication" -d knowledge.graph --title "SecurityPolicy"
 ```
 
-### 2. Query GraphRAG Context
+#### 2. Query Knowledge
+Query the database with automatic local embeddings, reranking, and dynamic Auto-K cutoff:
 ```bash
-graphite query "How does authentication work?" -d knowledge.graph --max-tokens 400 --top-k 5
+graphite query "How does authentication work?" -d knowledge.graph --threshold 0.80
 ```
 
-### 3. Record Facts & Rules
-```bash
-graphite remember "User prefers concise answers in Portuguese." -d knowledge.graph
-```
-
-### 4. Launch Embedded REST API
+#### 3. Start Local REST Server
+Launch the embedded HTTP server:
 ```bash
 graphite serve -d knowledge.graph --port 8080 --host 0.0.0.0
 ```
 
 ---
 
-## Docker & Container Deployment
+### REST API
 
-Run Graphite instantly via Docker or Docker Compose:
+When running `graphite serve`, interact via standard HTTP requests:
 
+#### Query Context
 ```bash
-docker run -d \
-  --name graphite-engine \
-  -p 8080:8080 \
-  -v graphite-data:/data \
-  ghcr.io/joaocardosodias/graphite:latest
+curl -X POST http://localhost:8080/v1/query \
+  -H "Content-Type: application/json" \
+  -d '{
+    "query": "How does authentication work?",
+    "threshold": 0.80,
+    "top_k_seeds": 5
+  }'
 ```
 
-Or using `docker compose`:
-
+#### Ingest Direct Text or Documents
 ```bash
-docker compose up -d
+# Ingest raw text
+curl -X POST http://localhost:8080/v1/ingest \
+  -H "Content-Type: application/json" \
+  -d '{
+    "text": "User prefers concise answers in Portuguese",
+    "title": "UserPreferences"
+  }'
+
+# Ingest file/folder path
+curl -X POST http://localhost:8080/v1/ingest \
+  -H "Content-Type: application/json" \
+  -d '{
+    "path": "./docs"
+  }'
+```
+```bash
+curl -X POST http://localhost:8080/v1/ingest \
+  -H "Content-Type: application/json" \
+  -d '{
+    "path": "./docs"
+  }'
+```
+
+#### Health Check
+```bash
+curl http://localhost:8080/health
 ```
 
 ---
 
-## Rust SDK Example
-
-Add `graphite-db` to your `Cargo.toml`:
-
-```toml
-[dependencies]
-graphite-db = "0.1"
-```
+### Rust Library
 
 ```rust
 use graphite::prelude::*;
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
-    // 1. Initialize engine
+    // 1. Initialize database
     let config = GraphiteConfig::new()
         .with_dim(384)
-        .with_max_tokens(500);
+        .with_threshold(0.75);
 
     let db = Graphite::open_or_create("knowledge.graph", config)?;
 
-    // 2. Ingest nodes with dense embeddings
-    let v_titan = vec![0.05f32; 384];
-    let v_ana = vec![0.048f32; 384];
+    // 2. Insert entities with optional embeddings
+    let v_auth = vec![0.05f32; 384];
+    let v_db = vec![0.048f32; 384];
 
-    let id_titan = db.upsert_node("Project Titan", "Project", "Generative AI Core", Some(&v_titan))?;
-    let id_ana = db.upsert_node("Ana Silva", "Person", "Lead Architect", Some(&v_ana))?;
+    let id_auth = db.upsert_node("AuthService", "Module", "Handles user authentication", Some(&v_auth))?;
+    let id_db = db.upsert_node("UsersDB", "Database", "Stores user profiles and credentials", Some(&v_db))?;
 
-    // 3. Create relational edge
-    db.add_edge(id_ana, id_titan, "LEADS", 0.95, true)?;
+    // 3. Connect entities with relationships
+    db.add_edge(id_auth, id_db, "QUERIES", 0.95, true)?;
     db.flush()?;
 
-    // 4. Retrieve token-budgeted GraphRAG prompt context
+    // 4. Retrieve context
     let query_vector = vec![0.05f32; 384];
-    let result = db.retrieve_context(&query_vector, Some(QueryOptions::default().with_max_tokens(400)))?;
+    let options = QueryOptions::default().with_threshold(0.75).with_auto_k(0.85);
+    let result = db.retrieve_context(&query_vector, Some(options))?;
 
-    println!("Context ({} tokens):\n{}", result.token_count, result.markdown);
+    println!("Context:\n{}", result.markdown);
     Ok(())
 }
 ```
 
 ---
 
-## Benchmarks
+## CLI Command Reference
 
-| Benchmark Metric | Scale | Latency / Performance | Speedup vs Baseline |
-| :--- | :--- | :--- | :--- |
-| **SIMD AVX2 Cosine (384-Dim)** | `MiniLM-L6` | **42 ns** (23.8M dist/s) | **7.02x faster** |
-| **SQ8 Quantization Memory** | 100,000 Vectors | **37.4 MB RAM** | **-74.5% memory** |
-| **CSR BFS Graph Traversal** | 5k Nodes / 15k Edges (2 Hops) | **4.8 µs** | 0 heap allocations |
-| **End-to-End GraphRAG Pipeline** | Vector + BM25 + CSR + MMR | **280 µs** (0.28 ms) | Sub-millisecond |
+| Command | Description | Example |
+| :--- | :--- | :--- |
+| `graphite init [path]` | Initialize a new `.graph` database with interactive setup | `graphite init knowledge.graph` |
+| `graphite ingest [path] [-t <text>]` | Ingest Markdown, PDF, text, JSON, CSV, or direct text string | `graphite ingest ./docs -d knowledge.graph`<br>`graphite ingest -t "Raw text..." -d knowledge.graph` |
+| `graphite query <text>` | Query knowledge context with reranking and Auto-K | `graphite query "auth flow" -d knowledge.graph --threshold 0.80` |
+| `graphite serve` | Start the embedded HTTP REST API server | `graphite serve -d knowledge.graph --port 8080` |
+| `graphite dump` | Export database nodes, edges, and statistics | `graphite dump -d knowledge.graph` |
+| `graphite doctor` | Verify system dependencies, GPU acceleration, and environment | `graphite doctor` |
 
 ---
 
-## Workspace Layout
+## Python API Reference
 
-- [`crates/graphite`](crates/graphite/): Pure Rust embedded storage engine, zero-copy mmap reader, SIMD AVX2 kernels, SQ8 quantization, CSR graph topology, BM25, and MMR token budgeting (`graphite-db`).
-- [`crates/graphite-cli`](crates/graphite-cli/): The `graphite` command-line executable, multi-format document chunker, and embedded REST API server (`graphite-db-cli`).
+### Database Initialization
+- `graphite.open(path="knowledge.graph", dim=384, metric="cosine", quantization="sq8", device="auto")`: Opens or creates a database file.
+- `graphite.in_memory(dim=384, metric="cosine", quantization="sq8", device="auto")`: Creates an ephemeral in-memory database.
+
+### Methods
+- `db.ingest(source: str = None, text: str = None, title: str = "DirectInput") -> int`: Ingests files, directories, or direct text strings.
+- `db.query(text: str, top_k: int = 10, threshold: float = None, relative_drop_off: float = 0.85, max_depth: int = None) -> QueryResult`: Queries the knowledge graph using plain text.
+- `db.upsert_node(name: str, node_type: str, description: str, embedding: list[float] = None) -> int`: Manually inserts or updates a node.
+- `db.add_edge(source_id: int, target_id: int, relation: str, weight: float = 1.0, bidirectional: bool = True)`: Adds a relationship between nodes.
+- `db.retrieve_context(vector: list[float], query_text: str = None, top_k: int = 10, threshold: float = None, relative_drop_off: float = 0.85) -> QueryResult`: Low-level retrieval with raw query vectors.
+- `db.flush()`: Persists all pending in-memory mutations to disk.
+- `db.close()`: Flushes and releases all database locks.
+
+---
+
+## Query & Retrieval Tuning
+
+| Parameter | Purpose | Typical Values |
+| :--- | :--- | :--- |
+| `threshold` / `min_score` | Minimum relevance score required for an entity to be included. | `0.80` - `0.90` (Strict/Exact)<br>`0.65` - `0.79` (Broad) |
+| `relative_drop_off` / `auto_k` | Auto-K cutoff ratio. Discards candidates that drop below $\text{top\_score} \times \text{drop\_off}$. | `0.85` (Default: within 15% of top match)<br>`0.90` (Strict top group) |
+| `top_k` | Upper bound ceiling of candidates evaluated before Auto-K filtering. | `5` - `20` |
+| `max_depth` | Multi-hop graph exploration depth in relations (BFS hops). | `1` - `2` |
+| `device` | Hardware acceleration backend for local embedding and reranking. | `auto`, `cuda`, `cpu` |
+
+---
+
+## Docker Deployment
+
+### Run Container
+```bash
+docker run -d \
+  --name graphite-server \
+  -p 8080:8080 \
+  -v graphite-data:/data \
+  ghcr.io/joaocardosodias/graphite:latest
+```
+
+### Docker Compose
+```yaml
+services:
+  graphite:
+    image: ghcr.io/joaocardosodias/graphite:latest
+    container_name: graphite-server
+    restart: unless-stopped
+    ports:
+      - "8080:8080"
+    volumes:
+      - ./data:/data
+    environment:
+      - GRAPHITE_DB_PATH=/data/knowledge.graph
+      - GRAPHITE_PORT=8080
+      - GRAPHITE_HOST=0.0.0.0
+```
 
 ---
 

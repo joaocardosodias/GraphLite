@@ -70,12 +70,53 @@ def _chunk_text(text: str, chunk_size: int = 400, overlap: int = 50) -> List[Dic
     return chunks
 
 
-def ingest(self, path: str, chunk_size: int = 400, overlap: int = 50, batch_size: int = 64) -> int:
+def ingest(
+    self,
+    source: str = None,
+    text: str = None,
+    title: str = "DirectInput",
+    chunk_size: int = 400,
+    overlap: int = 50,
+    batch_size: int = 64,
+) -> int:
     """
-    Ingesta um arquivo (.md, .txt, .pdf) ou diretorio diretamente no banco.
+    Ingesta um arquivo (.md, .txt, .pdf), diretorio, ou texto direto no banco.
     Gera embeddings locais e constroi as conexoes no grafo automaticamente.
     """
-    if not os.path.exists(path):
+    raw_text = text
+    if raw_text is None and source is not None:
+        if not os.path.exists(source) and (len(source) > 200 or "\n" in source or not any(source.endswith(ext) for ext in [".md", ".txt", ".pdf", ".json", ".csv", ".yaml", ".yml", ".graph"])):
+            raw_text = source
+
+    if raw_text is not None:
+        chunks = _chunk_text(raw_text, chunk_size=chunk_size, overlap=overlap)
+        if not chunks:
+            chunks = [{"title": title, "content": raw_text}]
+
+        total_ingested = 0
+        for i in range(0, len(chunks), batch_size):
+            batch = chunks[i:i + batch_size]
+            textos = [c["content"] for c in batch]
+            vetores = embed_batch(textos)
+
+            prev_id = None
+            for c, v in zip(batch, vetores):
+                node_id = self.insert(
+                    name=c["title"],
+                    entity_type="TextDocument",
+                    description=c["content"],
+                    vector=v
+                )
+                if prev_id is not None:
+                    self.add_edge(prev_id, node_id, "SEQUENCIA_DE", 0.9, True)
+                prev_id = node_id
+                total_ingested += 1
+
+        self.flush()
+        return total_ingested
+
+    path = source
+    if not path or not os.path.exists(path):
         raise FileNotFoundError(f"Arquivo ou diretorio nao encontrado: {path}")
 
     files_to_process = []
@@ -90,20 +131,20 @@ def ingest(self, path: str, chunk_size: int = 400, overlap: int = 50, batch_size
     total_ingested = 0
 
     for fpath in files_to_process:
-        text = ""
+        content = ""
         if fpath.endswith(".pdf"):
             try:
                 from pypdf import PdfReader
                 reader = PdfReader(fpath)
-                text = "\n".join([p.extract_text() or "" for p in reader.pages])
+                content = "\n".join([p.extract_text() or "" for p in reader.pages])
             except ImportError:
                 raise ImportError("Instale pypdf para ingerir arquivos PDF: pip install pypdf")
         else:
             import builtins
             with builtins.open(fpath, "r", encoding="utf-8", errors="ignore") as f:
-                text = f.read()
+                content = f.read()
 
-        chunks = _chunk_text(text, chunk_size=chunk_size, overlap=overlap)
+        chunks = _chunk_text(content, chunk_size=chunk_size, overlap=overlap)
         if not chunks:
             continue
 

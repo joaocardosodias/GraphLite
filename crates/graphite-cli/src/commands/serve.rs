@@ -31,15 +31,10 @@ pub struct QueryRequest {
 }
 
 #[derive(Debug, Deserialize)]
-pub struct RememberRequest {
-    pub text: String,
-    pub category: Option<String>,
-    pub relate_to: Option<String>,
-}
-
-#[derive(Debug, Deserialize)]
 pub struct IngestRequest {
-    pub path: String,
+    pub path: Option<String>,
+    pub text: Option<String>,
+    pub title: Option<String>,
     pub chunk_size: Option<usize>,
     pub chunk_overlap: Option<usize>,
     pub extensions: Option<String>,
@@ -168,8 +163,7 @@ pub fn execute_serve(db_path: &Path, args: &ServeArgs) -> Result<()> {
     println!("  * Endpoints:");
     println!("    - GET  /v1/health   -> Check server & database stats");
     println!("    - POST /v1/query    -> GraphRAG context retrieval");
-    println!("    - POST /v1/remember -> Store agent memory / facts");
-    println!("    - POST /v1/ingest   -> Ingest documents on demand");
+    println!("    - POST /v1/ingest   -> Ingest documents or direct text");
     println!("========================================================");
     println!("Listening for requests... (Press Ctrl+C to stop)\n");
 
@@ -273,115 +267,101 @@ pub fn execute_serve(db_path: &Path, args: &ServeArgs) -> Result<()> {
                 }
             }
 
-            (Method::Post, "/v1/remember") | (Method::Post, "/remember") => {
-                match serde_json::from_slice::<RememberRequest>(&body_bytes) {
-                    Ok(req) => {
-                        let text = req.text.trim();
-                        if text.is_empty() {
-                            json_response(&json!({"error": "Memory text cannot be empty"}), 400)
-                        } else {
-                            let category =
-                                req.category.unwrap_or_else(|| "AgentMemory".to_string());
-                            match embedder_clone.embed_one(text) {
-                                Ok(vector) => {
-                                    let eng = engine_clone.write();
-                                    let preview: String = text.chars().take(40).collect();
-                                    let memory_name = format!("{}: {}", category, preview.trim());
-
-                                    match eng.upsert_node(
-                                        &memory_name,
-                                        &category,
-                                        text,
-                                        Some(&vector),
-                                    ) {
-                                        Ok(node_id) => {
-                                            if let Some(ref rel_name) = req.relate_to {
-                                                if let Some(target) = eng.get_node_by_name(rel_name)
-                                                {
-                                                    let _ = eng.add_edge(
-                                                        node_id,
-                                                        target.id,
-                                                        "RELATES_TO",
-                                                        0.90,
-                                                        true,
-                                                    );
-                                                }
-                                            }
-                                            let _ = eng.flush();
-                                            json_response(
-                                                &json!({
-                                                    "status": "success",
-                                                    "node_id": node_id.as_u32(),
-                                                    "name": memory_name,
-                                                    "category": category,
-                                                    "total_nodes": eng.node_count(),
-                                                }),
-                                                201,
-                                            )
-                                        }
-                                        Err(e) => json_response(
-                                            &json!({"error": format!("Storage failed: {}", e)}),
-                                            500,
-                                        ),
-                                    }
-                                }
-                                Err(e) => json_response(
-                                    &json!({"error": format!("Embedding failed: {}", e)}),
-                                    500,
-                                ),
-                            }
-                        }
-                    }
-                    Err(e) => json_response(
-                        &json!({"error": format!("Invalid JSON payload: {}", e)}),
-                        400,
-                    ),
-                }
-            }
-
             (Method::Post, "/v1/ingest") | (Method::Post, "/ingest") => {
                 match serde_json::from_slice::<IngestRequest>(&body_bytes) {
                     Ok(req) => {
-                        let ingest_args = IngestArgs {
-                            path: std::path::PathBuf::from(&req.path),
-                            chunk_size: req.chunk_size.unwrap_or(350),
-                            chunk_overlap: req.chunk_overlap.unwrap_or(40),
-                            extensions: req.extensions,
-                            max_files: 1000,
-                            watch: false,
-                            force: req.force.unwrap_or(false),
-                            device: args.device,
-                            no_tmp: false,
-                        };
-
                         let start = Instant::now();
-                        match run_ingest_pass(&db_path_buf, &ingest_args, &embedder_clone, false) {
-                            Ok(modified) => {
-                                if modified {
+
+                        // Direct text ingestion
+                        if let Some(ref text) = req.text {
+                            let title = req.title.unwrap_or_else(|| "DirectInput".to_string());
+                            let chunk_size = req.chunk_size.unwrap_or(350);
+                            let chunk_overlap = req.chunk_overlap.unwrap_or(40);
+
+                            match crate::ingestion::ingest_direct_text(
+                                &db_path_buf,
+                                text,
+                                &title,
+                                chunk_size,
+                                chunk_overlap,
+                                false,
+                                &embedder_clone,
+                            ) {
+                                Ok(chunks_count) => {
                                     let new_cfg = load_or_default_config(&db_path_buf);
                                     if let Ok(new_eng) =
                                         GraphiteEngine::open_or_create(&db_path_buf, new_cfg)
                                     {
                                         *engine_clone.write() = new_eng;
                                     }
+                                    let eng = engine_clone.read();
+                                    let elapsed = start.elapsed().as_secs_f64() * 1000.0;
+                                    json_response(
+                                        &json!({
+                                            "status": "success",
+                                            "type": "text",
+                                            "chunks_created": chunks_count,
+                                            "total_nodes": eng.node_count(),
+                                            "total_edges": eng.edge_count(),
+                                            "elapsed_ms": (elapsed * 100.0).round() / 100.0,
+                                        }),
+                                        200,
+                                    )
                                 }
-                                let eng = engine_clone.read();
-                                let elapsed = start.elapsed().as_secs_f64() * 1000.0;
-                                json_response(
-                                    &json!({
-                                        "status": "success",
-                                        "modified": modified,
-                                        "total_nodes": eng.node_count(),
-                                        "total_edges": eng.edge_count(),
-                                        "elapsed_ms": (elapsed * 100.0).round() / 100.0,
-                                    }),
-                                    200,
-                                )
+                                Err(e) => json_response(
+                                    &json!({"error": format!("Direct text ingestion failed: {}", e)}),
+                                    500,
+                                ),
                             }
-                            Err(e) => json_response(
-                                &json!({"error": format!("Ingestion failed: {}", e)}),
-                                500,
-                            ),
+                        } else if let Some(ref path_str) = req.path {
+                            let ingest_args = IngestArgs {
+                                path: Some(std::path::PathBuf::from(path_str)),
+                                text: None,
+                                title: req.title.unwrap_or_else(|| "DirectInput".to_string()),
+                                chunk_size: req.chunk_size.unwrap_or(350),
+                                chunk_overlap: req.chunk_overlap.unwrap_or(40),
+                                extensions: req.extensions,
+                                max_files: 1000,
+                                watch: false,
+                                force: req.force.unwrap_or(false),
+                                device: args.device,
+                                no_tmp: false,
+                            };
+
+                            match run_ingest_pass(&db_path_buf, &ingest_args, &embedder_clone, false) {
+                                Ok(modified) => {
+                                    if modified {
+                                        let new_cfg = load_or_default_config(&db_path_buf);
+                                        if let Ok(new_eng) =
+                                            GraphiteEngine::open_or_create(&db_path_buf, new_cfg)
+                                        {
+                                            *engine_clone.write() = new_eng;
+                                        }
+                                    }
+                                    let eng = engine_clone.read();
+                                    let elapsed = start.elapsed().as_secs_f64() * 1000.0;
+                                    json_response(
+                                        &json!({
+                                            "status": "success",
+                                            "type": "files",
+                                            "modified": modified,
+                                            "total_nodes": eng.node_count(),
+                                            "total_edges": eng.edge_count(),
+                                            "elapsed_ms": (elapsed * 100.0).round() / 100.0,
+                                        }),
+                                        200,
+                                    )
+                                }
+                                Err(e) => json_response(
+                                    &json!({"error": format!("Ingestion failed: {}", e)}),
+                                    500,
+                                ),
+                            }
+                        } else {
+                            json_response(
+                                &json!({"error": "Request must include either 'path' (file/folder) or 'text' (raw string)"}),
+                                400,
+                            )
                         }
                     }
                     Err(e) => json_response(
