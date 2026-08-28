@@ -133,7 +133,7 @@ fn test_large_scale_storage_roundtrip_fidelity() {
 #[test]
 fn test_forced_corruption_and_checksum_verification() {
     let dir = tempdir().unwrap();
-    let db_path = dir.path().join("corrupt_test.graphite");
+    let db_path = dir.path().join("corrupt_test.graph");
 
     let mut interner = StringInterner::new();
     let s0 = interner.intern("Nó Seguro");

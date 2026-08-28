@@ -23,10 +23,10 @@ fn get_render_config() -> RenderConfig<'static> {
 pub fn run_interactive_wizard(default_path: &Path) -> Result<(PathBuf, GraphiteConfig)> {
     let render_config = get_render_config();
 
-    // 1. Target file path with automatic .graphite extension
+    // 1. Target file path with automatic .graph extension
     let default_path_str = default_path
         .to_str()
-        .unwrap_or("knowledge.graphite")
+        .unwrap_or("graphite.graph")
         .to_string();
 
     let path_input = Text::new("Database path:")
@@ -35,8 +35,8 @@ pub fn run_interactive_wizard(default_path: &Path) -> Result<(PathBuf, GraphiteC
         .prompt()?;
 
     let mut raw_path = path_input.trim().to_string();
-    if !raw_path.is_empty() && !raw_path.ends_with(".graphite") && !raw_path.ends_with(".graph") {
-        raw_path.push_str(".graphite");
+    if !raw_path.is_empty() && !raw_path.ends_with(".graph") && !raw_path.ends_with(".graphite") {
+        raw_path.push_str(".graph");
     }
 
     let db_path = PathBuf::from(raw_path);

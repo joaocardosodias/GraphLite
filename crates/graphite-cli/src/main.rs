@@ -17,9 +17,9 @@ use ingestion::execute_ingest;
 
 fn normalize_db_path(path: &std::path::Path) -> std::path::PathBuf {
     let s = path.to_string_lossy();
-    if !s.ends_with(".graphite") && !s.ends_with(".graph") {
+    if !s.ends_with(".graph") && !s.ends_with(".graphite") {
         let mut p = path.to_path_buf();
-        p.set_extension("graphite");
+        p.set_extension("graph");
         p
     } else {
         path.to_path_buf()

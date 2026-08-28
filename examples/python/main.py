@@ -6,7 +6,7 @@ sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "../.
 
 import graphite_db as graphite
 
-db_path = os.path.join(os.path.dirname(__file__), "codigo_penal.graphite")
+db_path = os.path.join(os.path.dirname(__file__), "codigo_penal.graph")
 md_path = os.path.join(os.path.dirname(__file__), "codigo_penal.md")
 
 # 1. Ingestao automatica apenas se o banco ainda nao existir no disco

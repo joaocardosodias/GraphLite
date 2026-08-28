@@ -15,10 +15,9 @@
   <a href="https://crates.io/crates/graphite-db"><img src="https://img.shields.io/crates/v/graphite-db.svg?color=black" alt="Crates.io" /></a>
   <a href="https://docs.rs/graphite-db"><img src="https://img.shields.io/docsrs/graphite-db?color=black" alt="Documentation" /></a>
   <a href="https://github.com/joaocardosodias/Graphite/blob/main/LICENSE"><img src="https://img.shields.io/badge/License-MIT%20OR%20Apache--2.0-black.svg" alt="License" /></a>
-  <a href="https://joaocardosodias.github.io/Graphite"><img src="https://img.shields.io/badge/docs-fumadocs-black.svg" alt="Documentation Site" /></a>
 </p>
 
-> **Graphite DB** is a high-performance, embedded database engine for GraphRAG and AI agent memory. It combines Compressed Sparse Row (CSR) graph topology, SIMD AVX2 vector distance kernels, BM25 inverted lexical indexing, and token-budgeted prompt synthesis into a single, zero-dependency `.graphite` binary file with zero-copy memory mapping (`mmap`).
+> **Graphite DB** is a high-performance, embedded database engine for GraphRAG and AI agent memory. It combines Compressed Sparse Row (CSR) graph topology, SIMD AVX2 vector distance kernels, BM25 inverted lexical indexing, and token-budgeted prompt synthesis into a single, zero-dependency `.graph` binary file with zero-copy memory mapping (`mmap`).
 
 ---
 
@@ -49,7 +48,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         .with_dim(384)
         .with_max_tokens(400);
 
-    let db = Graphite::open_or_create("knowledge.graphite", config)?;
+    let db = Graphite::open_or_create("knowledge.graph", config)?;
 
     // 2. Ingest entities with dense embedding vectors
     let v_auth = vec![0.05f32; 384];
@@ -101,7 +100,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let query_vector = embedder.embed_one("How does authentication work?")?;
 
     // 2. Query database
-    let db = Graphite::open_or_create("knowledge.graphite", GraphiteConfig::default())?;
+    let db = Graphite::open_or_create("knowledge.graph", GraphiteConfig::default())?;
     let result = db.retrieve_context(&query_vector, None)?;
 
     println!("{}", result.markdown);
@@ -113,7 +112,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
 ## Technical Highlights
 
-- **Single-File Zero-Copy Storage:** Graph topology, Int8 scalar-quantized vectors (SQ8), BM25 inverted indices, and interned string tables packed into a single `.graphite` file mapped directly via `memmap2`.
+- **Single-File Zero-Copy Storage:** Graph topology, Int8 scalar-quantized vectors (SQ8), BM25 inverted indices, and interned string tables packed into a single `.graph` file mapped directly via `memmap2`.
 - **Sub-Millisecond Hybrid Retrieval:** Fuses SIMD AVX2 cosine distance with inverted BM25 lexical ranking via Reciprocal Rank Fusion (RRF with $k=60$).
 - **Multi-Hop Relational Traversal:** High-speed BFS traversal over CSR buffers with $O(1)$-cycle bitset deduplication.
 - **Token Budgeting & MMR:** Enforces exact token limits with BPE Tiktoken while pruning semantic redundancy via Maximal Marginal Relevance.

@@ -133,14 +133,14 @@ Graphite = _NativeGraphite
 
 
 def open(
-    path: str = "knowledge.graphite",
+    path: str = "knowledge.graph",
     dim: int = 384,
     max_tokens: int = 400,
     metric: str = "cosine",
     quantization: str = "sq8",
 ) -> Graphite:
     """
-    Abre ou cria um arquivo de banco de dados `.graphite`.
+    Abre ou cria um arquivo de banco de dados `.graph`.
     """
     return Graphite.open(
         path=path,

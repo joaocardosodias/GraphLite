@@ -22,18 +22,9 @@ target
 examples/.fastembed_cache/
 
 
-# Example artifacts
+# Example database artifacts
+*.graph
 *.graphite
-
-# Docs / Next.js
-docs/node_modules/
-docs/.next/
-docs/out/
-docs/.source/
-docs/.turbo/
-.agents/skills/
-.claude/skills/
-skills-lock.json
 
 # Python & Maturin
 *.so

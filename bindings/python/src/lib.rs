@@ -134,7 +134,7 @@ impl PyGraphite {
         })
     }
 
-    /// Opens an existing or new `.graphite` database file.
+    /// Opens an existing or new `.graph` database file.
     #[staticmethod]
     #[pyo3(signature = (path, dim = 384, max_tokens = 400, metric = "cosine", quantization = "sq8", device = "auto"))]
     fn open(

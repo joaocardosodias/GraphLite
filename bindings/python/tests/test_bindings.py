@@ -41,7 +41,7 @@ def test_in_memory_basic_lifecycle():
 
 def test_disk_backed_persistence():
     with tempfile.TemporaryDirectory() as tmpdir:
-        db_path = os.path.join(tmpdir, "test.graphite")
+        db_path = os.path.join(tmpdir, "test.graph")
         
         # 1. Create and populate
         db = graphite.open(db_path, dim=4, max_tokens=400)

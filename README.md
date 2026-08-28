@@ -15,10 +15,9 @@
   <a href="LICENSE"><img src="https://img.shields.io/badge/License-MIT%20OR%20Apache--2.0-black.svg" alt="License" /></a>
   <a href="https://crates.io/crates/graphite-db"><img src="https://img.shields.io/crates/v/graphite-db.svg?color=black" alt="Crates.io" /></a>
   <a href="https://github.com/joaocardosodias/Graphite/actions"><img src="https://img.shields.io/badge/CI-passing-black.svg" alt="CI Status" /></a>
-  <a href="https://joaocardosodias.github.io/Graphite"><img src="https://img.shields.io/badge/docs-fumadocs-black.svg" alt="Documentation" /></a>
 </p>
 
-> **Graphite** combines Knowledge Graphs (CSR), SIMD Vector Search (AVX2), BM25 Lexical Indexing, and Cross-Encoder Reranking into a single, zero-dependency `.graphite` binary file with zero-copy memory-mapped virtual memory (`mmap`).
+> **Graphite** combines Knowledge Graphs (CSR), SIMD Vector Search (AVX2), BM25 Lexical Indexing, and Cross-Encoder Reranking into a single, zero-dependency `.graph` binary file with zero-copy memory-mapped virtual memory (`mmap`).
 
 ---
 
@@ -43,7 +42,7 @@ cargo install graphite-db-cli
 
 ## Key Highlights
 
-- **Single-File Zero-Copy Storage (`.graphite`):** Compressed Sparse Row (CSR) graph topology, scalar-quantized vectors (SQ8), inverted lexical index (BM25), and string tables packed into a single binary file with CRC32 integrity verification and atomic safe rename commits.
+- **Single-File Zero-Copy Storage (`.graph`):** Compressed Sparse Row (CSR) graph topology, scalar-quantized vectors (SQ8), inverted lexical index (BM25), and string tables packed into a single binary file with CRC32 integrity verification and atomic safe rename commits.
 - **Sub-Millisecond Hybrid Retrieval (RRF):** Fuses SIMD-accelerated 256-bit AVX2 cosine distance with inverted BM25 lexical ranking via Reciprocal Rank Fusion (RRF with $k=60$).
 - **Multi-Hop Relational Graph Traversal:** Instantaneous BFS traversal over contiguous memory-mapped CSR buffers with $O(1)$-cycle visited node deduplication (`DenseNodeBitSet`).
 - **Token-Budgeted Context Synthesis (MMR):** Enforces strict prompt token limits (via BPE Tiktoken `cl100k_base` and `o200k_base`) while eliminating redundant chunks via Maximal Marginal Relevance ($\lambda = 0.75$).
@@ -83,22 +82,22 @@ cargo install graphite-db-cli
 
 ### 1. Ingest Document Acquis
 ```bash
-graphite ingest ./docs -d knowledge.graphite
+graphite ingest ./docs -d knowledge.graph
 ```
 
 ### 2. Query GraphRAG Context
 ```bash
-graphite query "How does authentication work?" -d knowledge.graphite --max-tokens 400 --top-k 5
+graphite query "How does authentication work?" -d knowledge.graph --max-tokens 400 --top-k 5
 ```
 
 ### 3. Record Facts & Rules
 ```bash
-graphite remember "User prefers concise answers in Portuguese." -d knowledge.graphite
+graphite remember "User prefers concise answers in Portuguese." -d knowledge.graph
 ```
 
 ### 4. Launch Embedded REST API
 ```bash
-graphite serve -d knowledge.graphite --port 8080 --host 0.0.0.0
+graphite serve -d knowledge.graph --port 8080 --host 0.0.0.0
 ```
 
 ---
@@ -121,7 +120,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         .with_dim(384)
         .with_max_tokens(500);
 
-    let db = Graphite::open_or_create("knowledge.graphite", config)?;
+    let db = Graphite::open_or_create("knowledge.graph", config)?;
 
     // 2. Ingest nodes with dense embeddings
     let v_titan = vec![0.05f32; 384];

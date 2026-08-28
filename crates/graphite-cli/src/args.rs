@@ -15,7 +15,7 @@ pub struct Cli {
     #[arg(
         short = 'd',
         long = "db",
-        default_value = "graphite.graphite",
+        default_value = "graphite.graph",
         global = true,
         help = "Path to the target .graph database file"
     )]

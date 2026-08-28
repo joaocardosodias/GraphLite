@@ -14,10 +14,9 @@
 <p align="center">
   <a href="https://pypi.org/project/graphite-database"><img src="https://img.shields.io/pypi/v/graphite-db.svg?color=black" alt="PyPI" /></a>
   <a href="https://github.com/joaocardosodias/Graphite/blob/main/LICENSE"><img src="https://img.shields.io/badge/License-MIT%20OR%20Apache--2.0-black.svg" alt="License" /></a>
-  <a href="https://joaocardosodias.github.io/Graphite"><img src="https://img.shields.io/badge/docs-fumadocs-black.svg" alt="Documentation" /></a>
 </p>
 
-> **Graphite DB** combines Knowledge Graphs, SIMD AVX2 Vector Search, BM25 Lexical Indexing, and Token-Budgeted Context Synthesis into a single-file `.graphite` database with zero-copy memory mapping.
+> **Graphite DB** combines Knowledge Graphs, SIMD AVX2 Vector Search, BM25 Lexical Indexing, and Token-Budgeted Context Synthesis into a single-file `.graph` database with zero-copy memory mapping.
 
 ---
 
@@ -35,7 +34,7 @@ pip install graphite-database
 import graphite_db as graphite
 
 # 1. Open or create an embedded database
-db = graphite.open("knowledge.graphite", dim=384, max_tokens=400)
+db = graphite.open("knowledge.graph", dim=384, max_tokens=400)
 
 # 2. Insert entities and create connections
 id_auth = db.insert("AuthService", entity_type="Module", description="Validates JWT tokens")
