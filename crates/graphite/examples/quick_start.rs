@@ -13,7 +13,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("============================================================\n");
 
     // 1. Initialize an in-memory database with 4-dimensional vectors
-    let config = GraphiteConfig::new().with_dim(4).with_max_tokens(400);
+    let config = GraphiteConfig::new().with_dim(4).with_threshold(0.70);
 
     let db = Graphite::in_memory(config)?;
 
@@ -47,7 +47,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     // 4. Query knowledge context
     let query_vector = [0.98, 0.02, 0.0, 0.0];
-    let options = QueryOptions::default().with_max_tokens(300);
+    let options = QueryOptions::default().with_threshold(0.70);
     let result = db.retrieve_context(&query_vector, Some(options))?;
 
     println!("Retrieved tokens: {}", result.token_count);

@@ -161,7 +161,7 @@ pub fn execute_query(db_path: &Path, args: &QueryArgs, verbose: bool) -> Result<
         },
         markdown_style: MarkdownStyle::Hierarchical,
         max_depth: args.depth,
-        min_score_threshold: None,
+        min_score_threshold: if is_reranking { None } else { args.threshold },
         alpha: args.alpha,
         relative_drop_off: if is_reranking { None } else { Some(0.60) },
         redundancy_threshold: if is_reranking { None } else { Some(0.82) },
@@ -216,10 +216,14 @@ pub fn execute_query(db_path: &Path, args: &QueryArgs, verbose: bool) -> Result<
             if !candidate_docs.is_empty() {
                 let rerank_res = reranker.rerank(q_text, &candidate_docs)?;
                 let top_score = rerank_res.first().map(|r| r.score).unwrap_or(0.0);
+                let threshold_val = args.threshold.unwrap_or(0.0);
                 let mut reranked_entities = Vec::new();
                 for (rank, r) in rerank_res.into_iter().enumerate() {
-                    // Always preserve the top candidate; filter out subsequent low-confidence items
-                    if rank > 0 && r.score < top_score * 0.30 {
+                    // Enforce user-defined threshold and relative dropoff
+                    if r.score < threshold_val {
+                        continue;
+                    }
+                    if rank > 0 && r.score < top_score * 0.40 {
                         continue;
                     }
                     if r.index < valid_indices.len() {
@@ -249,7 +253,7 @@ pub fn execute_query(db_path: &Path, args: &QueryArgs, verbose: bool) -> Result<
                     seed_ids: Vec::new(),
                 };
 
-                let token_budget = args.tokens.unwrap_or(engine.config().default_max_tokens);
+                let token_budget = args.tokens.unwrap_or(usize::MAX);
                 let token_counter = graphite::TiktokenCounter::cl100k();
                 let pruned = graphite::prune_subgraph_by_budget_mmr(
                     &connected_subgraph,

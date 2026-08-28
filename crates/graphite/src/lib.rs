@@ -23,7 +23,7 @@
 //!
 //! fn main() -> Result<(), Box<dyn std::error::Error>> {
 //!     // 1. Initialize an in-memory Graphite instance with 4-dimensional vectors
-//!     let config = GraphiteConfig::new().with_dim(4).with_max_tokens(500);
+//!     let config = GraphiteConfig::new().with_dim(4).with_threshold(0.70);
 //!     let db = GraphiteEngine::in_memory(config)?;
 //!
 //!     // 2. Ingest entities with optional embeddings

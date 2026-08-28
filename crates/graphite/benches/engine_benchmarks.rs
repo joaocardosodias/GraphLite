@@ -128,7 +128,7 @@ fn bench_end_to_end_retrieve_context(c: &mut Criterion) {
         .with_dim(384)
         .with_metric(Metric::Cosine)
         .with_quantization(Quantization::ScalarInt8)
-        .with_max_tokens(1500)
+        .with_threshold(0.70)
         .with_auto_flush(false);
 
     let engine = GraphiteEngine::open_or_create(&db_path, config).unwrap();

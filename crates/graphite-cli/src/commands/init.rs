@@ -111,7 +111,6 @@ pub fn execute_init(db_path: &Path, args: &InitArgs) -> Result<()> {
         .with_quantization(quantization)
         .with_models(emb_type.id(), rerank_type.id())
         .with_device(args.device.into())
-        .with_max_tokens(args.max_tokens)
         .with_auto_flush(true);
 
     let engine = GraphiteEngine::open_or_create(db_path, config)?;

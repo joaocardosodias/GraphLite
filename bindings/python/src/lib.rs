@@ -72,11 +72,10 @@ pub struct PyGraphite {
 impl PyGraphite {
     /// Creates or opens a Graphite database.
     #[new]
-    #[pyo3(signature = (path = None, dim = 384, max_tokens = 400, metric = "cosine", quantization = "sq8", device = "auto"))]
+    #[pyo3(signature = (path = None, dim = 384, metric = "cosine", quantization = "sq8", device = "auto"))]
     fn new(
         path: Option<String>,
         dim: usize,
-        max_tokens: usize,
         metric: &str,
         quantization: &str,
         device: &str,
@@ -109,7 +108,6 @@ impl PyGraphite {
 
         let config = GraphiteConfig::new()
             .with_dim(dim)
-            .with_max_tokens(max_tokens)
             .with_metric(metric_enum)
             .with_quantization(quant_enum)
             .with_device(device_type);
@@ -136,37 +134,38 @@ impl PyGraphite {
 
     /// Opens an existing or new `.graph` database file.
     #[staticmethod]
-    #[pyo3(signature = (path, dim = 384, max_tokens = 400, metric = "cosine", quantization = "sq8", device = "auto"))]
+    #[pyo3(signature = (path, dim = 384, metric = "cosine", quantization = "sq8", device = "auto"))]
     fn open(
         path: String,
         dim: usize,
-        max_tokens: usize,
         metric: &str,
         quantization: &str,
         device: &str,
     ) -> PyResult<Self> {
-        Self::new(Some(path), dim, max_tokens, metric, quantization, device)
+        Self::new(Some(path), dim, metric, quantization, device)
     }
 
     /// Creates an in-memory ephemeral Graphite instance.
     #[staticmethod]
-    #[pyo3(signature = (dim = 384, max_tokens = 400, metric = "cosine", quantization = "sq8", device = "auto"))]
+    #[pyo3(signature = (dim = 384, metric = "cosine", quantization = "sq8", device = "auto"))]
     fn in_memory(
         dim: usize,
-        max_tokens: usize,
         metric: &str,
         quantization: &str,
         device: &str,
     ) -> PyResult<Self> {
-        Self::new(None, dim, max_tokens, metric, quantization, device)
+        Self::new(None, dim, metric, quantization, device)
     }
 
     /// Queries the knowledge graph using a plain text prompt with automatic local embedding.
-    #[pyo3(signature = (text, top_k = 5, max_tokens = None, max_depth = None, alpha = None))]
+    #[allow(clippy::too_many_arguments)]
+    #[pyo3(signature = (text, top_k = 5, threshold = None, min_score = None, max_tokens = None, max_depth = None, alpha = None))]
     fn query(
         &self,
         text: &str,
         top_k: usize,
+        threshold: Option<f32>,
+        min_score: Option<f32>,
         max_tokens: Option<usize>,
         max_depth: Option<usize>,
         alpha: Option<f32>,
@@ -186,6 +185,9 @@ impl PyGraphite {
             .with_query_text(text)
             .with_top_k(top_k);
 
+        if let Some(t) = threshold.or(min_score) {
+            options = options.with_threshold(t);
+        }
         if let Some(mt) = max_tokens {
             options = options.with_max_tokens(mt);
         }
@@ -204,12 +206,15 @@ impl PyGraphite {
     }
 
     /// Retrieves prompt context using an explicit query vector.
-    #[pyo3(signature = (vector, query_text = None, top_k = 5, max_tokens = None, max_depth = None, alpha = None))]
+    #[allow(clippy::too_many_arguments)]
+    #[pyo3(signature = (vector, query_text = None, top_k = 5, threshold = None, min_score = None, max_tokens = None, max_depth = None, alpha = None))]
     fn retrieve_context(
         &self,
         vector: Vec<f32>,
         query_text: Option<String>,
         top_k: usize,
+        threshold: Option<f32>,
+        min_score: Option<f32>,
         max_tokens: Option<usize>,
         max_depth: Option<usize>,
         alpha: Option<f32>,
@@ -219,6 +224,9 @@ impl PyGraphite {
         let mut options = QueryOptions::default().with_top_k(top_k);
         if let Some(t) = query_text {
             options = options.with_query_text(t);
+        }
+        if let Some(thresh) = threshold.or(min_score) {
+            options = options.with_threshold(thresh);
         }
         if let Some(mt) = max_tokens {
             options = options.with_max_tokens(mt);

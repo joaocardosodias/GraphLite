@@ -17,7 +17,7 @@ fn test_full_ai_assistant_knowledge_graph_workflow() {
     let config = GraphiteConfig::new()
         .with_dim(4)
         .with_metric(Metric::Cosine)
-        .with_max_tokens(1000)
+        .with_threshold(0.50)
         .with_alpha(0.65)
         .with_max_depth(2)
         .with_auto_flush(true);

@@ -117,15 +117,6 @@ pub struct InitArgs {
     #[arg(short = 'q', long, value_enum, default_value_t = CliQuantization::ScalarInt8, help = "Quantization mode")]
     pub quantization: CliQuantization,
 
-    /// Default token budget allocated for LLM context retrieval.
-    #[arg(
-        short = 't',
-        long,
-        default_value_t = 2048,
-        help = "Default token budget for prompts"
-    )]
-    pub max_tokens: usize,
-
     /// Hardware acceleration execution device (auto, cpu, cuda).
     #[arg(
         long,
@@ -239,13 +230,21 @@ pub struct QueryArgs {
     #[arg(short = 'k', long, default_value_t = 5, help = "Top-K seed entries")]
     pub top_k: usize,
 
-    /// Maximum token budget for the returned prompt.
+    /// Maximum token budget for the returned prompt (optional, default: unlimited/threshold-driven).
     #[arg(
         short = 't',
         long,
-        help = "Token budget limit (overrides config default)"
+        help = "Token budget limit (optional)"
     )]
     pub tokens: Option<usize>,
+
+    /// Minimum relevance score threshold for entities to be included (e.g. 0.75, 0.80).
+    #[arg(
+        long = "threshold",
+        alias = "min-score",
+        help = "Minimum relevance score threshold (e.g. 0.75, 0.80)"
+    )]
+    pub threshold: Option<f32>,
 
     /// Maximum BFS graph exploration depth in hops.
     #[arg(long, help = "Maximum BFS search depth in hops (e.g. 1 or 2)")]

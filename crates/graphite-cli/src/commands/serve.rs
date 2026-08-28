@@ -22,6 +22,7 @@ use crate::ingestion::run_ingest_pass;
 #[derive(Debug, Deserialize)]
 pub struct QueryRequest {
     pub query: String,
+    pub threshold: Option<f32>,
     pub max_tokens: Option<usize>,
     pub top_k_seeds: Option<usize>,
     pub type_filter: Option<Vec<String>>,
@@ -234,6 +235,7 @@ pub fn execute_serve(db_path: &Path, args: &ServeArgs) -> Result<()> {
                                 let eng = engine_clone.read();
                                 let options = QueryOptions {
                                     top_k_seeds: req.top_k_seeds.unwrap_or(5),
+                                    min_score_threshold: req.threshold,
                                     max_tokens: req.max_tokens,
                                     type_filter: req.type_filter,
                                     redundancy_threshold: Some(0.82),

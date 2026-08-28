@@ -106,6 +106,12 @@ impl QueryOptions {
         self
     }
 
+    /// Sets the minimum relevance threshold for entities to be included (alias).
+    pub fn with_threshold(mut self, threshold: f32) -> Self {
+        self.min_score_threshold = Some(threshold);
+        self
+    }
+
     /// Sets an entity type filter list.
     pub fn with_type_filter<S: ToString>(mut self, types: &[S]) -> Self {
         self.type_filter = Some(types.iter().map(|t| t.to_string()).collect());
@@ -164,7 +170,7 @@ impl GraphiteEngine {
         let cache_key = if self.config.enable_cache {
             let key = QueryCacheKey::new(
                 query_vector,
-                opts.max_tokens,
+                opts.min_score_threshold,
                 opts.type_filter.as_deref(),
                 opts.top_k_seeds,
             );
@@ -268,7 +274,7 @@ impl GraphiteEngine {
         };
 
         if seed_matches.is_empty() {
-            let budget = opts.max_tokens.unwrap_or(self.config.default_max_tokens);
+            let budget = opts.max_tokens.unwrap_or(usize::MAX);
             return Ok(QueryResult {
                 markdown: String::new(),
                 token_count: 0,
@@ -309,76 +315,118 @@ impl GraphiteEngine {
             &hybrid_config,
         );
 
-        // 3.5. Apply Semantic Redundancy Deduplication (MMR / Diversity Filter)
-        let connected_subgraph = if let Some(redundancy_thresh) = opts.redundancy_threshold {
-            let mut deduped_entities: Vec<ScoredEntity> = Vec::new();
-            let mut deduped_node_ids = std::collections::HashSet::new();
+        // 3.1. Filter entities by relevance threshold
+        let min_threshold = opts
+            .min_score_threshold
+            .unwrap_or(hybrid_config.min_score_threshold);
 
-            for entity in connected_subgraph.entities {
-                let is_redundant = deduped_entities.iter().any(|selected| {
-                    // Check 1: Vector Cosine Similarity
-                    if let Some(sim) = state
-                        .vectors
-                        .similarity_between(entity.node_id, selected.node_id)
+        let initial_entities: Vec<ScoredEntity> = connected_subgraph
+            .entities
+            .into_iter()
+            .filter(|e| e.final_score >= min_threshold)
+            .collect();
+
+        // 3.2. Apply Multi-Strategy Semantic & Structural Deduplication
+        let mut deduped_entities: Vec<ScoredEntity> = Vec::with_capacity(initial_entities.len());
+        let mut deduped_node_ids = std::collections::HashSet::new();
+
+        for entity in initial_entities {
+            let node_id = entity.node_id;
+            let (node_name, desc) = if let Some(rec) = entity.node_record {
+                (
+                    state.interner.resolve(rec.name_id).unwrap_or(""),
+                    state.interner.resolve(rec.description_id).unwrap_or(""),
+                )
+            } else {
+                ("", "")
+            };
+
+            let is_duplicate = deduped_entities.iter().any(|selected| {
+                if selected.node_id == node_id {
+                    return true;
+                }
+
+                let (sel_name, sel_desc) = if let Some(rec) = selected.node_record {
+                    (
+                        state.interner.resolve(rec.name_id).unwrap_or(""),
+                        state.interner.resolve(rec.description_id).unwrap_or(""),
+                    )
+                } else {
+                    ("", "")
+                };
+
+                // Exact match or Subsumption (one description is contained inside another)
+                if !desc.is_empty() && !sel_desc.is_empty() {
+                    if desc == sel_desc {
+                        return true;
+                    }
+                    if desc.len() > 30
+                        && sel_desc.len() > 30
+                        && (desc.contains(sel_desc) || sel_desc.contains(desc))
                     {
+                        return true;
+                    }
+
+                    // High Lexical Jaccard Overlap (> 0.45)
+                    let words_a: std::collections::HashSet<&str> = desc.split_whitespace().collect();
+                    let words_b: std::collections::HashSet<&str> = sel_desc.split_whitespace().collect();
+                    if !words_a.is_empty() && !words_b.is_empty() {
+                        let inter = words_a.intersection(&words_b).count();
+                        let union = words_a.union(&words_b).count();
+                        if union > 0 {
+                            let jaccard = (inter as f32) / (union as f32);
+                            if jaccard >= 0.45 {
+                                return true;
+                            }
+                        }
+                    }
+                }
+
+                // Parent section / child chunk hierarchy overlap
+                if !node_name.is_empty()
+                    && !sel_name.is_empty()
+                    && (node_name.starts_with(sel_name) || sel_name.starts_with(node_name))
+                    && (node_name.contains("Part")
+                        || sel_name.contains("Part")
+                        || node_name.contains("Chunk")
+                        || sel_name.contains("Chunk"))
+                {
+                    return true;
+                }
+
+                // Vector cosine similarity redundancy check
+                if let Some(redundancy_thresh) = opts.redundancy_threshold {
+                    if let Some(sim) = state.vectors.similarity_between(node_id, selected.node_id) {
                         if sim >= redundancy_thresh {
                             return true;
                         }
                     }
-
-                    // Check 2: Content Token Jaccard Overlap
-                    if let (Some(rec_a), Some(rec_b)) = (entity.node_record, selected.node_record) {
-                        let desc_a = state.interner.resolve(rec_a.description_id).unwrap_or("");
-                        let desc_b = state.interner.resolve(rec_b.description_id).unwrap_or("");
-                        if !desc_a.is_empty() && !desc_b.is_empty() {
-                            let tokens_a: std::collections::HashSet<String> =
-                                crate::graph::bm25::Bm25Index::tokenize(desc_a)
-                                    .into_iter()
-                                    .collect();
-                            let tokens_b: std::collections::HashSet<String> =
-                                crate::graph::bm25::Bm25Index::tokenize(desc_b)
-                                    .into_iter()
-                                    .collect();
-                            if !tokens_a.is_empty() && !tokens_b.is_empty() {
-                                let intersection = tokens_a.intersection(&tokens_b).count();
-                                let union = tokens_a.union(&tokens_b).count();
-                                if union > 0 {
-                                    let jaccard = (intersection as f32) / (union as f32);
-                                    if jaccard >= 0.50 {
-                                        return true;
-                                    }
-                                }
-                            }
-                        }
-                    }
-
-                    false
-                });
-
-                if !is_redundant {
-                    deduped_node_ids.insert(entity.node_id);
-                    deduped_entities.push(entity);
                 }
-            }
 
-            let deduped_edges: Vec<crate::record::EdgeRecord> = connected_subgraph
-                .edges
-                .into_iter()
-                .filter(|e| {
-                    deduped_node_ids.contains(&e.source) && deduped_node_ids.contains(&e.target)
-                })
-                .collect();
+                false
+            });
 
-            crate::graph::subgraph::ConnectedSubgraph {
-                entities: deduped_entities,
-                edges: deduped_edges,
-                seed_ids: connected_subgraph.seed_ids,
+            if !is_duplicate {
+                deduped_node_ids.insert(node_id);
+                deduped_entities.push(entity);
             }
-        } else {
-            connected_subgraph
+        }
+
+        let deduped_edges: Vec<crate::record::EdgeRecord> = connected_subgraph
+            .edges
+            .into_iter()
+            .filter(|e| {
+                deduped_node_ids.contains(&e.source) && deduped_node_ids.contains(&e.target)
+            })
+            .collect();
+
+        let connected_subgraph = crate::graph::subgraph::ConnectedSubgraph {
+            entities: deduped_entities,
+            edges: deduped_edges,
+            seed_ids: connected_subgraph.seed_ids,
         };
 
-        // 3.6. Filter by Entity Type if specified (e.g. Function, Struct, DatabaseTable)
+        // 3.3. Filter by Entity Type if specified (e.g. Function, Struct, DatabaseTable)
         let connected_subgraph = if let Some(ref type_filters) = opts.type_filter {
             let normalized_filters: Vec<String> = type_filters
                 .iter()
@@ -422,8 +470,8 @@ impl GraphiteEngine {
             connected_subgraph
         };
 
-        // 4. Prune Subgraph by Token Budget with MMR Diversity
-        let token_budget = opts.max_tokens.unwrap_or(self.config.default_max_tokens);
+        // 4. Prune Subgraph by Token Budget with MMR Diversity (or return full threshold matches)
+        let token_budget = opts.max_tokens.unwrap_or(usize::MAX);
         let token_counter = TiktokenCounter::cl100k();
         let pruned_subgraph = prune_subgraph_by_budget_mmr(
             &connected_subgraph,
@@ -482,7 +530,7 @@ impl GraphiteEngine {
             }
         }
 
-        let budget = opts.max_tokens.unwrap_or(self.config.default_max_tokens);
+        let budget = opts.max_tokens.unwrap_or(usize::MAX);
         if seed_matches.is_empty() {
             return Ok(QueryResult {
                 markdown: String::new(),
@@ -564,7 +612,7 @@ mod tests {
 
     #[test]
     fn test_end_to_end_retrieve_context() {
-        let config = GraphiteConfig::new().with_dim(4).with_max_tokens(1000);
+        let config = GraphiteConfig::new().with_dim(4).with_threshold(0.10);
         let engine = GraphiteEngine::in_memory(config).unwrap();
 
         let v_titan = [1.0, 0.0, 0.0, 0.0];

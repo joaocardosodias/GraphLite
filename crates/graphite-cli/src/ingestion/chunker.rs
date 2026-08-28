@@ -150,38 +150,36 @@ pub fn chunk_markdown_document(
             relations: section_relations,
         });
 
-        // Split long sections into granular Chunks
+        // Split long multi-paragraph sections into granular Chunks
         let paragraphs = split_into_semantic_paragraphs(&full_section_text, config);
-        let mut prev_chunk_id: Option<String> = None;
+        if paragraphs.len() > 1 {
+            let mut prev_chunk_id: Option<String> = None;
 
-        for (p_idx, paragraph_text) in paragraphs.into_iter().enumerate() {
-            let chunk_node_name = if p_idx == 0 {
-                format!("{}: {} (Part 1)", file_basename, sec_title)
-            } else {
-                format!("{}: {} (Part {})", file_basename, sec_title, p_idx + 1)
-            };
+            for (p_idx, paragraph_text) in paragraphs.into_iter().enumerate() {
+                let chunk_node_name = format!("{}: {} (Part {})", file_basename, sec_title, p_idx + 1);
 
-            let mut chunk_relations = vec![
-                (section_node_name.clone(), "CHUNK_OF".to_string(), 0.95),
-                (doc_root_name.clone(), "PART_OF_DOC".to_string(), 0.85),
-            ];
+                let mut chunk_relations = vec![
+                    (section_node_name.clone(), "CHUNK_OF".to_string(), 0.95),
+                    (doc_root_name.clone(), "PART_OF_DOC".to_string(), 0.85),
+                ];
 
-            if let Some(prev) = prev_chunk_id {
-                chunk_relations.push((prev, "FOLLOWS".to_string(), 0.90));
+                if let Some(prev) = prev_chunk_id {
+                    chunk_relations.push((prev, "FOLLOWS".to_string(), 0.90));
+                }
+
+                prev_chunk_id = Some(chunk_node_name.clone());
+
+                out.push(DocumentChunk {
+                    chunk_id: chunk_node_name,
+                    title: format!("{} (Part {})", sec_title, p_idx + 1),
+                    chunk_type: "Chunk".to_string(),
+                    content: format!("[{}]\n{}", breadcrumb_header, paragraph_text.trim()),
+                    file_path: file_path.to_string(),
+                    line_number: section_start_line,
+                    section_hierarchy: breadcrumbs.clone(),
+                    relations: chunk_relations,
+                });
             }
-
-            prev_chunk_id = Some(chunk_node_name.clone());
-
-            out.push(DocumentChunk {
-                chunk_id: chunk_node_name,
-                title: format!("{} (Part {})", sec_title, p_idx + 1),
-                chunk_type: "Chunk".to_string(),
-                content: format!("[{}]\n{}", breadcrumb_header, paragraph_text.trim()),
-                file_path: file_path.to_string(),
-                line_number: section_start_line,
-                section_hierarchy: breadcrumbs.clone(),
-                relations: chunk_relations,
-            });
         }
     };
 

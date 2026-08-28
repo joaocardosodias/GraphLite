@@ -20,7 +20,7 @@ use serde::{Deserialize, Serialize};
 ///     .with_dim(384)
 ///     .with_metric(Metric::Cosine)
 ///     .with_quantization(Quantization::ScalarInt8)
-///     .with_max_tokens(1500);
+///     .with_threshold(0.70);
 ///
 /// assert_eq!(config.vector_dim, 384);
 /// assert!(config.validate().is_ok());
@@ -34,8 +34,6 @@ pub struct GraphiteConfig {
     pub metric: Metric,
     /// Vector quantization mode (full-precision Float32 vs 8-bit SQ8).
     pub quantization: Quantization,
-    /// Default token budget allocated for LLM context retrieval.
-    pub default_max_tokens: usize,
     /// Configuration for hybrid vector + graph relevance scoring.
     pub hybrid_config: HybridScoreConfig,
     /// Configuration for multi-hop graph BFS traversal.
@@ -66,7 +64,6 @@ impl Default for GraphiteConfig {
             vector_dim: 384,
             metric: Metric::Cosine,
             quantization: Quantization::ScalarInt8,
-            default_max_tokens: 2048,
             hybrid_config: HybridScoreConfig {
                 alpha: 0.6,
                 depth_decay: 0.85,
@@ -149,12 +146,6 @@ impl GraphiteConfig {
         self
     }
 
-    /// Sets the default maximum token budget for prompt context retrieval.
-    pub fn with_max_tokens(mut self, max_tokens: usize) -> Self {
-        self.default_max_tokens = max_tokens;
-        self
-    }
-
     /// Sets the alpha balancing factor ($0.0 \le \alpha \le 1.0$) for hybrid scoring:
     /// $\alpha \cdot \text{Vector} + (1 - \alpha) \cdot \text{Graph}$.
     pub fn with_alpha(mut self, alpha: f32) -> Self {
@@ -171,6 +162,18 @@ impl GraphiteConfig {
     /// Sets the maximum number of hops (depth) explored during graph traversal.
     pub fn with_max_depth(mut self, max_depth: usize) -> Self {
         self.traversal_config.max_depth = max_depth;
+        self
+    }
+
+    /// Sets the minimum hybrid score threshold for entities to be included during query retrieval.
+    pub fn with_min_score_threshold(mut self, threshold: f32) -> Self {
+        self.hybrid_config.min_score_threshold = threshold;
+        self
+    }
+
+    /// Sets the minimum relevance score threshold for entities to be included during query retrieval (alias).
+    pub fn with_threshold(mut self, threshold: f32) -> Self {
+        self.hybrid_config.min_score_threshold = threshold;
         self
     }
 
@@ -224,12 +227,6 @@ impl GraphiteConfig {
             ));
         }
 
-        if self.default_max_tokens == 0 {
-            return Err(GraphiteError::CorruptedFormat(
-                "Default max tokens must be greater than zero".to_string(),
-            ));
-        }
-
         if !(0.0..=1.0).contains(&self.hybrid_config.alpha) {
             return Err(GraphiteError::CorruptedFormat(
                 "Hybrid score alpha must be between 0.0 and 1.0".to_string(),
@@ -250,7 +247,7 @@ mod tests {
             .with_dim(1536)
             .with_metric(Metric::DotProduct)
             .with_quantization(Quantization::None)
-            .with_max_tokens(4096)
+            .with_threshold(0.75)
             .with_alpha(0.7)
             .with_max_depth(3)
             .with_auto_flush(false);
@@ -258,7 +255,7 @@ mod tests {
         assert_eq!(config.vector_dim, 1536);
         assert_eq!(config.metric, Metric::DotProduct);
         assert_eq!(config.quantization, Quantization::None);
-        assert_eq!(config.default_max_tokens, 4096);
+        assert_eq!(config.hybrid_config.min_score_threshold, 0.75);
         assert_eq!(config.hybrid_config.alpha, 0.7);
         assert_eq!(config.traversal_config.max_depth, 3);
         assert!(!config.auto_flush);
@@ -270,8 +267,5 @@ mod tests {
     fn test_config_validation_errors() {
         let invalid_dim = GraphiteConfig::new().with_dim(0);
         assert!(invalid_dim.validate().is_err());
-
-        let invalid_tokens = GraphiteConfig::new().with_max_tokens(0);
-        assert!(invalid_tokens.validate().is_err());
     }
 }

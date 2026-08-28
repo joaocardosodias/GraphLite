@@ -135,9 +135,9 @@ Graphite = _NativeGraphite
 def open(
     path: str = "knowledge.graph",
     dim: int = 384,
-    max_tokens: int = 400,
     metric: str = "cosine",
     quantization: str = "sq8",
+    device: str = "auto",
 ) -> Graphite:
     """
     Abre ou cria um arquivo de banco de dados `.graph`.
@@ -145,26 +145,26 @@ def open(
     return Graphite.open(
         path=path,
         dim=dim,
-        max_tokens=max_tokens,
         metric=metric,
         quantization=quantization,
+        device=device,
     )
 
 
 def in_memory(
     dim: int = 384,
-    max_tokens: int = 400,
     metric: str = "cosine",
     quantization: str = "sq8",
+    device: str = "auto",
 ) -> Graphite:
     """
     Cria um banco de dados efêmero em memória.
     """
     return Graphite.in_memory(
         dim=dim,
-        max_tokens=max_tokens,
         metric=metric,
         quantization=quantization,
+        device=device,
     )
 
 

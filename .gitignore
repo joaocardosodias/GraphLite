@@ -43,3 +43,6 @@ dist/
 wheels/
 target/wheels/
 
+AGENTS.md
+GEMINI.md
+.agents/rules/antigravity-rtk-rules.md

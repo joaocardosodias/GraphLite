@@ -211,7 +211,7 @@ impl<K: Clone + Eq + Hash, V: Clone> LruCache<K, V> {
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct QueryCacheKey {
     pub vector_hash: u64,
-    pub max_tokens: Option<usize>,
+    pub threshold: Option<u32>,
     pub type_filter: Option<Vec<String>>,
     pub top_k_seeds: usize,
 }
@@ -220,7 +220,7 @@ impl QueryCacheKey {
     /// Computes a hash key from a query vector and options.
     pub fn new(
         vector: &[f32],
-        max_tokens: Option<usize>,
+        threshold: Option<f32>,
         type_filter: Option<&[String]>,
         top_k_seeds: usize,
     ) -> Self {
@@ -232,7 +232,7 @@ impl QueryCacheKey {
 
         Self {
             vector_hash,
-            max_tokens,
+            threshold: threshold.map(|t| t.to_bits()),
             type_filter: type_filter.map(|f| f.to_vec()),
             top_k_seeds,
         }
