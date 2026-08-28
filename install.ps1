@@ -45,7 +45,13 @@ try {
     
     Write-Info "Graphite binary installed to $InstallDir\graphite.exe"
 } catch {
-    Write-ErrorExit "Failed to download and install binary archive."
+    if (Get-Command cargo -ErrorAction SilentlyContinue) {
+        Write-Info "Binary release not found. Attempting build via Cargo..."
+        cargo install --git "https://github.com/$Repo" graphite-db-cli --bin graphite --force
+        Write-Info "Installed graphite via Cargo."
+    } else {
+        Write-ErrorExit "Failed to download binary archive and Cargo is not installed."
+    }
 } finally {
     if (Test-Path $TempZip) { Remove-Item -Force $TempZip -ErrorAction SilentlyContinue }
     if (Test-Path $TempExtract) { Remove-Item -Recurse -Force $TempExtract -ErrorAction SilentlyContinue }

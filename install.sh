@@ -62,7 +62,7 @@ if curl -fSL -o "${TMP_DIR}/${ARCHIVE_NAME}" "${DOWNLOAD_URL}" 2>/dev/null; then
 else
     info "Binary release not found for ${TARGET}. Attempting build via Cargo..."
     if command -v cargo >/dev/null 2>&1; then
-        cargo install --git "https://github.com/${REPO}" graphite-cli
+        cargo install --git "https://github.com/${REPO}" graphite-db-cli --bin graphite --force
         info "Installed graphite via Cargo."
     else
         error "Failed to download pre-compiled binary and Cargo is not available."
