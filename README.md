@@ -102,6 +102,26 @@ graphite serve -d knowledge.graph --port 8080 --host 0.0.0.0
 
 ---
 
+## Docker & Container Deployment
+
+Run Graphite instantly via Docker or Docker Compose:
+
+```bash
+docker run -d \
+  --name graphite-engine \
+  -p 8080:8080 \
+  -v graphite-data:/data \
+  ghcr.io/joaocardosodias/graphite:latest
+```
+
+Or using `docker compose`:
+
+```bash
+docker compose up -d
+```
+
+---
+
 ## Rust SDK Example
 
 Add `graphite-db` to your `Cargo.toml`:
