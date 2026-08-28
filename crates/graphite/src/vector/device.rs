@@ -105,6 +105,7 @@ impl CudaStatus {
         }
 
         // 2. Check if an NVIDIA GPU is physically present on the PCI bus
+        #[allow(unused_mut)]
         let mut nvidia_gpu_found = false;
 
         #[cfg(target_os = "linux")]
