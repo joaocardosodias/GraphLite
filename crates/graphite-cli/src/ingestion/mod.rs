@@ -318,7 +318,10 @@ pub fn run_ingest_pass(
 
     // Process nodes in vectorized batches (512 on GPU Tensor Cores, 64 on CPU SIMD)
     let batch_size = if embedder.device().is_cuda() { 512 } else { 64 };
-    for (chunk_batch, text_batch) in all_chunks.chunks(batch_size).zip(formatted_texts.chunks(batch_size)) {
+    for (chunk_batch, text_batch) in all_chunks
+        .chunks(batch_size)
+        .zip(formatted_texts.chunks(batch_size))
+    {
         let vectors = embedder.embed_batch(text_batch)?;
 
         for (chunk, vector) in chunk_batch.iter().zip(vectors) {

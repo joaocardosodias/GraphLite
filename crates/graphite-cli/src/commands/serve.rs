@@ -328,7 +328,12 @@ pub fn execute_serve(db_path: &Path, args: &ServeArgs) -> Result<()> {
                                 no_tmp: false,
                             };
 
-                            match run_ingest_pass(&db_path_buf, &ingest_args, &embedder_clone, false) {
+                            match run_ingest_pass(
+                                &db_path_buf,
+                                &ingest_args,
+                                &embedder_clone,
+                                false,
+                            ) {
                                 Ok(modified) => {
                                     if modified {
                                         let new_cfg = load_or_default_config(&db_path_buf);

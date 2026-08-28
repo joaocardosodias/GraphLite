@@ -228,11 +228,7 @@ pub struct QueryArgs {
     pub top_k: usize,
 
     /// Maximum token budget for the returned prompt (optional, default: unlimited/threshold-driven).
-    #[arg(
-        short = 't',
-        long,
-        help = "Token budget limit (optional)"
-    )]
+    #[arg(short = 't', long, help = "Token budget limit (optional)")]
     pub tokens: Option<usize>,
 
     /// Minimum relevance score threshold for entities to be included (e.g. 0.75, 0.80).
@@ -306,11 +302,7 @@ pub struct IngestArgs {
     pub path: Option<std::path::PathBuf>,
 
     /// Direct text content to ingest into the database.
-    #[arg(
-        short = 't',
-        long = "text",
-        help = "Direct text content to ingest"
-    )]
+    #[arg(short = 't', long = "text", help = "Direct text content to ingest")]
     pub text: Option<String>,
 
     /// Optional document title or category when ingesting direct text.

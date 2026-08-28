@@ -156,7 +156,8 @@ pub fn chunk_markdown_document(
             let mut prev_chunk_id: Option<String> = None;
 
             for (p_idx, paragraph_text) in paragraphs.into_iter().enumerate() {
-                let chunk_node_name = format!("{}: {} (Part {})", file_basename, sec_title, p_idx + 1);
+                let chunk_node_name =
+                    format!("{}: {} (Part {})", file_basename, sec_title, p_idx + 1);
 
                 let mut chunk_relations = vec![
                     (section_node_name.clone(), "CHUNK_OF".to_string(), 0.95),

@@ -187,10 +187,8 @@ impl LocalReranker {
                 )
                 .with_cuda_graph(true)
                 .build();
-            options.execution_providers = vec![
-                cuda_ep,
-                ort::execution_providers::CPU::default().build(),
-            ];
+            options.execution_providers =
+                vec![cuda_ep, ort::execution_providers::CPU::default().build()];
         }
 
         #[cfg(not(feature = "cuda"))]

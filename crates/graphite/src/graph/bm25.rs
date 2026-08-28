@@ -41,7 +41,9 @@ pub fn fold_accents(s: &str) -> String {
             | 'Å' | 'Ā' | 'Ă' | 'Ą' => 'a',
             'é' | 'è' | 'ê' | 'ë' | 'ē' | 'ė' | 'ę' | 'ě' | 'É' | 'È' | 'Ê' | 'Ë' | 'Ē' | 'Ė'
             | 'Ę' | 'Ě' => 'e',
-            'í' | 'ì' | 'î' | 'ï' | 'ī' | 'į' | 'Í' | 'Ì' | 'Î' | 'Ï' | 'Ī' | 'Į' => 'i',
+            'í' | 'ì' | 'î' | 'ï' | 'ī' | 'į' | 'Í' | 'Ì' | 'Î' | 'Ï' | 'Ī' | 'Į' => {
+                'i'
+            }
             'ó' | 'ò' | 'õ' | 'ô' | 'ö' | 'ø' | 'ō' | 'ő' | 'Ó' | 'Ò' | 'Õ' | 'Ô' | 'Ö' | 'Ø'
             | 'Ō' | 'Ő' => 'o',
             'ú' | 'ù' | 'û' | 'ü' | 'ū' | 'ů' | 'ű' | 'ų' | 'Ú' | 'Ù' | 'Û' | 'Ü' | 'Ū' | 'Ů'
@@ -120,10 +122,10 @@ pub fn stem_portuguese(w: &str) -> Option<String> {
 
     // 2. Verb & Participle Reductions
     let verb_suffixes = [
-        "ando", "endo", "indo", "aram", "eram", "iram", "avam", "asse", "esse", "isse",
-        "aria", "eria", "iria", "ados", "adas", "idos", "idas", "ado", "ada", "ido", "ida",
-        "ara", "era", "ira", "ava", "iam", "emos", "imos", "amos", "eis", "ais", "ou", "eu",
-        "iu", "ar", "er", "ir", "em", "am",
+        "ando", "endo", "indo", "aram", "eram", "iram", "avam", "asse", "esse", "isse", "aria",
+        "eria", "iria", "ados", "adas", "idos", "idas", "ado", "ada", "ido", "ida", "ara", "era",
+        "ira", "ava", "iam", "emos", "imos", "amos", "eis", "ais", "ou", "eu", "iu", "ar", "er",
+        "ir", "em", "am",
     ];
 
     for suffix in verb_suffixes {

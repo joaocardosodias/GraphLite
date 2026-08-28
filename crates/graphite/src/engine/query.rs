@@ -380,8 +380,10 @@ impl GraphiteEngine {
                     }
 
                     // High Lexical Jaccard Overlap (> 0.45)
-                    let words_a: std::collections::HashSet<&str> = desc.split_whitespace().collect();
-                    let words_b: std::collections::HashSet<&str> = sel_desc.split_whitespace().collect();
+                    let words_a: std::collections::HashSet<&str> =
+                        desc.split_whitespace().collect();
+                    let words_b: std::collections::HashSet<&str> =
+                        sel_desc.split_whitespace().collect();
                     if !words_a.is_empty() && !words_b.is_empty() {
                         let inter = words_a.intersection(&words_b).count();
                         let union = words_a.union(&words_b).count();

@@ -148,12 +148,7 @@ impl PyGraphite {
     /// Creates an in-memory ephemeral Graphite instance.
     #[staticmethod]
     #[pyo3(signature = (dim = 384, metric = "cosine", quantization = "sq8", device = "auto"))]
-    fn in_memory(
-        dim: usize,
-        metric: &str,
-        quantization: &str,
-        device: &str,
-    ) -> PyResult<Self> {
+    fn in_memory(dim: usize, metric: &str, quantization: &str, device: &str) -> PyResult<Self> {
         Self::new(None, dim, metric, quantization, device)
     }
 
