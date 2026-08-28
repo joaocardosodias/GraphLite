@@ -5,11 +5,12 @@ FROM rust:1.85-slim-bookworm AS builder
 
 WORKDIR /app
 
-# Install compilation and linking dependencies
+# Install compilation, linking, and Python bindings header dependencies
 RUN apt-get update && apt-get install -y --no-install-recommends \
     pkg-config \
     libssl-dev \
     build-essential \
+    python3 \
     && rm -rf /var/lib/apt/lists/*
 
 # Copy workspace sources
