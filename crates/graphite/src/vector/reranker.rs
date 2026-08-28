@@ -180,8 +180,15 @@ impl LocalReranker {
 
         #[cfg(feature = "cuda")]
         if resolved_device.is_cuda() {
+            let cuda_ep = ort::execution_providers::CUDA::default()
+                .with_device_id(0)
+                .with_arena_extend_strategy(
+                    ort::execution_providers::ArenaExtendStrategy::SameAsRequested,
+                )
+                .with_cuda_graph(true)
+                .build();
             options.execution_providers = vec![
-                ort::execution_providers::CUDA::default().build(),
+                cuda_ep,
                 ort::execution_providers::CPU::default().build(),
             ];
         }
