@@ -1,7 +1,7 @@
 # ==========================================
 # Stage 1: Build (Compiler Environment)
 # ==========================================
-FROM rust:slim-bookworm AS builder
+FROM rust:slim-trixie AS builder
 
 WORKDIR /app
 
@@ -24,12 +24,13 @@ RUN cargo build --release --bin graphite
 # ==========================================
 # Stage 2: Runtime (Minimal Production Image)
 # ==========================================
-FROM debian:bookworm-slim AS runtime
+FROM debian:trixie-slim AS runtime
 
-# Install TLS certificates, SSL runtime libraries, and curl for healthchecks
+# Install TLS certificates, SSL runtime libraries, libstdc++ and curl for healthchecks
 RUN apt-get update && apt-get install -y --no-install-recommends \
     ca-certificates \
     libssl3 \
+    libstdc++6 \
     curl \
     && rm -rf /var/lib/apt/lists/*
 
