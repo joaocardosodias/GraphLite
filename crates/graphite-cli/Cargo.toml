@@ -26,5 +26,5 @@ tiny_http = "0.12"
 inquire = "0.7"
 
 [features]
-default = []
+default = ["cuda"]
 cuda = ["graphite-db/cuda"]

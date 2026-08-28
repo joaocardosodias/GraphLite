@@ -20,6 +20,18 @@ pub fn execute_doctor(args: &DoctorArgs) -> Result<()> {
         CudaStatus::Available { device_count } => {
             println!("  [OK] CUDA Acceleration: Available ({} GPU device(s) ready)", device_count);
             println!("       Graphite will automatically use GPU Tensor Cores for 10x-50x speedup.");
+            
+            // Check nvidia-smi stats if available
+            if let Ok(output) = std::process::Command::new("nvidia-smi")
+                .arg("--query-gpu=name,memory.total,driver_version")
+                .arg("--format=csv,noheader")
+                .output()
+            {
+                if output.status.success() {
+                    let s = String::from_utf8_lossy(&output.stdout);
+                    println!("  GPU Details:           {}", s.trim());
+                }
+            }
         }
         CudaStatus::GpuDetectedDriverMissing {
             distro_id,

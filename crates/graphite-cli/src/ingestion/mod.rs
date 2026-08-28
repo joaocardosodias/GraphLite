@@ -307,8 +307,8 @@ pub fn run_ingest_pass(
     let mut merged_entities_count = 0;
     let mut edges_created_count = 0;
 
-    // Process nodes in vectorized batches of 64 for massive ONNX SIMD throughput
-    let batch_size = 64;
+    // Process nodes in vectorized batches (256 on GPU Tensor Cores, 64 on CPU SIMD)
+    let batch_size = if embedder.device().is_cuda() { 256 } else { 64 };
     for chunk_batch in all_chunks.chunks(batch_size) {
         let texts: Vec<String> = chunk_batch
             .iter()

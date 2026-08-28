@@ -26,11 +26,11 @@ fastembed = { version = "6.0.0", optional = true }
 ort = { version = "2.0.0-rc.13", default-features = false, optional = true }
 
 [features]
-default = ["serde", "tiktoken", "fastembed"]
+default = ["serde", "tiktoken", "fastembed", "cuda"]
 serde = ["dep:serde", "dep:serde_json"]
 tiktoken = ["dep:tiktoken-rs"]
 fastembed = ["dep:fastembed", "dep:ort"]
-cuda = ["fastembed/cuda", "ort/cuda", "dep:ort"]
+cuda = ["ort/cuda", "dep:ort"]
 
 [dev-dependencies]
 tempfile = "3.17"
